@@ -313,7 +313,7 @@ export function createFakeChildSessions(queueDir: () => string): FakeChildSessio
 						if (!providerError && textPart && typeof textPart.text === "string" && (!sawProviderError || textPart.text.trim())) textPart.text = withAcceptanceReport(textPart.text, [launch.systemPrompt, launch.appendSystemPrompt, task].join("\n"));
 					}
 					// A real child's hook reports through the host's sink, not the session stream.
-					else emit(entry);
+					emit(entry);
 					await Promise.resolve();
 				}
 			};

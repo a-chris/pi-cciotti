@@ -18,6 +18,8 @@
 
 - **Removed parent↔child messaging.** The intercom/supervisor channel is gone: `contact_supervisor`/`subagent_supervisor` tools, the `intercomBridge` config and bridge prompt, result-intercom delivery, and pending-supervisor wait/auto-drain barriers were deleted. Subagents run one-shot and report back; a child that cannot safely complete returns `BLOCKED: <reason>` as a terminal completion status (`blocked` on the result and execution projection).
 
+- **M3.3b integration cleanup (watchdog removal follow-through).** The seven integration files left red by the watchdog deletion (`async-execution.part-4`, `slash-commands`, `render-widget`, `async-status`, `model-resolution-diagnostic`, `single-execution.part-2`, `external-cli-runner`) were excised of watchdog fixtures, describes, and assertions, and `single-execution.part-2` was deduplicated — the file had been doubled since `1d416cd1` and was parse-broken; the kept copy equals the pre-doubling baseline minus the intentional watchdog/lane/usageBudget excisions, with `contact_supervisor` renamed to `bg_wait` per the messaging removal. Stale assertions were updated or removed per the current contract, never skipped. The shared mock child-session fixture (`test/support/fake-child-session.ts`) additionally carried a dangling-`else` regression from the M3.3a trim (`cae19f1f`) that swallowed every scripted assistant `message_end`; it is restored to unconditional emission, which alone turned `single-execution.part-1` (98/98), `single-execution.part-2` (165/165), and `async-execution.part-4` (28/28) green with no test-body edits.
+
 ## [Unreleased]
 
 ### Fixed

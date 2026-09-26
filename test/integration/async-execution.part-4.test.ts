@@ -22,8 +22,8 @@ import { SUBAGENT_PROCESS_TERMINAL_EVENT } from "../../src/shared/types.ts";
 import { waitForSubagents } from "../../src/runs/background/subagent-wait.ts";
 import type { AsyncResultPayload, AsyncStatusPayload } from "../support/async-execution-fixture.ts";
 import {
-	installAsyncExecutionHooks, writeWatchdogSettings, withIsolatedWatchdogSettings,
-	childWatchdogStatus, available, isAsyncAvailable, executeAsyncSingle,
+	installAsyncExecutionHooks,
+	available, isAsyncAvailable, executeAsyncSingle,
 	executeAsyncChain, ASYNC_DIR, RESULTS_DIR, TEMP_ROOT_DIR, escapeRegExp,
 	createRepo, waitForAsyncResultFile, waitForAsyncState, tempDir, mockPi,
 	readAsyncPayload, waitForMockPiCall,
@@ -469,138 +469,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 		assert.match(result.content[0]?.text ?? "", /Failed to start async chain/);
 		assert.match(result.content[0]?.text ?? "", /async-cfg-/);
 	});
-
-	it("background ignores child watchdog status when child watchdogs are not configured", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
-		await withIsolatedWatchdogSettings(tempDir, async () => {
-			const id = `async-watchdog-unconfigured-${Date.now().toString(36)}`;
-			const terminalReleasePath = path.join(tempDir, `${id}-release`);
-			mockPi.onCall({
-				steps: [{ waitForPath: terminalReleasePath, jsonl: [events.assistantMessage("async-done-without-watchdog-config"), childWatchdogStatus(id, "reviewing", 1)] }],
-				keepAliveAfterFinalMessageMs: 10000,
-			});
-
-			executeAsyncSingle(id, {
-				agent: "worker",
-				task: "Do work",
-				agentConfig: makeAgent("worker"),
-				ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
-				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-				shareEnabled: false,
-				sessionRoot: path.join(tempDir, "sessions"),
-				maxSubagentDepth: 2,
-			});
-
-			await waitForMockPiCall(mockPi, 0);
-			// Measure final drain, not detached runner startup; terminal emission is still gated.
-			const start = Date.now();
-			fs.writeFileSync(terminalReleasePath, "release", "utf-8");
-			const resultPath = await waitForAsyncResultFile(id, 10_000);
-			const elapsed = Date.now() - start;
-			const payload = JSON.parse(fs.readFileSync(resultPath, "utf-8")) as AsyncResultPayload;
-			assert.ok(elapsed < 6000, `unconfigured watchdog status should not delay async final drain, took ${elapsed}ms`);
-			assert.equal(payload.success, true);
-			assert.equal(payload.results[0]?.output, "async-done-without-watchdog-config");
-			assert.equal((payload.results[0] as { watchdog?: unknown }).watchdog, undefined);
-		});
-	});
-
-	it("background final-drain waits for child watchdog settlement", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
-		await withIsolatedWatchdogSettings(tempDir, async () => {
-			writeWatchdogSettings(tempDir);
-			const id = `async-watchdog-drain-${Date.now().toString(36)}`;
-			mockPi.onCall({
-				steps: [
-					{ jsonl: [events.assistantMessage("async-done-before-watchdog"), childWatchdogStatus(id, "reviewing", 1)] },
-					{ delay: 1400, jsonl: [childWatchdogStatus(id, "idle", 2)] },
-				],
-				keepAliveAfterFinalMessageMs: 10000,
-			});
-
-			const start = Date.now();
-			executeAsyncSingle(id, {
-				agent: "worker",
-				task: "Do work",
-				agentConfig: makeAgent("worker"),
-				ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
-				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-				shareEnabled: false,
-				sessionRoot: path.join(tempDir, "sessions"),
-				maxSubagentDepth: 2,
-			});
-
-			const resultPath = await waitForAsyncResultFile(id, 10_000);
-			const elapsed = Date.now() - start;
-			const payload = JSON.parse(fs.readFileSync(resultPath, "utf-8")) as AsyncResultPayload;
-			assert.ok(elapsed >= 1200, `watchdog settlement should delay async final drain, took ${elapsed}ms`);
-			assert.ok(elapsed < 9000, `settled watchdog should still allow async cleanup, took ${elapsed}ms`);
-			assert.equal(payload.success, true);
-			assert.equal(payload.results[0]?.output, "async-done-before-watchdog");
-			assert.equal((payload.results[0] as { watchdog?: { phase?: string } }).watchdog?.phase, "idle");
-		});
-	});
-
-	it("background child watchdog tail timeout still finalizes successful output", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
-		await withIsolatedWatchdogSettings(tempDir, async () => {
-			writeWatchdogSettings(tempDir, 150);
-			const id = `async-watchdog-timeout-${Date.now().toString(36)}`;
-			mockPi.onCall({
-				jsonl: [events.assistantMessage("async-done-before-watchdog-timeout"), childWatchdogStatus(id, "reviewing", 1)],
-				keepAliveAfterFinalMessageMs: 10000,
-			});
-
-			const start = Date.now();
-			executeAsyncSingle(id, {
-				agent: "worker",
-				task: "Do work",
-				agentConfig: makeAgent("worker"),
-				ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
-				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-				shareEnabled: false,
-				sessionRoot: path.join(tempDir, "sessions"),
-				maxSubagentDepth: 2,
-			});
-
-			const resultPath = await waitForAsyncResultFile(id, 10_000);
-			const elapsed = Date.now() - start;
-			const payload = JSON.parse(fs.readFileSync(resultPath, "utf-8")) as AsyncResultPayload;
-			assert.ok(elapsed < 6000, `watchdog tail fallback should not hang async final drain, took ${elapsed}ms`);
-			assert.equal(payload.success, true);
-			assert.equal(payload.results[0]?.output, "async-done-before-watchdog-timeout");
-			const watchdog = (payload.results[0] as { watchdog?: { phase?: string; timedOut?: boolean } }).watchdog;
-			assert.equal(watchdog?.phase, "stale");
-			assert.equal(watchdog?.timedOut, true);
-		});
-	});
-
-	it("background runs carry unaddressed child watchdog blockers into the result payload and acceptance", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
-		await withIsolatedWatchdogSettings(tempDir, async () => {
-			writeWatchdogSettings(tempDir);
-			const id = `async-watchdog-blocker-${Date.now().toString(36)}`;
-			mockPi.onCall({ jsonl: [events.acceptanceReport(), events.watchdogStatusWarning("blocker", "Claims tests passed without running them", { runId: id, agent: "worker", childIndex: 0 })] });
-
-			executeAsyncSingle(id, {
-				agent: "worker",
-				task: "Do work",
-				agentConfig: makeAgent("worker"),
-				ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
-				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-				shareEnabled: false,
-				sessionRoot: path.join(tempDir, "sessions"),
-				maxSubagentDepth: 2,
-				acceptance: { level: "checked", criteria: ["Ship it"] },
-			});
-
-			const resultPath = await waitForAsyncResultFile(id, 10_000);
-			const payload = JSON.parse(fs.readFileSync(resultPath, "utf-8")) as AsyncResultPayload;
-			assert.equal(payload.success, false);
-			const child = payload.results[0] as AsyncResultPayload["results"][number] & { watchdog?: { warnings?: Array<{ severity: string; addressed: boolean; summary: string }> } };
-			assert.deepEqual(child.watchdog?.warnings?.map((warning) => [warning.severity, warning.addressed]), [["blocker", false]]);
-			const check = child.acceptance?.runtimeChecks?.find((entry) => entry.id === "watchdog-blocker");
-			assert.equal(check?.status, "failed");
-			assert.match(check?.message ?? "", /Unresolved watchdog blocker/);
-		});
-	});
-
 	it("background does not abort when a steer arrives after the final stop and turn_start is delayed", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
 		mockPi.onCall({
 			jsonl: [events.assistantMessage("before steer")],
@@ -651,29 +519,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			assert.equal(payload.results[0]?.output, "after continuation");
 		});
 	}
-
-	it("background ignores stale watchdog completion after resumed work", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
-		await withIsolatedWatchdogSettings(tempDir, async () => {
-			writeWatchdogSettings(tempDir);
-			const id = `async-resumed-watchdog-${Date.now().toString(36)}`;
-			mockPi.onCall({
-				steps: [
-					{ jsonl: [events.assistantMessage("before continuation"), { type: "turn_start" }, childWatchdogStatus(id, "idle", 1)] },
-					{ delay: 1400, jsonl: [events.assistantMessage("after continuation")] },
-				],
-			});
-			executeAsyncSingle(id, {
-				agent: "worker", task: "Do work", agentConfig: makeAgent("worker"),
-				ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
-				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-				shareEnabled: false, sessionRoot: path.join(tempDir, "sessions"), maxSubagentDepth: 2,
-			});
-			const payload = await readAsyncPayload(id);
-			assert.equal(payload.success, true, payload.results[0]?.error);
-			assert.equal(payload.results[0]?.output, "after continuation");
-		});
-	});
-
 	it("background forced drain after final assistant output is cleanup success", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
 		mockPi.onCall({
 			jsonl: [events.assistantMessage("async-done-before-drain")],

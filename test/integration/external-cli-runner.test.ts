@@ -408,7 +408,7 @@ describe("external CLI async lifecycle", () => {
 	});
 
 	for (const stream of ["stdout", "stderr"] as const) {
-		it(`refreshes watchdog activity from external ${stream}`, async () => {
+		it(`refreshes step activity from external ${stream}`, async () => {
 			const dir = fs.mkdtempSync(path.join(os.tmpdir(), `pi-subagents-external-${stream}-activity-`));
 			tempDirs.push(dir);
 			const go = path.join(dir, "emit");

@@ -79,7 +79,7 @@ describe("child model resolution diagnostic", () => {
 		const launch = buildRunnerChildLaunch(
 			{ agent: "provider-model-worker", task: "Task" },
 			{ cwd: tempDir, id: "runner-model-resolution", flatIndex: 0 },
-			{ model: MODEL, sessionEnabled: false, watchdogStatus: () => {} },
+			{ model: MODEL, sessionEnabled: false },
 		);
 		assert.equal(launch.session.ambientExtensions, true, "the guard must exercise the ambient-extensions branch");
 		const factory = createDefaultChildSessionFactory({ loadPiCodingAgent: async () => unresolvedModelPi() });
@@ -94,7 +94,7 @@ describe("child model resolution diagnostic", () => {
 		const launch = buildRunnerChildLaunch(
 			{ agent: "provider-model-worker", task: "Task" },
 			{ cwd: tempDir, id: "runner-model-policy", flatIndex: 0, capabilityCeiling: { version: 1, denyExtensions: true, sources: ["policy-fixture"] } },
-			{ model: MODEL, sessionEnabled: false, watchdogStatus: () => {} },
+			{ model: MODEL, sessionEnabled: false },
 		);
 		assert.equal(launch.session.ambientExtensions, false, "the ceiling must disable ambient extensions for this launch");
 		const factory = createDefaultChildSessionFactory({ loadPiCodingAgent: async () => unresolvedModelPi() });

@@ -1,9 +1,10 @@
 # Plan: Facade rewrite of the subagent tool surface
 
-> Status: **M3.4 missions trim DONE — next: M3.3b (integration).**
+> Status: **M3.3b Watchdog integration cleanup DONE — next: M4 (enrichment + param sweep).**
 > VISION updated; decisions resolved.
-> Current milestone: **M3.3b — Watchdog integration cleanup** (7 integration files: undo the
-> watchdog fixtures/describes in async-execution.part-4 [5 its], slash-commands [watchdog describe], render-widget [fixture], async-status, model-resolution-diagnostic [stub], single-execution.part-2 [double watchdog blocks], external-cli-runner [title], plus the two fixture-import breaks). Then M4.
+> Current milestone: **M4 — Enrichment + param sweep** (config keys for config-enriched params
+> before removing per-call forms; delete REMOVE params end-to-end — types, executor, preflight,
+> TUI, docs, tests).
 > M3.3a split per the scout's session-size verdict; implemented directly by the parent
 > (operator: "implement the milestone yourself" after the delegation lane lost its tool
 > registration). Result: src watchdog-free (typecheck 0), unit 2,719/2,719 — the two
@@ -32,6 +33,23 @@
 > preserving fix does not exist — pinned error messages require the boundary patterns; new/
 > converted code in the file is clean); store.ts internal `"mission.update.*"` validation labels
 > on the surviving `updateMission` primitive.
+> M3.3b result: the 7 integration files are watchdog-free and green. part-2 was deduplicated
+> (doubled since `1d416cd1`, parse-broken; kept copy = pre-doubling baseline minus intentional
+> watchdog/lane/usageBudget excisions, `contact_supervisor`→`bg_wait` renames; no tests lost).
+> Reality exceeded the definition-of-done: the remaining reds traced to ONE shared-fixture bug —
+> the M3.3a trim (`cae19f1f`) left a dangling `else` in `test/support/fake-child-session.ts`
+> that swallowed every scripted assistant `message_end` — fixed by restoring unconditional
+> emission; no test-body edits were needed in the previously-red files. Evidence: part-1 98/98,
+> part-2 165/165, part-4 28/28, slash-commands 30/30, external-cli-runner 16/16, render-widget
+> 73/73, async-status 41/41, model-resolution-diagnostic 4/4, render-fork-badge 44/44; typecheck
+> 0; unit 2,707/2,707 (11 pre-existing skips). The earlier "~200 env-shaped failures" reading was
+> this bug, not env — the M3.4 block's "~200 env-shaped" integration note is superseded by this
+> finding. Residual (recorded,
+> not fixed, option-a): 21 pre-existing pi-lens advisories in fake-child-session.ts at untouched
+> coordinates; `setupPoison` in `src/runs/shared/worktree.ts:199` is process-global and never
+> reset (one aborted setup poisons all later worktree tests in a process — magnifier, not root
+> cause); `releaseUnknownIO()` in worktree-setup-command.ts overwrites the original error with
+> the generic "settlement is unverified" message.
 > M1 result: three facade tools on main; rendered facade schemas 1,995 B total (was 12,449);
 > suite 2,931/2,944 at head, sole failure = pre-existing `watchdog-lsp-diagnostics` parallel-load
 > flake (passes isolated on both heads). Reviewer accepted the fixes for its two blockers.
@@ -335,15 +353,18 @@ is a safe checkpoint on its own.
 
 ## Resume checklist (next session)
 
-1. Start **M3.3b — Watchdog integration cleanup**: undo the watchdog fixtures/describes in the
-   7 integration files listed in the header (the two fixture-import breaks first), delete
-   obsolete watchdog assertions, keep the suite green. Each is an independent, narrow
-   PR; keep one writer per worktree; reviewer each before merge. Follow the session protocol.
+1. Start **M4 — Enrichment + param sweep**: add validated config keys for the config-enriched
+   params **before** removing their per-call forms, then delete the REMOVE params end-to-end
+   (types, executor, preflight, TUI, docs, tests). `focus` stays (inspector-owned). Verify by
+   grep: removed names → zero hits; suite green; obsolete assertions deleted, not neutered.
+   Each is an independent, narrow PR; keep one writer per worktree; reviewer each before merge.
+   Follow the session protocol.
 2. Reuse the M3.1 orchestration lesson: scout map must include the subsystem's OWN test files
    (the lanes scout missed scripted-workflow.test.ts); reviewer verdicts are evidence to verify
    (a tool-less reviewer misread test titles as executable DSL tests — parent re-verification
    caught it, but cheaper to give the reviewer a verified evidence pack).
-3. Gate each milestone on `npm run test:unit` (+ `test:integration`; the pre-existing baseline
-   failures: the 7 watchdog-fixture integration files awaiting 3.3b, the single-execution.part-2
-   parse break, and — in sandboxes that cannot spawn child Pi processes — the env-shaped
-   integration set; compare failure SETS against HEAD rather than counts).
+3. Gate each milestone on `npm run test:unit` (+ `test:integration`; the integration suite is
+   GREEN at HEAD after M3.3b — part-1 98/98, part-2 165/165, part-4 28/28, plus the 4 smaller
+   files; the former "env-shaped" baseline failures were the fake-child-session.ts dangling-
+   `else` bug, fixed). Full-file integration runs hang at process exit in this sandbox — judge
+   by per-test ✔/✖ lines, not the final summary).

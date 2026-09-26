@@ -4,8 +4,6 @@
  * subagent_control action:guide (e.g. tool-reference, workflows, agents).
  */
 
-import type { ExtensionConfig, ToolDescriptionMode } from "../shared/types.ts";
-
 export const SUBAGENT_TOOL_PROMPT_SNIPPET = "For operator-requested delegation, use subagents; compose multi-child work in one workflow call.";
 export const SUBAGENT_TOOL_PROMPT_GUIDELINES = [
 	"Do not invoke subagents unless the operator requested delegation directly or through applicable instructions.",
@@ -16,8 +14,7 @@ export interface SubagentToolPromptMetadata {
 	promptGuidelines?: string[];
 }
 
-export function buildSubagentToolPromptMetadata(config: Pick<ExtensionConfig, "toolDescriptionMode"> = {}): SubagentToolPromptMetadata {
-	if (config.toolDescriptionMode !== undefined) return {};
+export function buildSubagentToolPromptMetadata(): SubagentToolPromptMetadata {
 	return {
 		promptSnippet: SUBAGENT_TOOL_PROMPT_SNIPPET,
 		promptGuidelines: SUBAGENT_TOOL_PROMPT_GUIDELINES,

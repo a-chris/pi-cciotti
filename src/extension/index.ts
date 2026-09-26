@@ -696,7 +696,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		name: SUBAGENT_DELEGATION_TOOL,
 		label: "Subagent",
 		description: SUBAGENT_DELEGATION_DESCRIPTION,
-		...buildSubagentToolPromptMetadata(config),
+		...buildSubagentToolPromptMetadata(),
 		parameters: SubagentDelegationParams,
 
 		async execute(id, params, signal, onUpdate, ctx) {

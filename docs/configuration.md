@@ -76,16 +76,6 @@ For a native Pi `model_verification_failed` where your proxy accepts `claude-hai
 
 Replace `YOUR_PROVIDER` with the resolved Pi provider ID. Keep the outgoing model alias unchanged. This native remedy already exists in v0.65.1; it does not infer equivalence from provider prefixes or dates. Generic `external-cli` runs do not invoke this verifier or use this setting. If an external run shows this diagnostic, identify the installed version and resolved runner before applying a native remedy. Thanks to [sixtus](https://github.com/sixtus) for the concrete request-ID/response-ID example in [#1922](https://github.com/nicobailon/pi-subagents/issues/1922).
 
-## `toolDescriptionMode`
-
-```json
-{ "toolDescriptionMode": "compact" }
-```
-
-Controls the parent-facing `subagent` tool description registered at startup. The default registers the compact execution/safety description plus separate `promptSnippet` and `promptGuidelines`. That metadata explains use after operator-authorized delegation; it does not route ordinary work to children or independently authorize delegation. Explicit `"compact"` uses the same description without that extra metadata; `"full"` adds workflow and management detail, also without split metadata. All modes retain the same flat parameter schema. Extended examples and recipes are available on demand through `action:"guide"` and the bundled pi-subagents skill; full mode is not an exhaustive manual. Count the separate default metadata as well as the tool definition when comparing prompt footprints.
-
-`custom` reads `subagent-tool-description.md` from the project config directory, then from `~/.pi/agent/subagent-tool-description.md`. Missing, empty, unreadable, or oversized custom files fall back to the full description. Custom templates may use `{{fullDescription}}`, `{{compactDescription}}`, `{{safetyGuidance}}`, `{{agentDir}}`, and `{{projectConfigDir}}`; the safety guidance is always present so custom prose cannot remove the runtime guardrails. Restart Pi after changing the mode or custom file.
-
 ## `inlineToolDisplay`
 
 ```json
@@ -413,6 +403,10 @@ Overrides host-package discovery for spawned children. Foreground CLI resolution
 ## Removed: parent↔child messaging (`intercomBridge`, `contact_supervisor`)
 
 The parent↔child messaging channel was removed: subagents run one-shot and report back. A child that cannot safely or legitimately complete its task stops and returns `BLOCKED: <reason>` as a terminal completion status, which the parent observes on the result (`blocked`) and execution projection (`status: "blocked"`). There is no `intercomBridge` config, no `contact_supervisor`/`subagent_supervisor` tools, and no `instructionFile`/`resultDelivery` options. If the key appears in an existing config file it is ignored; old guidance to "reply to a pending supervisor request" no longer applies.
+
+## Removed: tool description modes (`toolDescriptionMode`)
+
+The facade registers one short description per tool and depth is on demand through `subagent_control` with `action: "guide"`, so there is nothing left to select between modes. `toolDescriptionMode` was removed: `full`, `compact`, and `custom` all resolved to the same schema, and `compact` was a no-op alias. There is no mode config, no `subagent-tool-description.md` template lookup, and no `{{fullDescription}}`/`{{compactDescription}}`/`{{safetyGuidance}}` substitution. A config file that still sets `toolDescriptionMode` fails to load with an explicit error rather than being ignored.
 
 ## `worktreeBaseDir`
 

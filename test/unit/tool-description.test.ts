@@ -71,9 +71,6 @@ describe("subagent facade tool descriptions", () => {
 		assert.deepEqual(metadata.promptGuidelines, SUBAGENT_TOOL_PROMPT_GUIDELINES);
 		assert.ok(Buffer.byteLength(metadata.promptGuidelines!.join("\n")) < 400);
 		for (const guideline of metadata.promptGuidelines!) assert.match(guideline, /subagent/);
-		for (const toolDescriptionMode of ["full", "compact", "custom"] as const) {
-			assert.deepEqual(buildSubagentToolPromptMetadata({ toolDescriptionMode }), {});
-		}
 	});
 });
 

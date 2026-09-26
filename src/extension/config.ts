@@ -1,5 +1,4 @@
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { Key } from "@earendil-works/pi-tui";
 import { FLEET_KEYBINDING_ACTIONS, type ArtifactDirPreference, type ExtensionConfig } from "../shared/types.ts";
@@ -10,6 +9,7 @@ import { validatePermissionConfig } from "../runs/shared/permissions.ts";
 import { MAX_ABANDONED_SLOT_RELEASE_AFTER_MS, MIN_ABANDONED_SLOT_RELEASE_AFTER_MS } from "../runs/background/active-async-capacity.ts";
 import { normalizeWorktreeBranchPrefix } from "../runs/shared/worktree.ts";
 import { validateModelResponseAliases } from "../shared/model-response-aliases.ts";
+import { validateToolBudgetConfig } from "../runs/shared/tool-budget.ts";
 
 const ARTIFACT_DIR_PREFERENCES = new Set<ArtifactDirPreference>(["project", "session", "temp"]);
 const FLEET_KEYBINDING_ACTION_SET = new Set<string>(FLEET_KEYBINDING_ACTIONS);
@@ -18,6 +18,9 @@ const BASE_KEY_IDS = new Set([
 	..."abcdefghijklmnopqrstuvwxyz0123456789",
 	...Object.values(Key).flatMap((value) => typeof value === "string" ? [value.toLowerCase()] : []),
 ]);
+const CONTROL_EVENT_TYPES = ["active_long_running", "needs_attention"] as const;
+const CONTROL_NOTIFICATION_CHANNELS = ["event", "async"] as const;
+const MAX_CONFIG_DELAY_MS = 2_147_483_647;
 
 class PrunedForkConfigError extends Error {}
 
@@ -127,6 +130,50 @@ function validateMainWindowRendererConfig(value: unknown): void {
 	}
 }
 
+function validatePositiveConfigDelay(value: unknown, label: string): void {
+	if (value !== undefined
+		&& (typeof value !== "number"
+			|| !Number.isInteger(value)
+			|| value <= 0
+			|| value > MAX_CONFIG_DELAY_MS)) {
+		throw new Error(`${label} must be a positive integer no larger than ${MAX_CONFIG_DELAY_MS}`);
+	}
+}
+
+function validateControlConfig(value: unknown): void {
+	if (value === undefined) return;
+	if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("config.control must be a JSON object");
+	const config = value as Record<string, unknown>;
+	const supportedKeys = new Set([
+		"enabled",
+		"needsAttentionAfterMs",
+		"activeNoticeAfterMs",
+		"activeNoticeAfterTurns",
+		"activeNoticeAfterTokens",
+		"failedToolAttemptsBeforeAttention",
+		"notifyOn",
+		"notifyChannels",
+	]);
+	for (const key of Object.keys(config)) {
+		if (!supportedKeys.has(key)) throw new Error(`config.control.${key} is not supported`);
+	}
+	if (config.enabled !== undefined && typeof config.enabled !== "boolean") {
+		throw new Error("config.control.enabled must be a boolean");
+	}
+	for (const key of ["needsAttentionAfterMs", "activeNoticeAfterMs", "activeNoticeAfterTurns", "activeNoticeAfterTokens", "failedToolAttemptsBeforeAttention"]) {
+		validatePositiveConfigDelay(config[key], `config.control.${key}`);
+	}
+	const validateList = (key: "notifyOn" | "notifyChannels", allowed: readonly string[]): void => {
+		const raw = config[key];
+		if (raw === undefined) return;
+		if (!Array.isArray(raw) || raw.some((entry) => typeof entry !== "string" || !allowed.includes(entry))) {
+			throw new Error(`config.control.${key} must be an array containing only ${allowed.map((entry) => `"${entry}"`).join(" or ")}`);
+		}
+	};
+	validateList("notifyOn", CONTROL_EVENT_TYPES);
+	validateList("notifyChannels", CONTROL_NOTIFICATION_CHANNELS);
+}
+
 function validateConfig(config: Record<string, unknown>): void {
 	if (config.worktree !== undefined && typeof config.worktree !== "boolean") {
 		throw new Error("config.worktree must be a boolean");
@@ -140,6 +187,14 @@ function validateConfig(config: Record<string, unknown>): void {
 	}
 	validateForkContextConfig(config.forkContext);
 	validateSummaryContextConfig(config.summaryContext);
+	// Launch defaults the executor enriches with (config > built-in default). Model
+	// defaults are NOT here: `subagents.defaultModel` in Pi settings owns them, and a
+	// second model-default path in this config would disagree with it.
+	validatePositiveConfigDelay(config.timeoutMs, "config.timeoutMs");
+	validatePositiveConfigDelay(config.toolTimeoutMs, "config.toolTimeoutMs");
+	validateControlConfig(config.control);
+	const toolBudget = validateToolBudgetConfig(config.toolBudget, "config.toolBudget");
+	if (toolBudget.error) throw new Error(toolBudget.error);
 	if (config.checkpointBeforeDeadlineMs !== undefined
 		&& (typeof config.checkpointBeforeDeadlineMs !== "number"
 			|| !Number.isInteger(config.checkpointBeforeDeadlineMs)
@@ -170,6 +225,7 @@ function validateConfig(config: Record<string, unknown>): void {
 	validateArtifactConfig(config.artifactConfig);
 	validateCapacityConfig(config.capacity);
 	if (config.modelExclusions !== undefined) throw new Error("config.modelExclusions was removed; model failures are no longer persisted or used for automatic switching");
+	if (config.toolDescriptionMode !== undefined) throw new Error("config.toolDescriptionMode was removed; the facade tool descriptions are fixed and depth lives in guide topics");
 	validateModelResponseAliases(config.modelResponseAliases);
 	validateMainWindowRendererConfig(config.mainWindowRenderer);
 	validateOrcaProgressTabsConfig(config.orcaProgressTabs);
@@ -217,7 +273,7 @@ export function loadConfig(): ExtensionConfig {
 		try {
 			const raw = JSON.parse(fs.readFileSync(configPath, "utf-8")) as unknown;
 			if (raw && typeof raw === "object" && !Array.isArray(raw)
-				&& (Object.hasOwn(raw, "worktreeProvider") || Object.hasOwn(raw, "worktreeBranchPrefix") || Object.hasOwn(raw, "modelResponseAliases") || Object.hasOwn(raw, "modelExclusions") || Object.hasOwn(raw, "checkpointBeforeDeadlineMs"))) throw error;
+				&& (Object.hasOwn(raw, "worktreeProvider") || Object.hasOwn(raw, "worktreeBranchPrefix") || Object.hasOwn(raw, "modelResponseAliases") || Object.hasOwn(raw, "modelExclusions") || Object.hasOwn(raw, "toolDescriptionMode") || Object.hasOwn(raw, "checkpointBeforeDeadlineMs") || Object.hasOwn(raw, "timeoutMs") || Object.hasOwn(raw, "toolTimeoutMs") || Object.hasOwn(raw, "toolBudget") || Object.hasOwn(raw, "control"))) throw error;
 		} catch (readError) {
 			if (readError === error) throw error;
 		}

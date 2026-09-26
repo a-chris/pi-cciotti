@@ -2293,7 +2293,6 @@ export interface ProactiveSkillSubagentsConfig {
 	preferredAgent?: string;
 }
 
-export type ToolDescriptionMode = "full" | "compact" | "custom";
 export type InlineToolDisplay = "rich" | "summary";
 
 export type FleetViewPlacement = "aboveEditor" | "belowEditor";
@@ -2369,8 +2368,6 @@ export interface ExtensionConfig {
 	asyncWidget?: boolean;
 	/** Exact provider/model candidates mapped to operator-declared equivalent response IDs. Empty arrays add no accepted IDs. */
 	modelResponseAliases?: Record<string, string[]>;
-	/** Tool description variant registered for the parent-facing subagent tool. Defaults to split metadata. */
-	toolDescriptionMode?: ToolDescriptionMode;
 	/** Inline chat rendering for the subagent tool. Defaults to rich. */
 	inlineToolDisplay?: InlineToolDisplay;
 	/** Density controls for the main chat subagent call/result renderer. */

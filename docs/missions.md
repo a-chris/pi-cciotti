@@ -17,7 +17,7 @@ Records created under the old default `<project>/.pi/subagents/missions` stay on
 
 Behavior:
 
-- Automatic persistence failures do not block the run and are reported as `details.missionWarning`. Explicit `missionId` and `mission` requests remain strict before launch.
+- Automatic persistence failures do not block the run and are reported as `details.missionWarning`. Explicit `mission` requests remain strict before launch.
 - Human receipts end with `Mission: <id> (<status>)`, while JSON/structured output text stays unchanged and `details.missionId` is authoritative.
 - Pass `mission: false` for an intentionally ephemeral workflow. It creates no mission for the workflow or its children and has no `state` global.
 - Set `missions.enabled: false` to disable automatic mission creation; explicit mission fields still work.
@@ -29,10 +29,6 @@ An explicit `mission` object must have exactly one non-empty `title` or `summary
 const created = subagent({
   action: "mission.create",
   mission: { title: "Ship auth refresh", objective: "Implement and validate token refresh" }
-})
-subagent({
-  workflowScript: `return runs.run("main", { agent: "worker", task: "Implement the approved auth refresh plan" })`,
-  missionId: "<mission-id>"
 })
 
 // Or create and attach in one launch

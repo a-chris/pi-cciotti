@@ -389,6 +389,15 @@ it documents and each rejected key throws. 2715 / 0 / 11.
     depth-0 as the intentional kill switch. **Default: option 2** (VISION: removal over compatibility;
     a capability with no reachable non-zero depth is not a capability), but it is a user-facing removal
     of a documented key, so it needs the owner's yes.
+  - **U2b-2 candidate found (measured):** the Herdr-panes removal left `project.open`/`project.status`/
+    `project.close` in `SUBAGENT_ACTIONS` (types.ts:2552) with **no handler** in the executor — they
+    fall through to "Unknown action", and the enum is built from that list. `authorityPolicy.projectOpen`
+    (authority.ts:8,22) is a **documented** config key (`docs/configuration.md:486`) whose only consumer
+    was that removed path — the same phantom-validator class U1 deleted. Also two schema descriptions
+    still mention `project.open` (schemas.ts:284,288). Plan's action long-tail already says remove
+    `project.*`; do it as one narrow unit (enum entries, policy action + default, 2 schema descriptions,
+    docs row, `test/unit/authority-policy.test.ts` assertions, CHANGELOG — user-facing key removal).
+    `focus` (REMOVE list) is the adjacent same-file edit.
 - **U3** trim the 68-key pool to facade/RPC-derivable keys, delete dead schemas
   (`ChainItem`, `ParallelTaskSchema`, `Dynamic*Schema`); **U4** add `topic`/script-source/`mission`
   to the control facade + `normalizeControlParams`; **U5** the REMOVE-list params end-to-end.

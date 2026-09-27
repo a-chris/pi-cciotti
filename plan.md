@@ -107,18 +107,42 @@ Five items, small and bounded:
    params. Fixing the second exposed a hole in the docs parser — it dropped any literal without an
    `action:`, so no delegation or workflow example had ever been shape-checked; it now reports all
    of them.
-5. **Green suites, then release** — version bump, consolidated CHANGELOG, push, and one recorded
-   real-session smoke run: the extension loads and one delegation, one workflow, and one control call
-   each work end to end.
+5. **Green suites, then release — DONE (2026-09-27).** v0.69.0: `package.json` + lockfile bumped
+   from the upstream 0.68.0, CHANGELOG consolidated, annotated tag, pushed to `origin/main`.
+
+   **Recorded real-session smoke** (real `pi` 0.85.1 CLI, `pi -p --offline --approve -ne -e
+   ./index.ts --mode json`, judgement taken from the JSON transcript's `tool_execution_end` records,
+   never from model prose): the extension loads and registers the three facades; `subagent_control
+   {action:"list"}` printed the live registry; **D10's two new routes drove for real** —
+   `{action:"get",agent:"reviewer"}` returned reviewer's full field set and
+   `{action:"mission.create",mission:{title:"Smoke mission",labels:["smoke"]}}` returned
+   *Created mission e8ba843c-…*; a delegation
+   `subagent {task, agent:"worker"}` ran a child that returned `pi-subagents`; and a foreground
+   workflow `runs.all([{key:"a",agent:"worker",…}])` reported *Workflow completed* with its child
+   finishing in 3.5s. Two further observations, both favourable to the design: a capable model was
+   instructed verbatim to make an agent-less `subagent({task})` call and **refused**, stating the
+   arguments did not match the tool schema (D11's requirement is legible from the model side); and a
+   tiny local model that improvised `agent`→`id` and `mission`→`message` got targeted validation
+   errors back rather than a silent misfire. `validate` was never emitted by either model.
+
+   One smoke attempt failed *outside this repo*: the async child recorded
+   `Agent 'scout' requested unavailable child tools: contact_supervisor`. Repo `agents/` and `src/`
+   contain zero references (cleaned in `1d416cd1`); the cause is the operator's global override
+   `~/.pi/agent/agents/scout.md`, which still allowlists the removed tool and shadows the builtin
+   scout. The retry on an agent with no override passed. Operator action: delete that stale override
+   file or drop `contact_supervisor` from its `tools` line — children now report `BLOCKED: <reason>`
+   instead of calling a supervisor tool.
 
 **Measured size of (2)+(3):** the three facade schemas render at **1,995** chars today; the five added
 params cost **601** (`topic` 27, `agent` 81, `source` 2, `args` 242, `mission` 249) → **2,596**,
 inside the existing 3,000-char test threshold, plus roughly 200 for the descriptions `topic` and
 `source` still lack. The byte budget does not have to move.
 
-**Shipped size (D9 + D10 + D11):** 1,008 + 624 + 959 = **2,591** chars, still inside the 3,000
-threshold enforced by `schemas.test.ts`. D10b kept it there: `source` + `args` never landed on
-control, so the real cost was 334 (`topic` 27 + `agent` 81 + `mission` 249) against the planned 601.
+**Shipped size (D9 + D10 + D10b + D11):** delegation 1,008 + workflow 624 + control 935 =
+**2,567** chars, inside the 3,000 threshold enforced by `schemas.test.ts`. Measured, not estimated:
+D10's `agent` + `mission` cost **+333** on control (935 with them, 602 without), and dropping
+`validate` from the enum paid back 18. Net over D9's 647-char control schema: **+288**.
+D10b is why the budget held — `source` + `args` never landed on control.
 
 **Acceptance for "fully working" (not a demo):** `tsc` 0; unit + integration green; the docs contract
 test green with `topic` no longer an exception; and one recorded end-to-end run of each facade mode

@@ -414,9 +414,25 @@ it documents and each rejected key throws. 2715 / 0 / 11.
     (legacy top-level chain/parallel input is rejected in `public-execution`). `OutputOverride`,
     `ReadsOverride`, `ChainGateOverride` became definition-only and went with them: 119 lines, pool
     unchanged at 56 keys, 2686 pass / 0 fail, integration `in-process-child` 25/25.
-  - **Pool measured: 56 keys, not 68** (the plan's figure predates M1–M3). Remaining U3b/U5 work is the
+  - **Reachability, not reference-count, is the U3b test.** Measured per key: the model can pass 15
+    keys across the three facades; `rpc.ts` writes 14 more into its per-method params; slash adds
+    `agentScope`/`config`/`control`/`index`/`view`/`workflowScript`. That leaves **37 pool keys no entry
+    point can deliver**, each with live executor *readers* but no producer — dead-read branches, which
+    is exactly what the pool trim should take. `createSubagentParamsSchema` (schemas.ts:231) has zero
+    callers and should go with them.
+  - **`tsconfig.json` includes only `index.ts` + `src/**` — `tsc` cannot see `test/`.** This is the
+    mechanism behind the U2b-3 local-interface lesson, and it generalises: any signature/shape change to
+    an exported helper needs the test files swept by hand, because typecheck will stay green regardless.
+  - **U3b-1 DONE — `chatProgress` removed** (pool 56 → 55). Unreachable from every entry point *and* on
+    the REMOVE list. With no way to request a mode, `auto` is the only behaviour, so
+    `resolveWorkflowChatProgress` lost its `requested` input and both error returns (both were
+    `requested`-only) — it is now total, returning `WorkflowChatProgressProjection` directly. Kept
+    `details.chatProgress` and the whole TUI live-card path, which are live. Tests: the impossible
+    `explicit off` rendering scenario was deleted, not neutered; `schemas.test.ts` now asserts the key is
+    absent from the public pool. `tsc` 0, 2653 pass / 0 fail / 11 skipped, integration 914 / 0 / 1.
+  - **Pool measured: 56 keys, not 68** (the plan's figure predates M1–M3; now 55). Remaining U3b/U5 work is the
     REMOVE-list survivors still in the pool — cheapest first by `src`/`test` file count:
-    `steeringRecovery` 4/2, `additional` 6/8, `handoffPath` 5/6, `share`/`sessionDir`/`chatProgress`,
+    `steeringRecovery` 4/2, `additional` 6/8, `handoffPath` 5/6, `share`/`sessionDir`,
     then `childId` 15/13, `repo` 8/42. `merge`/`supersession`/`sessionOnly`/`quiet` as *params* are
     already gone (M3); `planId` survives only as an internal cleanup-plan field, not a param.
   - **M3 already covered by earlier milestones** — `schedule.*`/`watchdog.*`/`lane` count zero in
@@ -438,6 +454,15 @@ it documents and each rejected key throws. 2715 / 0 / 11.
     always `undefined` in production — the same dead-plumbing shape U2a/U2b-1 removed. It is a large
     blast radius (status tree, run-id resolution, runner self-events), so scope it deliberately rather
     than folding it into a key trim.
+
+**pi-lens residual added in U3b-1 (recorded, not fixed — option-a precedent).** The lens gate fires on
+`src/extension/schemas.ts` L5–22 (`pruneNestedDescriptions`: `unknown` param/return, two `typeof`
+narrowings, an assertion without `SAFETY:`) and on `src/workflows/chat-progress.ts` L95–98 (`cleanLabel`:
+`unknown` param + `typeof`). Both regions are **byte-identical to HEAD** (`git diff` shows the only
+schemas.ts change is the deleted `chatProgress` line; `cleanLabel` appears in zero diff lines), and
+`pruneNestedDescriptions` was introduced by `a512bb7f`, which `git merge-base` confirms is an ancestor of
+the M4 start — carried baseline, not this milestone's code. The one finding on a line I actually wrote
+(chat-progress.ts conditional spread) was fixed.
 
 **pi-lens residual (recorded, not fixed — option-a precedent, sessions 4–6).** `src/extension/index.ts`
 reports 26 findings (17 errors: `no-runtime-typeof`, `require-exact-type`,

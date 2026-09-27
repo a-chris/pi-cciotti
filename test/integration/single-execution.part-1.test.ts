@@ -52,7 +52,7 @@ import { registerSubagentCapabilityCeiling } from "../../src/api/capability-ceil
 describe("single sync execution", { skip: !available ? "pi packages not available" : undefined }, () => {
 	installSingleExecutionHooks();
 
-	it("streams bounded concurrent synchronous workflow activity with chatProgress off", async () => {
+	it("streams bounded concurrent synchronous workflow activity", async () => {
 		for (const [task, tool] of [["Child A", "read"], ["Child B", "bash"]]) {
 			mockPi.onCall({ matchArgIncludes: task, steps: [
 				{ jsonl: Array.from({ length: 100 }, () => ({ type: "tool_execution_start", toolCallId: tool, toolName: tool, args: { secret: "not-forwarded" } })) },
@@ -63,7 +63,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 		const updates: any[] = [];
 		const result = await makeExecutor([makeAgent("worker")]).execute("wf-activity", {
 			workflowScript: `return await runs.all([{ key: "a", agent: "worker", task: "Child A", async: false }, { key: "b", agent: "worker", task: "Child B", async: false }]);`,
-			async: false, chatProgress: "off",
+			async: false,
 		}, undefined, (update) => updates.push(structuredClone(update.details)), makeMinimalCtx(tempDir));
 		assert.equal(result.isError, undefined, JSON.stringify(result.content));
 		for (const [key, tool] of [["a", "read"], ["b", "bash"]]) {

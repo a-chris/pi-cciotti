@@ -4,9 +4,7 @@ import * as path from "node:path";
 import type { Details, WorkflowPreflightLane, WorkflowPreflight } from "../shared/types.ts";
 import { workflowPreflightLaneForRuntimeKey } from "./workflow-preflight.ts";
 
-export const WORKFLOW_CHAT_PROGRESS_MODES = ["auto", "off", "live-card"] as const;
-export type WorkflowChatProgressMode = typeof WORKFLOW_CHAT_PROGRESS_MODES[number];
-export type ResolvedWorkflowChatProgressMode = Exclude<WorkflowChatProgressMode, "auto">;
+export type ResolvedWorkflowChatProgressMode = "live-card" | "off";
 
 export interface GitRepositoryIdentity {
 	root: string;
@@ -20,7 +18,6 @@ export interface WorkflowChatProgressProjection {
 }
 
 interface ResolveWorkflowChatProgressInput {
-	requested: unknown;
 	parentCwd: string;
 	workflowCwd: string;
 	background: boolean;
@@ -64,17 +61,12 @@ export function isSameGitRepository(leftCwd: string, rightCwd: string): boolean 
 	return isSameGitRepositoryIdentity(resolveGitRepositoryIdentity(leftCwd), resolveGitRepositoryIdentity(rightCwd));
 }
 
-function normalizeRequestedMode(value: unknown): { mode?: WorkflowChatProgressMode; error?: string } {
-	if (value === undefined) return { mode: "auto" };
-	if (typeof value !== "string" || !WORKFLOW_CHAT_PROGRESS_MODES.includes(value as WorkflowChatProgressMode)) {
-		return { error: `chatProgress must be one of: ${WORKFLOW_CHAT_PROGRESS_MODES.join(", ")}.` };
-	}
-	return { mode: value as WorkflowChatProgressMode };
-}
-
-export function resolveWorkflowChatProgress(input: ResolveWorkflowChatProgressInput): { projection?: WorkflowChatProgressProjection; error?: string } {
-	const requested = normalizeRequestedMode(input.requested);
-	if (requested.error) return { error: requested.error };
+/**
+ * Derives the chat projection for a workflow run. There is no per-call override:
+ * a watched foreground workflow in the same Git repository gets the live card,
+ * everything else renders nothing inline.
+ */
+export function resolveWorkflowChatProgress(input: ResolveWorkflowChatProgressInput): WorkflowChatProgressProjection {
 	const parentIdentity = resolveGitRepositoryIdentity(input.parentCwd);
 	const workflowIdentity = resolveGitRepositoryIdentity(input.workflowCwd);
 	const sameRepo = !!(
@@ -85,14 +77,10 @@ export function resolveWorkflowChatProgress(input: ResolveWorkflowChatProgressIn
 	const repoLabel = workflowIdentity ? path.basename(workflowIdentity.root) : undefined;
 	const repoRelation = sameRepo ? "same" : "other";
 
-	const requestedMode = requested.mode ?? "auto";
-	let mode: ResolvedWorkflowChatProgressMode;
-	if (requestedMode === "auto") mode = sameRepo && !input.background ? "live-card" : "off";
-	else mode = requestedMode;
-
-	if (mode === "live-card" && !sameRepo) return { error: "chatProgress: 'live-card' is only available for workflowScript runs in the same Git repository." };
-	if (mode === "live-card" && input.background) return { error: "chatProgress: 'live-card' is unavailable for async workflowScript. Async workflows have no inline live card; omit chatProgress or use auto/off. Use async:false only when the parent must block." };
-	return { projection: { mode, repoRelation, ...(repoLabel ? { repoLabel } : {}) } };
+	const mode: ResolvedWorkflowChatProgressMode = sameRepo && !input.background ? "live-card" : "off";
+	const projection: WorkflowChatProgressProjection = { mode, repoRelation };
+	if (repoLabel !== undefined) projection.repoLabel = repoLabel;
+	return projection;
 }
 
 export interface WorkflowChatProgressRow {

@@ -53,11 +53,6 @@ interface SubagentParamsSchema {
 			description?: string;
 		};
 		preflight?: JsonSchemaNode;
-		chatProgress?: {
-			type?: string;
-			enum?: string[];
-			description?: string;
-		};
 		timeoutMs?: {
 			minimum?: number;
 			description?: string;
@@ -243,12 +238,6 @@ describe("SubagentParams schema", { skip: !schemasAvailable ? "typebox not avail
 		assert.equal((preflight?.properties as JsonSchemaNode | undefined)?.version?.minimum, 1);
 		assert.equal((preflight?.properties as JsonSchemaNode | undefined)?.version?.maximum, 1);
 		assert.equal((preflight?.properties as JsonSchemaNode | undefined)?.lanes?.maxItems, 64);
-		const chatProgress = SubagentParams?.properties?.chatProgress;
-		assert.equal(chatProgress?.type, "string");
-		assert.deepEqual(chatProgress?.enum, ["auto", "off", "live-card"]);
-		assert.match(String(chatProgress?.description ?? ""), /same Git repository/i);
-		assert.match(String(chatProgress?.description ?? ""), /async:false/);
-		assert.match(String(chatProgress?.description ?? ""), /async: omit or auto\/off/);
 		const worktree = SubagentParams?.properties?.worktree;
 		assert.equal(worktree?.type, "boolean");
 		assert.match(String(worktree?.description ?? ""), /each workflow child/i);
@@ -271,7 +260,7 @@ describe("SubagentParams schema", { skip: !schemasAvailable ? "typebox not avail
 	});
 
 	it("omits removed legacy and workflow-child-only fields", () => {
-		for (const name of ["tasks", "chain", "concurrency", "chainDir", "step", "resume"]) {
+		for (const name of ["tasks", "chain", "concurrency", "chainDir", "step", "resume", "chatProgress"]) {
 			assert.equal((SubagentParams?.properties as Record<string, unknown> | undefined)?.[name], undefined, `${name} should not be public`);
 		}
 	});

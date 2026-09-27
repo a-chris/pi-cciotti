@@ -95,12 +95,11 @@ describe("workflow chat progress policy", () => {
 			assert.equal(isSameGitRepository(repo, worktree), true);
 			assert.equal(isSameGitRepository(repo, other), false);
 
-			assert.equal(resolveWorkflowChatProgress({ requested: "auto", parentCwd: repo, workflowCwd: worktree, background: false }).projection?.mode, "live-card");
-			assert.equal(resolveWorkflowChatProgress({ requested: "auto", parentCwd: repo, workflowCwd: worktree, background: true }).projection?.mode, "off");
-			assert.equal(resolveWorkflowChatProgress({ requested: "auto", parentCwd: repo, workflowCwd: other, background: false }).projection?.mode, "off");
-			assert.match(resolveWorkflowChatProgress({ requested: "live-card", parentCwd: repo, workflowCwd: other, background: false }).error ?? "", /same Git repository/i);
-			assert.match(resolveWorkflowChatProgress({ requested: "live-card", parentCwd: repo, workflowCwd: repo, background: true }).error ?? "", /omit chatProgress or use auto\/off.*async:false only when the parent must block/i);
-			assert.match(resolveWorkflowChatProgress({ requested: "terminal", parentCwd: repo, workflowCwd: repo, background: false }).error ?? "", /one of: auto, off, live-card/i);
+			// Same repo, watched (foreground) -> live card. Everything else -> off.
+			assert.equal(resolveWorkflowChatProgress({ parentCwd: repo, workflowCwd: worktree, background: false }).mode, "live-card");
+			assert.equal(resolveWorkflowChatProgress({ parentCwd: repo, workflowCwd: worktree, background: true }).mode, "off");
+			assert.equal(resolveWorkflowChatProgress({ parentCwd: repo, workflowCwd: other, background: false }).mode, "off");
+			assert.equal(resolveWorkflowChatProgress({ parentCwd: repo, workflowCwd: repo, background: true }).mode, "off");
 		} finally {
 			try { git(repo, ["worktree", "remove", "--force", worktree]); } catch {}
 			fs.rmSync(repo, { recursive: true, force: true });
@@ -111,12 +110,12 @@ describe("workflow chat progress policy", () => {
 });
 
 describe("workflow chat progress rendering", () => {
-	for (const scenario of ["explicit off", "non-repository auto", "cross-repository auto"] as const) {
+	for (const scenario of ["non-repository cwd", "cross-repository cwd"] as const) {
 		it(`emits foreground lifecycle updates before settlement with ${scenario}`, async () => {
-			const root = scenario === "non-repository auto"
+			const root = scenario === "non-repository cwd"
 				? fs.mkdtempSync(path.join(os.tmpdir(), "pi-workflow-progress-headless-"))
 				: createRepo("pi-workflow-progress-off-");
-			const other = scenario === "cross-repository auto" ? createRepo("pi-workflow-progress-cross-") : undefined;
+			const other = scenario === "cross-repository cwd" ? createRepo("pi-workflow-progress-cross-") : undefined;
 			try {
 				const updates: Details[] = [];
 				let settled = false;
@@ -125,7 +124,6 @@ describe("workflow chat progress rendering", () => {
 					{
 						workflowScript: `return await runs.run("scout", { agent: "missing-agent", task: "scan" });`,
 						async: false,
-						chatProgress: scenario === "explicit off" ? "off" : "auto",
 						...(other ? { cwd: other } : {}),
 					},
 					new AbortController().signal,
@@ -158,7 +156,7 @@ describe("workflow chat progress rendering", () => {
 		const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-workflow-progress-emits-"));
 		try {
 			const updates: Details[] = [];
-			const params = { workflowScript: `emit({ phase: "checking" }); return "done";`, async: false, chatProgress: "off" as const };
+			const params = { workflowScript: `emit({ phase: "checking" }); return "done";`, async: false };
 			const result = await createExecutor().execute("wf-emits", params, undefined, (update) => {
 				assert.equal(update.details.workflow?.value, undefined);
 				updates.push(structuredClone(update.details));

@@ -82,7 +82,7 @@ for (const host of ["foreground", "runner"] as const) {
 				child.prompt = (text) => { prompts++; return prompt(text); };
 				return child;
 			} };
-			const agent: AgentConfig = { name: "reader", description: "Read marker", source: "project", filePath: join(cwd, "reader.md"), model: "baseten/acceptance", systemPrompt: "Read only.", systemPromptMode, inheritProjectContext: false, inheritGlobalContext: false, inheritSkills: false, tools: ["read"], extensions: [], allowNestedSubagents: false };
+			const agent: AgentConfig = { name: "reader", description: "Read marker", source: "project", filePath: join(cwd, "reader.md"), model: "baseten/acceptance", systemPrompt: "Read only.", systemPromptMode, inheritProjectContext: false, inheritGlobalContext: false, inheritSkills: false, tools: ["read"] };
 			try {
 				const result = host === "foreground"
 					? await runSync(cwd, [agent], agent.name, task, { acceptance: explicit, structuredOutput, waitToolEnabled: false, childSessionFactory: observedFactory })

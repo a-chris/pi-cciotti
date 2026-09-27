@@ -21,8 +21,7 @@ than becoming default ceremony. The parent keeps user intent, constraints,
 routing, arbitration, decisions, final acceptance, and publication authority,
 and may perform the work directly where it is the most efficient owner.
 
-Children do not spawn subagents unless the parent explicitly delegated fanout
-and their resolved `tools` allow `subagent`.
+Children never spawn subagents: delegation is a parent-only capability.
 
 ## Launch shape
 

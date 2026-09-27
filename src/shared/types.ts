@@ -762,7 +762,6 @@ export interface SteeringRecoveryDescriptor {
 	thinkingCeiling?: ThinkingLevel;
 	tools?: string[];
 	excludeTools?: string[];
-	allowNestedSubagents?: boolean;
 	extensions?: string[];
 	subagentOnlyExtensions?: string[];
 	mcpDirectTools?: string[];

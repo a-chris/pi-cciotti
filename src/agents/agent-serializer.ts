@@ -11,7 +11,6 @@ export const KNOWN_FIELDS = new Set([
 	"aliases",
 	"tools",
 	"excludeTools",
-	"allowNestedSubagents",
 	"model",
 	"fast",
 	"thinking",
@@ -76,10 +75,6 @@ export function serializeAgent(config: AgentConfig, options: SerializeAgentOptio
 	if (toolsValue || preserve("tools")) lines.push(`tools: ${toolsValue ?? ""}`);
 	const excludeToolsValue = joinComma(config.excludeTools);
 	if (excludeToolsValue || preserve("excludeTools")) lines.push(`excludeTools: ${excludeToolsValue ?? ""}`);
-	if (config.allowNestedSubagents === true || preserve("allowNestedSubagents")) {
-		lines.push(`allowNestedSubagents: ${config.allowNestedSubagents === undefined ? "" : config.allowNestedSubagents ? "true" : "false"}`);
-	}
-
 	if (config.model || preserve("model")) lines.push(`model: ${config.model ?? ""}`);
 	if (config.fast === true || preserve("fast")) lines.push(`fast: ${config.fast === undefined ? "" : config.fast ? "true" : "false"}`);
 	if ((config.thinking && (config.thinking !== "off" || preserve("thinking"))) || (!config.thinking && preserve("thinking"))) {

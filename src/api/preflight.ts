@@ -130,7 +130,6 @@ export interface SubagentLaunchContractTools {
 	requiredExtensionIds: string[];
 	extensionArgs: string[];
 	disableAmbientExtensions: boolean;
-	fanoutAuthorized: boolean;
 	capabilityCeiling?: ResolvedSubagentCapabilityCeiling;
 	capabilityAudit?: SubagentCapabilityAudit;
 }
@@ -369,7 +368,6 @@ export async function resolveSubagentLaunchContract(input: SubagentLaunchContrac
 		toolPlan = resolvePiLaunchToolPlan({
 			tools: agent.tools,
 			excludeTools: agent.excludeTools,
-			allowNestedSubagents: agent.allowNestedSubagents,
 			extensions: agent.extensions,
 			subagentOnlyExtensions: agent.subagentOnlyExtensions,
 			requiredExtensions,
@@ -471,7 +469,6 @@ export async function resolveSubagentLaunchContract(input: SubagentLaunchContrac
 			// Required paths are private launch authority; preflight exposes their safe IDs above.
 			extensionArgs: toolPlan.extensionArgs.filter((extensionPath) => !requiredExtensions.some(({ path }) => path === extensionPath)),
 			disableAmbientExtensions: toolPlan.disableAmbientExtensions,
-			fanoutAuthorized: toolPlan.fanoutAuthorized,
 			...(toolPlan.capabilityCeiling ? { capabilityCeiling: toolPlan.capabilityCeiling } : {}),
 			...(toolPlan.capabilityAudit ? { capabilityAudit: toolPlan.capabilityAudit } : {}),
 		},

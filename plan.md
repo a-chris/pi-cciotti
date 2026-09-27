@@ -1,6 +1,6 @@
 # Plan: Facade rewrite of the subagent tool surface
 
-> Status: **M3.3b Watchdog integration cleanup DONE — next: M4 (enrichment + param sweep).**
+> Status: **M4 in progress — U1 (config layer) + U2a (child delegation removed) committed. Next: U2b (dead depth/nested plumbing).**
 > VISION updated; decisions resolved.
 > Current milestone: **M4 — Enrichment + param sweep** (config keys for config-enriched params
 > before removing per-call forms; delete REMOVE params end-to-end — types, executor, preflight,
@@ -327,6 +327,57 @@ is a safe checkpoint on its own.
    M2's merge carried it and needed a corrective revert).
 4. **End:** suite green; measurement recorded when applicable; plan.md status + current-milestone
    updated; committed. A milestone is never "mostly done" — it is done (done-when met) or not.
+
+### M4 execution log — U1 + U2a
+
+**U1 — config layer (committed `f0928173`).** Kept + fail-closed validated the five enrichment keys
+with real readers (`timeoutMs`, `toolTimeoutMs`, `checkpointBeforeDeadlineMs`, `toolBudget`,
+`control`); dropped the five phantom validators (`model` — no global-reader call site;
+`agentScope`/`fast`/`includeProgress`/`outputMode` — declared per-agent instead; `model` stays an
+unvalidated *passthrough* so `subagents.defaultModel` still reads it); completed `toolDescriptionMode`
+removal end-to-end (load-time throw, `ToolDescriptionMode` type, zero-arg
+`buildSubagentToolPromptMetadata()`, custom-template lookup, docs "Removed:" section). New
+`test/unit/config-enrichment-keys.test.ts` (8 tests) proves each kept key reaches the runtime output
+it documents and each rejected key throws. 2715 / 0 / 11.
+
+**Owner ruling: children must not launch subagents → delete the fanout-child subsystem.** U2 split:
+
+- **U2a — capability removal (committed).** `git rm src/extension/fanout-child.ts` +
+  `test/unit/nested-control.test.ts`. Removed `fanoutAuthorized` (tool-plan decision), `fanoutChild`
+  (runtime config), the `FANOUT_CHILD_EXTENSION_PATH` child grant, `allowNestedSubagents`
+  (frontmatter + builtin override + every plumb-through: preflight, agents, serializer, management,
+  registry, launch-contract, async-execution, async-resume, runner, child-launch, execution,
+  parallel-utils, dynamic-fanout, types), the child-side writes that existed only so fanout children
+  could route (`nestedRoute`/`nestedParent`/child `runFanoutBudget` in child-launch), the fanout
+  boundary prompt variant + `preserveFanoutToolHistory`, and the fanout child-safe `runtimeState`
+  block. **Enforcement is explicit per hard cutover:** an agent listing `subagent` in `tools`, or
+  setting `allowNestedSubagents` in frontmatter or a builtin override, throws naming the removal. A
+  child session never registers a delegation tool (`index.ts` still early-returns under
+  `SUBAGENT_CHILD_ENV`). Parent-side fanout (`dynamic-fanout`, `run-fanout-budget`, spawn budgets) is
+  **kept** — it budgets a parent's own children. Docs corrected (agents/configuration/observability);
+  the skill's stale "children spawn subagents when delegated" claim rewritten. 2688 / 0 / 11
+  (−27 fanout tests, +1 enforcement test); `in-process-child` 25/25 and `single-execution.part-2`
+  164/164 green.
+- **U2b — dead depth plumbing (next).** `maxSubagentDepth` (parse/types/docs — it gates nothing now),
+  `nestedRoute`/`nestedParent` types + status plumbing, `nested-events.ts`,
+  `NestedPathEntry`/`nested-path.ts`, the retained-nested-route tracker, child-side
+  `runFanoutBudget` remnants. **Deferred from U2a deliberately:** the `allowMutatingManagementActions`
+  dep and its seven `is not available from child-safe subagent fanout mode` guards in
+  `subagent-executor.ts` — verified in U2a that **no production caller passes it anymore** (deleted
+  fanout-child was the sole setter; only tests pass it), so those guards are unreachable production
+  code naming a mode that no longer exists. Delete dep + guards + their tests in U2b rather than
+  rewording a dead branch (U2a kept them so the suite stayed green and the commit stayed narrow).
+- **U3** trim the 68-key pool to facade/RPC-derivable keys, delete dead schemas
+  (`ChainItem`, `ParallelTaskSchema`, `Dynamic*Schema`); **U4** add `topic`/script-source/`mission`
+  to the control facade + `normalizeControlParams`; **U5** the REMOVE-list params end-to-end.
+
+**pi-lens residual (recorded, not fixed — option-a precedent, sessions 4–6).** `src/extension/index.ts`
+reports 26 findings (17 errors: `no-runtime-typeof`, `require-exact-type`,
+`no-conditional-empty-object-spread`, `no-known-value-widening`, `no-unsafe-dictionary-type`).
+Verified byte-identical to HEAD (`git diff HEAD -- src/extension/index.ts` empty) with flagged lines
+present verbatim at HEAD; U1 touched one line there (699) and U2a touched none. The findings are a
+whole-file re-scan artifact of advanced lens packs on **carried baseline code**, so per plan
+discipline they are recorded, not refactored mid-milestone.
 
 ## Resolved decisions (owner, 2026-09)
 

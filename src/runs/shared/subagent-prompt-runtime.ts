@@ -61,15 +61,6 @@ export const CHILD_SUBAGENT_BOUNDARY_INSTRUCTIONS = [
 	"If you need to edit files, use the available editing tools. Do not print tool-call syntax, patches, or pseudo-tool calls as text.",
 ].join("\n");
 
-export const CHILD_FANOUT_BOUNDARY_INSTRUCTIONS = [
-	"You are a child subagent with explicit fanout responsibility for this assigned task.",
-	"The parent session owns final orchestration, acceptance, and follow-up implementation launches.",
-	"You may use the `subagent` tool only for the fanout work explicitly requested in this task.",
-	"Do not broaden yourself into general parent orchestration. Do not launch follow-up workers unless the task explicitly asks for that.",
-	"The maxSubagentDepth cap still applies and may block further fanout.",
-	"If you need to edit files, use the available editing tools. Do not print tool-call syntax, patches, or pseudo-tool calls as text.",
-].join("\n");
-
 const PARENT_ONLY_CUSTOM_MESSAGE_TYPES = new Set([
 	"subagent-orchestration-instructions",
 	"subagent-slash-result",
@@ -216,7 +207,7 @@ export function stripSubagentOrchestrationSkill(prompt: string): string {
 
 function stripChildBoundaryInstructions(prompt: string): string {
 	let rewritten = prompt;
-	for (const boundary of [CHILD_SUBAGENT_BOUNDARY_INSTRUCTIONS, CHILD_FANOUT_BOUNDARY_INSTRUCTIONS]) {
+	for (const boundary of [CHILD_SUBAGENT_BOUNDARY_INSTRUCTIONS]) {
 		rewritten = rewritten.split(boundary).join("");
 	}
 	return rewritten.replace(/^(?:[ \t]*\r?\n)+/, "");
@@ -224,7 +215,7 @@ function stripChildBoundaryInstructions(prompt: string): string {
 
 export function rewriteSubagentPrompt(
 	prompt: string,
-	options: { inheritProjectContext: boolean; inheritGlobalContext: boolean; inheritSkills: boolean; fanoutChild?: boolean; structuredOutput?: boolean },
+	options: { inheritProjectContext: boolean; inheritGlobalContext: boolean; inheritSkills: boolean; structuredOutput?: boolean },
 ): string {
 	let rewritten = prompt;
 	if (!options.inheritProjectContext) {
@@ -238,7 +229,7 @@ export function rewriteSubagentPrompt(
 	}
 	rewritten = stripSubagentOrchestrationSkill(rewritten);
 	rewritten = stripChildBoundaryInstructions(rewritten);
-	const boundary = options.fanoutChild ? CHILD_FANOUT_BOUNDARY_INSTRUCTIONS : CHILD_SUBAGENT_BOUNDARY_INSTRUCTIONS;
+	const boundary = CHILD_SUBAGENT_BOUNDARY_INSTRUCTIONS;
 	const structured = options.structuredOutput ? `\n\n${STRUCTURED_OUTPUT_INSTRUCTIONS}` : "";
 	return `${boundary}${structured}\n\n${rewritten}`;
 }
@@ -325,18 +316,17 @@ function stripAssistantSubagentToolCallBlocks(message: RuntimeRecord): RuntimeRe
 	return { ...message, content: filteredContent };
 }
 
-export function stripParentOnlySubagentMessages(messages: unknown[], options: { sanitizeToolIds?: boolean; preserveFanoutToolHistory?: boolean } = {}): unknown[] {
-	const preserveCurrentFanoutToolHistory = options.preserveFanoutToolHistory === true;
-	const sanitizeToolIds = options.sanitizeToolIds ?? true;
+export function stripParentOnlySubagentMessages(messages: unknown[], options: { sanitizeToolIds?: boolean } = {}): unknown[] {
+		const sanitizeToolIds = options.sanitizeToolIds ?? true;
 	let changed = false;
 	const filtered: unknown[] = [];
 	for (const message of messages) {
-		if (isParentOnlySubagentMessage(message) || (!preserveCurrentFanoutToolHistory && isSubagentToolResultMessage(message))) {
+		if (isParentOnlySubagentMessage(message) || isSubagentToolResultMessage(message)) {
 			changed = true;
 			continue;
 		}
 		const recordMessage = isRecord(message) ? message : {};
-		const stripped = preserveCurrentFanoutToolHistory ? recordMessage : stripAssistantSubagentToolCallBlocks(recordMessage);
+		const stripped = stripAssistantSubagentToolCallBlocks(recordMessage);
 		if (stripped === undefined) {
 			changed = true;
 			continue;
@@ -485,7 +475,6 @@ export default function registerSubagentPromptRuntime(pi: ExtensionAPI, config?:
 		if (!Array.isArray(event.messages)) return undefined;
 		const messages = stripParentOnlySubagentMessages(event.messages, {
 			sanitizeToolIds: !COMPOSITE_TOOL_ID_APIS.has(ctx?.model?.api ?? ""),
-			preserveFanoutToolHistory: config.fanoutChild,
 		});
 		if (messages === event.messages) return undefined;
 		return { messages };
@@ -499,14 +488,12 @@ export default function registerSubagentPromptRuntime(pi: ExtensionAPI, config?:
 		}
 
 		const { inheritProjectContext, inheritGlobalContext, inheritSkills } = config;
-		const fanoutChild = config.fanoutChild;
 		let rewritten = event.systemPrompt;
-		if (inheritProjectContext !== undefined || inheritGlobalContext !== undefined || inheritSkills !== undefined || fanoutChild) {
+		if (inheritProjectContext !== undefined || inheritGlobalContext !== undefined || inheritSkills !== undefined) {
 			rewritten = rewriteSubagentPrompt(event.systemPrompt, {
 				inheritProjectContext: inheritProjectContext ?? true,
 				inheritGlobalContext: inheritGlobalContext ?? true,
 				inheritSkills: inheritSkills ?? true,
-				fanoutChild,
 				structuredOutput: Boolean(config.structuredOutput),
 			});
 		}

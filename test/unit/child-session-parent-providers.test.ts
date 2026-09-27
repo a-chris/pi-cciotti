@@ -33,7 +33,7 @@ function launch(parentProviderRegistry?: ParentProviderRegistry): ChildSessionLa
 		hooks: [],
 		noSkills: true,
 		noContextFiles: true,
-		runtime: { fanoutChild: false, depth: 1, waitTool: { enabled: false }, fast: false } as ChildSessionLaunch["runtime"],
+		runtime: { depth: 1, waitTool: { enabled: false }, fast: false } as ChildSessionLaunch["runtime"],
 		...(parentProviderRegistry ? { parentProviderRegistry } : {}),
 	};
 }

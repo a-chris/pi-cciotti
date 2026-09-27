@@ -1,7 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { listBackgroundWorkProviders } from "../../api/background-work.ts";
 import { ReadonlyDrainObservation } from "./readonly-drain-observation.ts";
-import registerFanoutChildSubagentExtension, { createChildSafeState } from "../../extension/fanout-child.ts";
 import registerSubagentFastModeExtension from "./fast-mode-extension.ts";
 import registerSubagentPromptRuntime from "./subagent-prompt-runtime.ts";
 import type { ChildRuntimeConfig } from "./child-runtime-config.ts";
@@ -64,10 +63,10 @@ function readonlyConfig(config: ChildRuntimeConfig, capture?: OwnedCapture): str
 	if (capture && (config.toolDiagnostic !== capture.toolDiagnostic || config.runtimeAcknowledgements !== capture.runtimeAcknowledgements)) return undefined;
 	const waitKeys = dataKeys(config.waitTool);
 	if (!waitKeys || waitKeys.some((key) => key !== "enabled")) return undefined;
-	if (config.fast !== false || config.fanoutChild !== false || config.waitTool.enabled !== false) return undefined;
+	if (config.fast !== false || config.waitTool.enabled !== false) return undefined;
 	for (const key of keys) {
 		const value = Object.getOwnPropertyDescriptor(config, key)!.value;
-		if (["fast", "fanoutChild", "waitTool"].includes(key)) continue;
+		if (["fast", "waitTool"].includes(key)) continue;
 		if (capture && (key === "toolDiagnostic" || key === "runtimeAcknowledgements")) continue;
 		if (capture && key === "requiredTools" && Array.isArray(value) && Object.getPrototypeOf(value) === Array.prototype) {
 			const descriptors = Object.getOwnPropertyDescriptors(value);
@@ -121,7 +120,7 @@ export function captureReadonlyChildDrain(hooks: ChildHookExtension[]): (() => b
 /**
  * The child-side hooks pi-subagents installs in every child, keyed off the
  * launch config. The registrations live in `subagent-prompt-runtime.ts`,
- * `fast-mode-extension.ts`, and `fanout-child.ts`.
+ * `fast-mode-extension.ts`.
  */
 export function createChildHooks(config: ChildRuntimeConfig): ChildHookExtension[] {
 	return childHooks(config);
@@ -164,10 +163,6 @@ function childHooks(config: ChildRuntimeConfig, capture?: OwnedCapture, holdFina
 	const snapshot = readonlyConfig(config, capture);
 	const proof: PromptProof | undefined = snapshot === undefined ? undefined : { config, snapshot, capture };
 	const runtime = Object.create(config) as ChildRuntimeConfig;
-	const ownedState = Object.getOwnPropertyDescriptor(config, "runtimeState");
-	if (!ownedState || !("value" in ownedState) || ownedState.value == null) {
-		Object.defineProperty(runtime, "runtimeState", { configurable: true, enumerable: true, writable: true, value: createChildSafeState() });
-	}
 	if (holdFinalDrain) {
 		Object.defineProperty(runtime, "holdFinalDrain", { configurable: true, enumerable: true, writable: true, value: holdFinalDrain });
 	}
@@ -184,6 +179,5 @@ function childHooks(config: ChildRuntimeConfig, capture?: OwnedCapture, holdFina
 		promptProofs.set(hooks[0]!.factory, proof);
 	}
 	if (config.fast) hooks.push({ name: "pi-subagents:fast-mode", factory: (pi) => registerSubagentFastModeExtension(pi) });
-	if (config.fanoutChild) hooks.push({ name: "pi-subagents:fanout-child", factory: (pi) => registerFanoutChildSubagentExtension(pi, runtime) });
 	return hooks;
 }

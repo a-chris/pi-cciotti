@@ -60,7 +60,6 @@ describe("in-process foreground child", () => {
 			assert.equal(session.launch.runtime.agent, "echo");
 			assert.equal(session.launch.runtime.runId, "hooks-config");
 			assert.equal(session.launch.runtime.childIndex, 3);
-			assert.equal(session.launch.runtime.fanoutChild, false);
 			assert.equal(session.launch.runtime.waitTool.enabled, false);
 			assert.equal(session.launch.runtime.steerInbox, undefined, "in-process children have no steer inbox");
 			assert.equal(session.launch.runtime.depth, 1);
@@ -73,25 +72,6 @@ describe("in-process foreground child", () => {
 	});
 
 
-
-	it("adds the fanout hook and nested route only for fanout-authorized children", async () => {
-		const route = createNestedRoute("hooks-fanout");
-		try {
-			mockPi.onCall({ output: "done" });
-			const result = await runSync(tempDir, [makeAgent("delegator", { tools: ["read", "subagent"] })], "delegator", "Task", {
-				runId: "hooks-fanout",
-				nestedRoute: route,
-			});
-			assert.equal(result.exitCode, 0);
-			const [session] = mockPi.sessions;
-			assert.equal(session?.launch.runtime.fanoutChild, true);
-			assert.deepEqual(session?.launch.runtime.nestedRoute, route);
-			assert.deepEqual(session?.launch.runtime.nestedParent, { parentRunId: "hooks-fanout", parentChildIndex: 0, depth: 1, path: [{ runId: "hooks-fanout", stepIndex: 0, agent: "delegator" }] });
-			assert.deepEqual(session?.launch.tools, ["read", "subagent"]);
-		} finally {
-			fs.rmSync(path.dirname(route.eventSink), { recursive: true, force: true });
-		}
-	});
 
 	it("routes steer and follow-up to the child session", async () => {
 		const release = path.join(tempDir, "release");
@@ -272,7 +252,7 @@ function stubPi(session: Record<string, unknown> = {}, onReload?: () => void): P
 		createAgentSession: async () => ({ session: { bindExtensions: async () => {}, dispose() {}, extensionRunner: { hasHandlers: () => false }, subscribe: () => () => {}, prompt: async () => {}, abort: async () => {}, steer: async () => {}, followUp: async () => {}, messages: [], sessionId: "s", ...session } }),
 	} as unknown as PiCodingAgentModule;
 }
-const stubLaunch: ChildSessionLaunch = { cwd: process.cwd(), storage: { kind: "memory" }, extensionPaths: [], ambientExtensions: false, hooks: [], noSkills: true, noContextFiles: true, runtime: { fanoutChild: false, depth: 1, waitTool: { enabled: false }, fast: false } as ChildSessionLaunch["runtime"] };
+const stubLaunch: ChildSessionLaunch = { cwd: process.cwd(), storage: { kind: "memory" }, extensionPaths: [], ambientExtensions: false, hooks: [], noSkills: true, noContextFiles: true, runtime: { depth: 1, waitTool: { enabled: false }, fast: false } as ChildSessionLaunch["runtime"] };
 
 describe("default child session factory", () => {
 	it("serializes process env through extension loading and session start across concurrent launches", async () => {

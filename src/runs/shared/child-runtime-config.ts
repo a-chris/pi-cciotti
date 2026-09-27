@@ -44,7 +44,6 @@ export interface ChildRuntimeConfig {
 	runId?: string;
 	agent?: string;
 	childIndex?: number;
-	fanoutChild: boolean;
 	sessionName?: string;
 	orchestratorSessionId?: string;
 	parentSessionId?: string;

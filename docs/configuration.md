@@ -380,7 +380,7 @@ Routes relative `output` paths for single-agent `/run` calls under this director
 { "maxSubagentDepth": 1 }
 ```
 
-Controls nested delegation when no stricter limit is inherited from the launching child's runtime config. Per-agent `maxSubagentDepth` can tighten the limit for that agent's child runs, but cannot relax an inherited stricter limit. This applies even to children that explicitly declare `tools: subagent` or `allowNestedSubagents: true`; at the cap, execution fanout is blocked instead of silently hiding nested work.
+Retained for the detached runner's own chain bookkeeping. Children cannot launch subagents at all, so this never gates child-initiated delegation: an agent that lists `subagent` in `tools` fails launch preflight with a removal error.
 
 ## `PI_SUBAGENT_PI_BINARY`
 

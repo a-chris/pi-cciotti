@@ -14,7 +14,6 @@ import { createNestedRoute, nestedResultsPath } from "../../src/runs/shared/nest
 import { updateActiveRunIndex } from "../../src/runs/background/active-run-index.ts";
 import { SUBAGENT_ASYNC_COMPLETE_EVENT, TEMP_ROOT_DIR, SUBAGENT_FOREGROUND_COMPLETE_EVENT, type SubagentState } from "../../src/shared/types.ts";
 import registerSubagentPromptRuntime, {
-	CHILD_FANOUT_BOUNDARY_INSTRUCTIONS,
 	CHILD_SUBAGENT_BOUNDARY_INSTRUCTIONS,
 	rewriteSubagentPrompt,
 	stripGlobalContext,
@@ -25,7 +24,7 @@ import registerSubagentPromptRuntime, {
 } from "../../src/runs/shared/subagent-prompt-runtime.ts";
 
 function childConfig(overrides: Partial<ChildRuntimeConfig> = {}): ChildRuntimeConfig {
-	return { fanoutChild: false, depth: 1, waitTool: { enabled: true }, fast: false, ...overrides };
+	return { depth: 1, waitTool: { enabled: true }, fast: false, ...overrides };
 }
 
 it("does not skip drain for in-process child sessions when hasUI is true", async () => {
@@ -106,7 +105,7 @@ it("registered child bg_wait discovers nested personas and agent_end drains the 
 			on: (event: string, fn: Function) => handlers.set(event, [...(handlers.get(event) ?? []), fn]),
 			registerTool: (tool: { name: string; execute: Function }) => tools.set(tool.name, tool),
 			events,
-		} as never, childConfig({ fanoutChild: true, nestedRoute: route, holdFinalDrain: (value) => { held.push(value); } }));
+		} as never, childConfig({ nestedRoute: route, holdFinalDrain: (value) => { held.push(value); } }));
 		await emit("session_start");
 		writeStatus("running");
 		const wait = tools.get("bg_wait")!;
@@ -506,36 +505,6 @@ describe("subagent prompt runtime", () => {
 		assert.equal(rewriteSubagentPrompt(rewritten, { inheritProjectContext: true, inheritGlobalContext: true, inheritSkills: true }).lastIndexOf(CHILD_SUBAGENT_BOUNDARY_INSTRUCTIONS), 0);
 	});
 
-	it("replaces inherited child boundaries with the fanout boundary when authorized", () => {
-		const strictPrompt = `${CHILD_SUBAGENT_BOUNDARY_INSTRUCTIONS}\n\n${BASE_PROMPT}`;
-		const rewritten = rewriteSubagentPrompt(strictPrompt, {
-			inheritProjectContext: true,
-			inheritGlobalContext: true,
-			inheritSkills: true,
-			fanoutChild: true,
-		});
-
-		assert.ok(rewritten.startsWith(CHILD_FANOUT_BOUNDARY_INSTRUCTIONS));
-		assert.ok(rewritten.includes("You may use the `subagent` tool only for the fanout work explicitly requested in this task."));
-		assert.ok(rewritten.includes("If you need to edit files, use the available editing tools."));
-		assert.ok(!rewritten.includes("call the actual edit/write tools"));
-		assert.ok(!rewritten.includes("Do not propose or run subagents."));
-		assert.equal(rewritten.lastIndexOf(CHILD_FANOUT_BOUNDARY_INSTRUCTIONS), 0);
-	});
-
-	it("replaces inherited fanout boundaries with the strict boundary when fanout is not authorized", () => {
-		const fanoutPrompt = `${CHILD_FANOUT_BOUNDARY_INSTRUCTIONS}\n\n${BASE_PROMPT}`;
-		const rewritten = rewriteSubagentPrompt(fanoutPrompt, {
-			inheritProjectContext: true,
-			inheritGlobalContext: true,
-			inheritSkills: true,
-		});
-
-		assert.ok(rewritten.startsWith(CHILD_SUBAGENT_BOUNDARY_INSTRUCTIONS));
-		assert.ok(!rewritten.includes("explicit fanout responsibility"));
-		assert.equal(rewritten.lastIndexOf(CHILD_SUBAGENT_BOUNDARY_INSTRUCTIONS), 0);
-	});
-
 	it("keeps explicitly injected skill content when inherited skills are stripped", () => {
 		const rewritten = rewriteSubagentPrompt(PROMPT_WITH_EXPLICIT_SKILL, {
 			inheritProjectContext: false,
@@ -654,14 +623,6 @@ describe("subagent prompt runtime", () => {
 			{ role: "toolResult", toolName: "read", toolCallId: "tool_Y2FsbF9yZWFkfGZjXzEyMw", content: "file contents" },
 			bashResult,
 		]);
-	});
-
-	it("preserves live nested subagent calls and results in fanout child context", () => {
-		const user = { role: "user", content: "Task" };
-		const subagentResult = { role: "toolResult", toolName: "subagent", content: "OK" };
-		const subagentCall = { role: "assistant", content: [{ type: "toolCall", name: "subagent", input: { agent: "delegate" } }] };
-		const instruction = { role: "custom", customType: "subagent-orchestration-instructions", content: "Subagent orchestration is enabled." };
-		assert.deepEqual(stripParentOnlySubagentMessages([user, subagentCall, subagentResult, instruction], { preserveFanoutToolHistory: true }), [user, subagentCall, subagentResult]);
 	});
 
 

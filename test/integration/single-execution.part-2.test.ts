@@ -788,7 +788,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		const descriptor = createRunFanoutBudget("root-run", 2);
 		try {
 			const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, true, new Map(), undefined, createEventBus(), undefined, {
-				fanoutChild: true,
 				depth: 1,
 				waitTool: { enabled: true },
 				fast: false,
@@ -1153,7 +1152,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		const route = createNestedRoute("root-nested-model");
 		try {
 			const executor = makeExecutor([makeAgent("echo", { model: "openai/gpt-5-mini", thinking: "high" })], {}, false, undefined, true, new Map(), undefined, createEventBus(), undefined, {
-				fanoutChild: true,
 				depth: 1,
 				waitTool: { enabled: true },
 				fast: false,
@@ -3732,38 +3730,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		assert.equal(call.runtime?.inheritSkills, false);
 		assert.equal(call.launch?.noContextFiles, true);
 		assert.equal(call.launch?.noSkills, true);
-	});
-
-	it("passes fanout routing only when nested fanout is explicitly authorized", async () => {
-		mockPi.onCall({ output: "ok" });
-		const fanoutAgents = [makeAgent("delegator", { tools: ["read", "subagent"] })];
-		const fanout = await runSync(tempDir, fanoutAgents, "delegator", "Task", { runId: "fanout-run", index: 2 });
-		assert.equal(fanout.exitCode, 0);
-		const fanoutRuntime = readCall().runtime;
-		assert.equal(fanoutRuntime?.fanoutChild, true);
-		assert.equal(fanoutRuntime?.nestedParent?.parentRunId, "fanout-run");
-		assert.equal(fanoutRuntime?.nestedParent?.parentChildIndex, 2);
-		assert.equal(fanoutRuntime?.nestedParent?.depth, 1);
-
-		mockPi.reset();
-		mockPi.onCall({ output: "ok" });
-		const inheritedToolAgents = [makeAgent("inherited-delegator", { allowNestedSubagents: true })];
-		const inheritedToolFanout = await runSync(tempDir, inheritedToolAgents, "inherited-delegator", "Task", { runId: "inherited-tool-fanout", index: 3 });
-		assert.equal(inheritedToolFanout.exitCode, 0);
-		const inheritedRuntime = readCall().runtime;
-		assert.equal(inheritedRuntime?.fanoutChild, true);
-		assert.equal(inheritedRuntime?.nestedParent?.parentRunId, "inherited-tool-fanout");
-		assert.equal(inheritedRuntime?.nestedParent?.parentChildIndex, 3);
-
-		mockPi.reset();
-		mockPi.onCall({ output: "ok" });
-		const nonFanoutAgents = [makeAgent("worker", { tools: ["read"] })];
-		const nonFanout = await runSync(tempDir, nonFanoutAgents, "worker", "Task", { runId: "non-fanout-run" });
-		assert.equal(nonFanout.exitCode, 0);
-		const workerRuntime = readCall().runtime;
-		assert.equal(workerRuntime?.fanoutChild, false);
-		assert.equal(workerRuntime?.nestedParent, undefined);
-		assert.equal(workerRuntime?.nestedRoute, undefined);
 	});
 
 	it("passes child execution identifiers through to child runtime config", async () => {

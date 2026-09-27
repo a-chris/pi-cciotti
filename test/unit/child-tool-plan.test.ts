@@ -84,15 +84,15 @@ describe("child tool plan host builtin intersection", () => {
 	});
 
 	it("keeps requested native coordination tools through host builtin filtering", () => {
-		const tools = ["read", "subagent", "bg_wait"];
-		const input = { tools, hostAvailableBuiltins: ["read"] };
-		const plan = resolvePiLaunchToolPlan(input);
+		const tools = ["read", "bg_wait"];
+		const plan = resolvePiLaunchToolPlan({ tools, hostAvailableBuiltins: ["read"] });
 		assert.deepEqual(plan.effectiveToolAllowlist, tools);
-		assert.deepEqual(plan.requiredChildTools, ["read", "subagent", "bg_wait"]);
-		assert.equal(plan.fanoutAuthorized, true);
+		assert.deepEqual(plan.requiredChildTools, ["read", "bg_wait"]);
 		assert.deepEqual(plan.unavailableHostBuiltins, []);
-		const leaf = resolvePiLaunchToolPlan({ ...input, tools: ["read"] });
-		assert.equal(leaf.fanoutAuthorized, false);
+	});
+
+	it("rejects agents that request the removed subagent tool", () => {
+		assert.throws(() => resolvePiLaunchToolPlan({ tools: ["read", "subagent"] }), /'subagent', which was removed/);
 	});
 
 

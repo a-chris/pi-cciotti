@@ -644,16 +644,16 @@ Project prompt.
 		assert.equal(invalidArtifactDir.code, "invalid_artifact_dir");
 	});
 
-	it("projects MCP, extension, fanout, structured-output, and fork diagnostics", async () => {
+	it("projects MCP, extension, structured-output, and fork diagnostics", async () => {
 		const cwd = path.join(tempDir, "repo");
 		fs.mkdirSync(cwd, { recursive: true });
 		writeMcpFixture();
 		writeAgent(path.join(cwd, ".pi", "agents", "fanout.md"), `---
 name: fanout
-description: Project fanout
+description: Project tools
 tools:
   - read
-  - subagent
+  - bash
   - /tmp/tool-ext.ts
   - mcp:github/search_repositories
 extensions:
@@ -677,16 +677,14 @@ Project prompt.
 		assert.equal(result.ok, true);
 		assert.equal(result.contract.context, "fork");
 		assert.ok(result.contract.diagnostics.some((diagnostic) => diagnostic.code === "host_required"));
-		assert.deepEqual(result.contract.tools.declaredBuiltin, ["read", "subagent"]);
+		assert.deepEqual(result.contract.tools.declaredBuiltin, ["read", "bash"]);
 		assert.equal(result.contract.tools.explicitAllowlist, true);
-		assert.equal(result.contract.tools.fanoutAuthorized, true);
 		assert.deepEqual(result.contract.tools.internalTools, ["structured_output"]);
 		assert.deepEqual(result.contract.tools.effectiveMcpTools, ["github_search_repositories"]);
-		assert.deepEqual(result.contract.tools.requiredChildTools, ["read", "subagent", "github_search_repositories", "structured_output"]);
+		assert.deepEqual(result.contract.tools.requiredChildTools, ["read", "bash", "github_search_repositories", "structured_output"]);
 		assert.deepEqual(result.contract.tools.toolExtensionPaths, ["/tmp/tool-ext.ts"]);
 		assert.equal(result.contract.tools.disableAmbientExtensions, true);
 		assert.ok(result.contract.tools.runtimeExtensions.some((extensionPath) => extensionPath.endsWith("subagent-prompt-runtime.ts")));
-		assert.ok(result.contract.tools.runtimeExtensions.some((extensionPath) => extensionPath.endsWith("fanout-child.ts")));
 		assert.ok(result.contract.tools.extensionArgs.includes("/tmp/config-ext.ts"));
 		assert.ok(result.contract.tools.extensionArgs.includes("/tmp/subagent-only.ts"));
 	});

@@ -293,20 +293,15 @@ describe("async resume lookup", () => {
 			writeJson(path.join(asyncDir, "recovery-descriptor.json"), {
 				...descriptor,
 				launchContractDigest: "launch-contract-digest",
-				allowNestedSubagents: true,
 				extensionBindings: { "shepherd.dispatch/1": { role: "coder" } },
 				requiredExtensions: [{ id: "provider", path: path.join(root, "provider.mjs") }],
 			});
 			const valid = resolveAsyncResumeTarget({ id: "run-descriptor" }, { asyncDirRoot: asyncRoot, resultsDir });
 			assert.equal(valid.launchContractDigest, "launch-contract-digest");
 			assert.equal(valid.recoveryDescriptor?.launchContractDigest, "launch-contract-digest");
-			assert.equal(valid.recoveryDescriptor?.allowNestedSubagents, true);
 			assert.deepEqual(valid.recoveryDescriptor?.extensionBindings, { "shepherd.dispatch/1": { role: "coder" } });
 			assert.deepEqual(valid.recoveryDescriptor?.requiredExtensions, [{ id: "provider", path: path.join(root, "provider.mjs") }]);
 			assert.ok(Object.isFrozen(valid.recoveryDescriptor?.requiredExtensions));
-
-			writeJson(path.join(asyncDir, "recovery-descriptor.json"), { ...descriptor, allowNestedSubagents: "true" });
-			assert.throws(() => resolveAsyncResumeTarget({ id: "run-descriptor" }, { asyncDirRoot: asyncRoot, resultsDir }), /allowNestedSubagents/);
 
 			writeJson(path.join(asyncDir, "recovery-descriptor.json"), { ...descriptor, extensionBindings: { invalid: true } });
 			assert.throws(() => resolveAsyncResumeTarget({ id: "run-descriptor" }, { asyncDirRoot: asyncRoot, resultsDir }), /namespace/);

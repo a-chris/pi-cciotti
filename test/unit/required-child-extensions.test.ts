@@ -79,7 +79,7 @@ describe("required child extension host policy", () => {
 		const { dir, file } = fixture();
 		try {
 			const requiredExtensions = Object.freeze([Object.freeze({ id: "nested-provider", path: fs.realpathSync(file) })]);
-			const parent = buildInProcessChildLaunch({ ...baseInput("unregistered-root"), requiredExtensions, allowNestedSubagents: true });
+			const parent = buildInProcessChildLaunch({ ...baseInput("unregistered-root"), requiredExtensions });
 			const nested = buildInProcessChildLaunch({ ...baseInput("nested-child"), inherited: { depth: 1, requiredExtensions: parent.config.requiredExtensions } });
 			assert.equal(nested.session.extensionPaths.at(-1), fs.realpathSync(file));
 			assert.deepEqual(nested.launchResolvedExtensions.required, ["nested-provider"]);

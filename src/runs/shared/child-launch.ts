@@ -14,7 +14,6 @@ import {
 	type ResolvedToolBudget,
 	type RunFanoutBudgetDescriptor,
 } from "../../shared/types.ts";
-import type { NestedPathEntry } from "./nested-path.ts";
 import type { McpRuntimeSnapshotHost } from "./mcp-direct-tool-allowlist.ts";
 import type { PermissionRules } from "./permissions.ts";
 import type { StructuredOutputRuntime } from "./structured-output.ts";
@@ -95,7 +94,6 @@ export interface BuildInProcessChildLaunchInput {
 	permissionAuditPath?: string;
 	waitToolEnabled?: boolean;
 	waitToolDefaultTimeoutMs?: number;
-	allowNestedSubagents?: boolean;
 	capabilityCeiling?: ResolvedSubagentCapabilityCeiling;
 	thinkingCeiling?: ThinkingLevel;
 	maxSubagentDepth?: number;
@@ -183,7 +181,6 @@ export function buildInProcessChildLaunch(input: BuildInProcessChildLaunchInput)
 	const toolPlan = resolvePiLaunchToolPlan({
 		tools: input.tools,
 		excludeTools: input.excludeTools,
-		allowNestedSubagents: input.allowNestedSubagents,
 		extensions: input.extensions,
 		subagentOnlyExtensions: input.subagentOnlyExtensions,
 		requiredExtensions,
@@ -202,16 +199,6 @@ export function buildInProcessChildLaunch(input: BuildInProcessChildLaunchInput)
 	});
 
 	const inherited = input.inherited;
-	const fanout = toolPlan.fanoutAuthorized;
-	const inheritedRoute = inherited?.nestedRoute;
-	const parentRunId = input.runId ?? inherited?.nestedParent?.parentRunId ?? "";
-	const parentChildIndex = input.childIndex;
-	const parentDepth = inheritedRoute && inherited?.nestedParent ? inherited.nestedParent.depth + 1 : 1;
-	const parentPath: NestedPathEntry[] = [
-		...(inherited?.nestedParent?.path ?? []),
-		...(parentRunId ? [{ runId: parentRunId, stepIndex: parentChildIndex, agent: input.childAgentName }] : []),
-	];
-	const nestedRoute = fanout ? (input.nestedRoute ?? inheritedRoute) : undefined;
 	const childDepth = resolveChildDepth(input.maxSubagentDepth, inherited);
 	const permissions = input.permissionRules && Object.keys(input.permissionRules).length > 0
 		? { rules: input.permissionRules, ...(input.permissionAuditPath ? { auditPath: input.permissionAuditPath } : {}) }
@@ -227,12 +214,8 @@ export function buildInProcessChildLaunch(input: BuildInProcessChildLaunchInput)
 		...(input.runId ? { runId: input.runId } : {}),
 		agent: input.childAgentName,
 		childIndex: input.childIndex,
-		fanoutChild: fanout,
 		...(input.sessionName?.trim() ? { sessionName: input.sessionName.trim() } : {}),
 				...(input.parentSessionId ? { orchestratorSessionId: input.parentSessionId, parentSessionId: input.parentSessionId } : {}),
-		...(nestedRoute ? { nestedRoute } : {}),
-		...(fanout && parentRunId ? { nestedParent: { parentRunId, parentChildIndex, depth: parentDepth, path: parentPath } } : {}),
-		...(fanout && (input.runFanoutBudget ?? inherited?.runFanoutBudget) ? { runFanoutBudget: input.runFanoutBudget ?? inherited?.runFanoutBudget } : {}),
 		depth: childDepth.depth,
 		maxDepth: childDepth.maxDepth,
 		...(toolPlan.capabilityCeiling ? { capabilityCeiling: toolPlan.capabilityCeiling } : {}),

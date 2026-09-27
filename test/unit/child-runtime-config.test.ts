@@ -5,7 +5,7 @@ import { buildInProcessChildLaunch } from "../../src/runs/shared/child-launch.ts
 import { evaluateChildToolDiagnostic, type ChildRuntimeConfig } from "../../src/runs/shared/child-runtime-config.ts";
 
 function baseConfig(overrides: Partial<ChildRuntimeConfig> = {}): ChildRuntimeConfig {
-	return { fanoutChild: false, depth: 1, waitTool: { enabled: true }, fast: false, ...overrides };
+	return { depth: 1, waitTool: { enabled: true }, fast: false, ...overrides };
 }
 
 interface FakePi {
@@ -31,10 +31,10 @@ function fakePi(available: string[]): FakePi {
 }
 
 describe("child runtime config", () => {
-	it("creates the prompt runtime hook always and the fast and fanout hooks on demand", () => {
+	it("creates the prompt runtime hook always and the fast hook on demand", () => {
 		assert.deepEqual(createChildHooks(baseConfig()).map((hook) => hook.name), ["pi-subagents:prompt-runtime"]);
 		assert.deepEqual(createChildHooks(baseConfig({ fast: true })).map((hook) => hook.name), ["pi-subagents:prompt-runtime", "pi-subagents:fast-mode"]);
-		assert.deepEqual(createChildHooks(baseConfig({ fanoutChild: true })).map((hook) => hook.name), ["pi-subagents:prompt-runtime", "pi-subagents:fanout-child"]);
+		assert.deepEqual(createChildHooks(baseConfig({ fast: false })).map((hook) => hook.name), ["pi-subagents:prompt-runtime"]);
 	});
 
 

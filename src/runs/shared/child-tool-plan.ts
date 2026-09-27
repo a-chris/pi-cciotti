@@ -36,20 +36,12 @@ const PROMPT_RUNTIME_EXTENSION_PATH = path.join(
 	path.dirname(fileURLToPath(import.meta.url)),
 	`subagent-prompt-runtime${path.extname(fileURLToPath(import.meta.url))}`,
 );
-const FANOUT_CHILD_EXTENSION_PATH = path.join(
-	path.dirname(fileURLToPath(import.meta.url)),
-	"..",
-	"..",
-	"extension",
-	`fanout-child${path.extname(fileURLToPath(import.meta.url))}`,
-);
 const FAST_MODE_EXTENSION_PATH = path.join(
 	path.dirname(fileURLToPath(import.meta.url)),
 	`fast-mode-extension${path.extname(fileURLToPath(import.meta.url))}`,
 );
 const SUBAGENT_RUNTIME_EXTENSION_PATHS = new Set([
 	PROMPT_RUNTIME_EXTENSION_PATH,
-	FANOUT_CHILD_EXTENSION_PATH,
 	FAST_MODE_EXTENSION_PATH,
 ].map((extensionPath) => path.normalize(extensionPath)));
 
@@ -144,7 +136,6 @@ function resolveFastModeExtension(input: Pick<ResolvePiLaunchToolPlanInput, "fas
 export interface ResolvePiLaunchToolPlanInput {
 	tools?: string[];
 	excludeTools?: string[];
-	allowNestedSubagents?: boolean;
 	extensions?: string[];
 	subagentOnlyExtensions?: string[];
 	requiredExtensions?: RequiredChildExtensionSnapshot;
@@ -190,7 +181,6 @@ export interface PiLaunchToolPlan {
 	internalTools: string[];
 	effectiveToolAllowlist: string[];
 	requiredChildTools: string[];
-	fanoutAuthorized: boolean;
 	runtimeExtensions: string[];
 	configuredExtensions: string[];
 	requiredExtensions: RequiredChildExtensionSnapshot;
@@ -401,11 +391,9 @@ export function resolvePiLaunchToolPlan(
 	const excludeTools = [...new Set((input.excludeTools ?? []).map((tool) => tool.trim()).filter(Boolean))];
 	const excludedToolSet = new Set(excludeTools);
 	const effectiveDeclaredBuiltinTools = declaredBuiltinTools.filter((tool) => !excludedToolSet.has(tool));
-	const fanoutAuthorized = effectiveDeclaredBuiltinTools.includes("subagent") || (
-		input.allowNestedSubagents === true &&
-		!excludedToolSet.has("subagent") &&
-		(!allowedToolSet || allowedToolSet.has("subagent"))
-	);
+	if (effectiveDeclaredBuiltinTools.includes("subagent")) {
+		throw new Error("Agent tools include 'subagent', which was removed: children cannot launch subagents. Remove 'subagent' from this agent's tools.");
+	}
 	const toolExtensionPaths: string[] = capabilityCeiling?.denyExtensions
 		? []
 		: (input.tools ?? []).filter(
@@ -465,7 +453,6 @@ export function resolvePiLaunchToolPlan(
 	const runtimeExtensions = [
 		PROMPT_RUNTIME_EXTENSION_PATH,
 		...fastModeExtensions,
-		...(fanoutAuthorized ? [FANOUT_CHILD_EXTENSION_PATH] : []),
 		...(permSystemExt ? [permSystemExt] : []),
 	];
 	const disableAmbientExtensions =
@@ -587,7 +574,6 @@ export function resolvePiLaunchToolPlan(
 		internalTools,
 		effectiveToolAllowlist,
 		requiredChildTools,
-		fanoutAuthorized,
 		runtimeExtensions,
 		configuredExtensions,
 		requiredExtensions,

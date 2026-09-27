@@ -371,7 +371,6 @@ async function runSingleAttempt(
 		requireReadTool: Boolean(shared.resolvedSkillNames?.length),
 		tools: agent.tools,
 		excludeTools: agent.excludeTools,
-		allowNestedSubagents: agent.allowNestedSubagents,
 		extensions: agent.extensions,
 		subagentOnlyExtensions: agent.subagentOnlyExtensions,
 		// Exact terminal protocol belongs to session resources, not compactable history.

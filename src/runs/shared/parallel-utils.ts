@@ -44,7 +44,6 @@ export interface RunnerSubagentStep {
 	modelResponseAliases?: Record<string, string[]>;
 	tools?: string[];
 	excludeTools?: string[];
-	allowNestedSubagents?: boolean;
 	extensions?: string[];
 	subagentOnlyExtensions?: string[];
 	/** Private immutable host policy snapshot serialized to the native runner. */

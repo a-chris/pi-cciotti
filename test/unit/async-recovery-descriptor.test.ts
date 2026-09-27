@@ -36,7 +36,6 @@ describe("async recovery descriptor", () => {
 				inheritSkills: false,
 				outputMode: "inline",
 				context: "fork",
-				maxSubagentDepth: 2,
 				share: false,
 			}), "utf-8");
 
@@ -64,7 +63,6 @@ describe("async recovery descriptor", () => {
 				inheritProjectContext: false,
 				inheritSkills: false,
 				outputMode: "inline",
-				maxSubagentDepth: 2,
 				share: false,
 			}), "utf-8");
 			assert.equal(readAsyncRecoveryDescriptor(root)?.baseRef, "@/foo");
@@ -89,7 +87,6 @@ describe("async recovery descriptor", () => {
 					inheritProjectContext: false,
 					inheritSkills: false,
 					outputMode: "inline",
-					maxSubagentDepth: 2,
 					share: false,
 				}), "utf-8");
 				assert.throws(() => readAsyncRecoveryDescriptor(root), /baseRef must be a valid Git ref/);
@@ -112,7 +109,6 @@ describe("async recovery descriptor", () => {
 				inheritProjectContext: true,
 				inheritSkills: false,
 				outputMode: "inline",
-				maxSubagentDepth: 2,
 				share: false,
 			}), "utf-8");
 
@@ -139,7 +135,6 @@ describe("async recovery descriptor", () => {
 				inheritProjectContext: false,
 				inheritSkills: false,
 				outputMode: "inline",
-				maxSubagentDepth: 2,
 				share: false,
 			}), "utf-8");
 
@@ -167,7 +162,6 @@ describe("async recovery descriptor", () => {
 				inheritProjectContext: false,
 				inheritSkills: false,
 				outputMode: "inline",
-				maxSubagentDepth: 2,
 				share: false,
 			}), "utf-8");
 
@@ -194,7 +188,6 @@ describe("async recovery descriptor", () => {
 				inheritSkills: false,
 				outputMode: "inline",
 				context: "other",
-				maxSubagentDepth: 2,
 				share: false,
 			}), "utf-8");
 
@@ -221,7 +214,6 @@ describe("async recovery descriptor", () => {
 				inheritProjectContext: false,
 				inheritSkills: false,
 				outputMode: "inline",
-				maxSubagentDepth: 2,
 				share: false,
 			} as const;
 
@@ -253,7 +245,6 @@ describe("async recovery descriptor", () => {
 				inheritProjectContext: false,
 				inheritSkills: false,
 				outputMode: "inline",
-				maxSubagentDepth: 2,
 				share: false,
 			}), "utf-8");
 			assert.throws(() => readAsyncRecoveryDescriptor(root), /fast must be a boolean/);
@@ -277,7 +268,6 @@ describe("async recovery descriptor", () => {
 				inheritProjectContext: false,
 				inheritSkills: false,
 				outputMode: "inline",
-				maxSubagentDepth: 2,
 				share: false,
 			}), "utf-8");
 

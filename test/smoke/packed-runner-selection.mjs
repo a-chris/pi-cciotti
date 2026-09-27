@@ -28,7 +28,6 @@ const result = executeAsyncSingle("packed-selection", {
 	ctx: { pi: { events: { emit() {} } }, cwd: process.cwd(), currentSessionId: "packed-selector" },
 	artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 	shareEnabled: false,
-	maxSubagentDepth: 1,
 	acceptance: false,
 });
 assert.equal(result.isError, true);

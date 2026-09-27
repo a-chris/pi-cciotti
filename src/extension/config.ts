@@ -226,6 +226,7 @@ function validateConfig(config: Record<string, unknown>): void {
 	validateCapacityConfig(config.capacity);
 	if (config.modelExclusions !== undefined) throw new Error("config.modelExclusions was removed; model failures are no longer persisted or used for automatic switching");
 	if (config.toolDescriptionMode !== undefined) throw new Error("config.toolDescriptionMode was removed; the facade tool descriptions are fixed and depth lives in guide topics");
+	if (config.maxSubagentDepth !== undefined) throw new Error("config.maxSubagentDepth was removed; children cannot launch subagents, so there is no nesting depth to cap");
 	validateModelResponseAliases(config.modelResponseAliases);
 	validateMainWindowRendererConfig(config.mainWindowRenderer);
 	validateOrcaProgressTabsConfig(config.orcaProgressTabs);
@@ -239,7 +240,7 @@ function validateConfig(config: Record<string, unknown>): void {
  */
 const FAIL_CLOSED_CONFIG_KEYS = [
 	"worktreeProvider", "worktreeBranchPrefix",
-	"modelResponseAliases", "modelExclusions", "toolDescriptionMode",
+	"modelResponseAliases", "modelExclusions", "toolDescriptionMode", "maxSubagentDepth",
 	"checkpointBeforeDeadlineMs", "timeoutMs", "toolTimeoutMs", "toolBudget", "control",
 ] as const;
 

@@ -4,11 +4,14 @@ interface AsyncOverrideParams {
 	foregroundOnly?: boolean;
 }
 
+/**
+ * Applies the operator's force-top-level-async policy. The executor always runs at the
+ * top level — children cannot delegate — so there is no depth to consult.
+ */
 export function applyForceTopLevelAsyncOverride<T extends AsyncOverrideParams>(
 	params: T,
-	depth: number,
 	forceTopLevelAsync: boolean,
 ): T {
-	if (params.foregroundOnly || !(depth === 0 && forceTopLevelAsync)) return params;
+	if (params.foregroundOnly || !forceTopLevelAsync) return params;
 	return { ...params, async: true, clarify: false };
 }

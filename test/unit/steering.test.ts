@@ -177,7 +177,6 @@ describe("steering lifecycle ledger", () => {
 			memory: { scope: "user", path: "/current/memory.md" },
 			output: "/current/output.md",
 			toolBudget: { hard: 99, block: "*" },
-			maxSubagentDepth: 9,
 		} as AgentConfig;
 		const recovered = applySteeringRecoveryAgentConfig(current, {
 			version: 1,
@@ -192,7 +191,6 @@ describe("steering lifecycle ledger", () => {
 			inheritSkills: false,
 			outputMode: "inline",
 			initialToolBudget: { hard: 7, block: ["read"] },
-			maxSubagentDepth: 2,
 			share: false,
 		});
 		assert.equal(recovered.model, "original/model");
@@ -200,7 +198,6 @@ describe("steering lifecycle ledger", () => {
 		assert.equal(recovered.systemPrompt, "original prompt");
 		assert.equal(recovered.inheritProjectContext, false);
 		assert.deepEqual(recovered.toolBudget, { hard: 7, block: ["read"] });
-		assert.equal(recovered.maxSubagentDepth, 2);
 		for (const field of ["extensions", "subagentOnlyExtensions", "mcpDirectTools", "skills", "skillPath", "filePath", "completionGuard", "memory", "output"] as const) {
 			assert.equal(recovered[field], undefined, `${field} leaked from current config`);
 		}
@@ -230,7 +227,6 @@ describe("steering lifecycle ledger", () => {
 			inheritProjectContext: false,
 			inheritSkills: false,
 			outputMode: "inline",
-			maxSubagentDepth: 2,
 			share: false,
 		});
 		assert.equal(recovered.thinking, "xhigh");

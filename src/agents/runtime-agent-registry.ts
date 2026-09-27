@@ -46,7 +46,6 @@ export interface RuntimeAgentDefinition {
 	defaultReads?: readonly string[];
 	defaultProgress?: boolean;
 	interactive?: boolean;
-	maxSubagentDepth?: number;
 	completionGuard?: boolean;
 	toolBudget?: ToolBudgetConfig;
 	permissions?: PermissionRules;
@@ -201,7 +200,7 @@ function validateDefinition(value: unknown): RuntimeAgentDefinition {
 		"systemPromptMode", "inheritProjectContext", "inheritGlobalContext", "inheritSkills", "defaultContext", "contextBrief", "defaultAsync", "defaultTimeoutMs",
 		"defaultToolTimeoutMs", "defaultAcceptance", "acceptanceRole", "runner", "skills", "skillPath",
 		"extensions", "subagentOnlyExtensions", "mutationTools", "output", "outputMode", "defaultReads", "defaultProgress", "interactive",
-		"maxSubagentDepth", "completionGuard", "toolBudget", "permissions",
+		"completionGuard", "toolBudget", "permissions",
 	]);
 	const unknown = Object.keys(definition).filter((key) => !supported.has(key));
 	if (unknown.length > 0) throw new Error(`Runtime agent definition has unknown fields: ${unknown.join(", ")}.`);
@@ -240,7 +239,6 @@ function validateDefinition(value: unknown): RuntimeAgentDefinition {
 	const defaultReads = validateStringList(definition.defaultReads, "Runtime agent definition defaultReads");
 	const defaultProgress = validateBoolean(definition.defaultProgress, "Runtime agent definition defaultProgress");
 	const interactive = validateBoolean(definition.interactive, "Runtime agent definition interactive");
-	const maxSubagentDepth = validatePositiveInteger(definition.maxSubagentDepth, "Runtime agent definition maxSubagentDepth");
 	const completionGuard = validateBoolean(definition.completionGuard, "Runtime agent definition completionGuard");
 	const toolBudget = validateToolBudget(definition.toolBudget);
 	const permissions = validatePermissionRules(definition.permissions, "Runtime agent definition permissions");
@@ -274,7 +272,6 @@ function validateDefinition(value: unknown): RuntimeAgentDefinition {
 		...(defaultReads ? { defaultReads } : {}),
 		...(defaultProgress !== undefined ? { defaultProgress } : {}),
 		...(interactive !== undefined ? { interactive } : {}),
-		...(maxSubagentDepth !== undefined ? { maxSubagentDepth } : {}),
 		...(completionGuard !== undefined ? { completionGuard } : {}),
 		...(toolBudget !== undefined ? { toolBudget } : {}),
 		...(permissions !== undefined ? { permissions } : {}),
@@ -355,7 +352,6 @@ function toAgentConfig(name: string, definition: RuntimeAgentDefinition): AgentC
 		...(definition.defaultReads !== undefined ? { defaultReads: [...definition.defaultReads] } : {}),
 		...(definition.defaultProgress !== undefined ? { defaultProgress: definition.defaultProgress } : {}),
 		...(definition.interactive !== undefined ? { interactive: definition.interactive } : {}),
-		...(definition.maxSubagentDepth !== undefined ? { maxSubagentDepth: definition.maxSubagentDepth } : {}),
 		...(definition.completionGuard !== undefined ? { completionGuard: definition.completionGuard } : {}),
 		...(definition.toolBudget !== undefined ? { toolBudget: definition.toolBudget } : {}),
 		...(definition.permissions !== undefined ? { permissions: definition.permissions } : {}),

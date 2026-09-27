@@ -17,7 +17,6 @@ Child-safety boundaries are enforced at runtime:
 - Child sessions do not receive the bundled `pi-subagents` skill.
 - Forked child context filtering removes parent-only subagent artifacts (including old hidden orchestration-instruction messages, slash/status/control messages, and prior parent `subagent` tool-call/tool-result history) while preserving ordinary prose and unrelated tool calls/results.
 - By default, children do not register the `subagent` tool and receive boundary instructions that they are not the parent orchestrator and must not propose or run subagents.
-- The explicit exception is an agent whose resolved builtin `tools` includes `subagent`; that child gets a child-safe `subagent` tool for the fanout work the parent assigned, still bounded by `maxSubagentDepth`.
 
 ### Execution-mode boundaries after failures
 
@@ -354,26 +353,6 @@ Use `baseRef` to branch managed worktrees from `HEAD` or a supported named ref s
 Configure the worktree provider, native path layout, base directory, and setup hook in [configuration.md](configuration.md).
 
 Setup waits remain nonblocking and cancellable. Normal cleanup, including detached foreground finalization, waits for the same in-process setup turn rather than retaining worktrees merely because another setup is active. This is not a cross-process lock. Hooks must follow the [finite setup contract](configuration.md#worktreesetuphook).
-
-## Recursion guard
-
-Subagents can call `subagent` only when their resolved builtin tools explicitly include `subagent`. That is meant for delegated fanout agents, not ordinary worker/reviewer children. A depth guard prevents unbounded nesting.
-
-By default, nesting is limited to two levels: main session → subagent → sub-subagent. Deeper calls are blocked with guidance to complete the current task directly. Nested runs appear in the parent status widget and `status` output as a tree, and `status`, `interrupt`, and `resume` can target a nested run by its id.
-
-Configure the limit with:
-
-1. `PI_SUBAGENT_MAX_DEPTH` before starting Pi
-2. `config.maxSubagentDepth`
-3. `maxSubagentDepth` in agent frontmatter, which can only tighten the inherited limit
-
-```bash
-export PI_SUBAGENT_MAX_DEPTH=3
-export PI_SUBAGENT_MAX_DEPTH=1
-export PI_SUBAGENT_MAX_DEPTH=0
-```
-
-`PI_SUBAGENT_MAX_DEPTH` applies to the top-level parent; children inherit their limit through their runtime config, and their own depth is tracked there too.
 
 ## Prompt-template integration
 

@@ -757,7 +757,6 @@ export default function() {
 					artifactConfig,
 					artifactsDir: path.join(tempDir, ".pi/subagents", "artifacts"),
 					shareEnabled: false,
-					maxSubagentDepth: 2,
 					output: outputPath,
 					outputMode,
 					acceptance: { level: "checked", criteria: ["Report the findings"] },

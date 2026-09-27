@@ -35,8 +35,7 @@ it("native reviewer consumes nested persona results via exact, prefix, and aggre
 	try {
 		const reviewer = makeAgent("reviewer", { model: "nested-wait-fixture/reviewer", tools: ["read", "subagent", "bg_wait"], extensions: [extension], inheritGlobalContext: false, inheritProjectContext: false, inheritSkills: false });
 		const result = await runSync(root, [reviewer], "reviewer", "Review using the two assigned arms", {
-			runId: "native-nested-wait", sessionDir: path.join(root, "sessions"), share: true, maxSubagentDepth: 4,
-			timeoutMs: 45000, waitToolDefaultTimeoutMs: 25000, childSessionFactory: factory,
+			runId: "native-nested-wait", sessionDir: path.join(root, "sessions"), share: true,			timeoutMs: 45000, waitToolDefaultTimeoutMs: 25000, childSessionFactory: factory,
 		});
 		assert.equal(result.exitCode, 0, `${result.error}\nAudit: ${fs.readFileSync(auditPath, "utf8")}`);
 		assert.equal(result.finalOutput, "CONSUMED_reviewer: PERSONA_EVIDENCE");

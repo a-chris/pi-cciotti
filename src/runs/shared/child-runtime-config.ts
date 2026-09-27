@@ -51,9 +51,6 @@ export interface ChildRuntimeConfig {
 	nestedRoute?: ChildNestedRoute;
 	nestedParent?: ChildNestedParent;
 	runFanoutBudget?: RunFanoutBudgetDescriptor;
-	/** Nesting depth of this child (1 for a top-level parent's child). */
-	depth: number;
-	maxDepth?: number;
 	capabilityCeiling?: ResolvedSubagentCapabilityCeiling;
 	/** Immutable root-parent host policy propagated to nested native launches. */
 	requiredExtensions?: RequiredChildExtensionSnapshot;

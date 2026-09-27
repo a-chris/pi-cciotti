@@ -49,7 +49,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(result.isError, undefined);
@@ -81,7 +80,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				},
 				shareEnabled: false,
 				sessionRoot: path.join(tempDir, "sessions"),
-				maxSubagentDepth: 2,
 			});
 
 			assert.equal(result.isError, undefined);
@@ -149,7 +147,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				cleanupDays: 7,
 			},
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		await waitForMockPiCall(mockPi, 2, 10_000);
@@ -178,7 +175,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const asyncDir = path.join(ASYNC_DIR, id);
@@ -234,7 +230,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 					artifactConfig: { enabled: true, includeInput: false, includeOutput: true, includeJsonl: true, includeMetadata: true, cleanupDays: 7 },
 					artifactsDir: path.join(tempDir, "artifacts", id),
 					shareEnabled: false,
-					maxSubagentDepth: 2,
 				});
 				assert.ok(!launch.isError, JSON.stringify(launch));
 				const asyncDir = path.join(ASYNC_DIR, id);
@@ -290,7 +285,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-inbox-steer" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 		await waitForMockPiCall(mockPi, 0, 10_000);
 		const asyncDir = path.join(ASYNC_DIR, id);
@@ -340,7 +334,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-steer-unconsumed-queued" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 		await waitForMockPiCall(mockPi, 0, 10_000);
 		const scriptedFinal = path.join(mockPi.dir, "scripted-final.jsonl");
@@ -399,7 +392,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-steer-consumed" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 		await waitForMockPiCall(mockPi, 0, 10_000);
 		const scriptedFinal = path.join(mockPi.dir, "scripted-final.jsonl");
@@ -466,7 +458,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				cleanupDays: 7,
 			},
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		await waitForMockPiCall(mockPi, 1, 10_000);
@@ -513,7 +504,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 					cleanupDays: 7,
 				},
 				shareEnabled: false,
-				maxSubagentDepth: 2,
 				timeoutMs: 1_500,
 			});
 
@@ -559,7 +549,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				cleanupDays: 7,
 			},
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const payload = await readAsyncPayload(id);
@@ -593,7 +582,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 					cleanupDays: 7,
 				},
 				shareEnabled: false,
-				maxSubagentDepth: 2,
 			});
 
 			// The child writes after its mutation baseline, then stays blocked.
@@ -661,7 +649,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 					cleanupDays: 7,
 				},
 				shareEnabled: false,
-				maxSubagentDepth: 2,
 				timeoutMs: 8_000, // run-level budget is longer; the per-tool timer must fire first
 			});
 
@@ -691,7 +678,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 				shareEnabled: false,
-				maxSubagentDepth: 2,
 				timeoutMs: 5_000,
 			});
 
@@ -731,7 +717,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 					cleanupDays: 7,
 				},
 				shareEnabled: false,
-				maxSubagentDepth: 2,
 				timeoutMs: 8_000,
 			});
 
@@ -767,7 +752,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 					cleanupDays: 7,
 				},
 				shareEnabled: false,
-				maxSubagentDepth: 2,
 				timeoutMs: 300,
 			});
 
@@ -805,7 +789,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 					cleanupDays: 7,
 				},
 				shareEnabled: false,
-				maxSubagentDepth: 2,
 				timeoutMs: 8_000,
 			});
 
@@ -850,7 +833,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 					cleanupDays: 7,
 				},
 				shareEnabled: false,
-				maxSubagentDepth: 2,
 				timeoutMs: 8_000,
 			});
 
@@ -889,7 +871,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				cleanupDays: 7,
 			},
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const payload = await readAsyncPayload(id);
@@ -918,7 +899,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				cleanupDays: 7,
 			},
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 			timeoutMs,
 		});
 
@@ -957,7 +937,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			},
 			artifactsDir: path.join(tempDir, ".pi/subagents", "artifacts"),
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 			timeoutMs,
 			acceptance: {
 				level: "verified",
@@ -1001,7 +980,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			},
 			artifactConfig,
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		};
 		const startedEvent = (id: string): { task?: string; goal?: string } => {
 			const event = emitted.find((entry) => entry.channel === SUBAGENT_ASYNC_STARTED_EVENT && (entry.data as { id?: string }).id === id);
@@ -1102,7 +1080,7 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			agent: agent.name, task: "Inspect using fixture search", agentConfig: agent,
 			ctx: { pi: host, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-			shareEnabled: false, sessionRoot: path.join(tempDir, "sessions"), maxSubagentDepth: 2, acceptance: false,
+			shareEnabled: false, sessionRoot: path.join(tempDir, "sessions"), acceptance: false,
 		});
 		const payload = await readAsyncPayload(id);
 		assert.equal(payload.success, true);
@@ -1121,7 +1099,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} }, getAllTools: () => [{ name: "read", sourceInfo: { source: "extension" } }, { name: "bash", sourceInfo: { source: "builtin" } }] }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id, 10_000);
@@ -1144,7 +1121,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 			acceptance: false,
 		});
 
@@ -1195,7 +1171,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-role-task-patch" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 		const patchPayload = await readAsyncPayload(patchId);
 		assert.equal(patchPayload.results[0]?.acceptance?.effectiveAcceptance?.level, "checked");
@@ -1208,7 +1183,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-role-task-review" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 		const reviewPayload = await readAsyncPayload(reviewId);
 		assert.equal(reviewPayload.results[0]?.acceptance?.effectiveAcceptance?.level, "none");
@@ -1233,7 +1207,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			artifactConfig: { enabled: true, includeInput: false, includeOutput: true, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			artifactsDir: path.join(tempDir, ".pi/subagents", "artifacts"),
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(launch.isError, undefined);
@@ -1294,7 +1267,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-acceptance" },
 			artifactConfig,
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 			acceptance: { level: "checked", criteria: ["Patch bug"], review: { agent: "reviewer", required: true } },
 		});
 		const resultPath = await waitForAsyncResultFile(id, 10_000);
@@ -1318,7 +1290,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-preserved-index" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 			acceptance: { level: "checked", preserveStagedIndex: true },
 		});
 		const payload = JSON.parse(fs.readFileSync(await waitForAsyncResultFile(id, 10_000), "utf-8")) as AsyncResultPayload;
@@ -1340,7 +1311,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-malformed" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(result.isError, true);
@@ -1373,7 +1343,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-structured" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		assert.ok(!result.isError);
@@ -1422,7 +1391,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-parallel-funnel-fanout" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		assert.ok(!result.isError, `should launch: ${JSON.stringify(result.content)}`);
@@ -1484,7 +1452,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			artifactConfig: { enabled: true, includeInput: false, includeOutput: true, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			artifactsDir: path.join(tempDir, ".pi/subagents", "artifacts"),
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		assert.ok(!result.isError);
@@ -1540,7 +1507,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-dynamic-explicit-output" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(launch.isError, undefined);
@@ -1577,7 +1543,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-dynamic-acceptance-timeout" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 			timeoutMs: 1_000,
 		});
 
@@ -1682,7 +1647,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				cleanupDays: 7,
 			},
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const payload = JSON.parse(fs.readFileSync(await waitForAsyncResultFile(id), "utf-8")) as AsyncResultPayload;
@@ -1726,7 +1690,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				cleanupDays: 7,
 			},
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const payload = JSON.parse(fs.readFileSync(await waitForAsyncResultFile(id), "utf-8"));
@@ -1774,7 +1737,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				cleanupDays: 7,
 			},
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const payload = JSON.parse(fs.readFileSync(await waitForAsyncResultFile(id), "utf-8"));
@@ -1809,7 +1771,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			availableModels: [{ provider: "openai", id: "gpt-5-mini", fullId: "openai/gpt-5-mini" }],
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const payload = JSON.parse(fs.readFileSync(await waitForAsyncResultFile(id), "utf-8"));
@@ -1843,7 +1804,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			availableModels: [{ provider: "openai", id: "gpt-5-mini", fullId: "openai/gpt-5-mini" }],
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const payload = JSON.parse(fs.readFileSync(await waitForAsyncResultFile(id), "utf-8"));

@@ -60,7 +60,6 @@ import {
 	SUBAGENT_LIFECYCLE_ARTIFACT_VERSION,
 	TEMP_ROOT_DIR,
 	getAsyncConfigPath,
-	resolveChildMaxSubagentDepth,
 } from "../../shared/types.ts";
 import { inheritedNestedParentAddressOf, inheritedNestedRouteOf, nestedResultsPath, nestedSummaryFromAsyncStatus, writeNestedEvent } from "../shared/nested-events.ts";
 import type { ChildRuntimeConfig } from "../shared/child-runtime-config.ts";
@@ -202,7 +201,6 @@ interface AsyncChainParams {
 	contextForAgent?: (agentName: string) => ContextMode;
 	progressDir?: string;
 	dynamicFanoutMaxItems?: number;
-	maxSubagentDepth: number;
 	waitToolEnabled?: boolean;
 	waitToolDefaultTimeoutMs?: number;
 	worktreeSetupHook?: string;
@@ -269,7 +267,6 @@ interface AsyncSingleParams {
 	fast?: boolean;
 	thinkingOverride?: AgentConfig["thinking"];
 	availableModels?: AvailableModelInfo[];
-	maxSubagentDepth: number;
 	waitToolEnabled?: boolean;
 	waitToolDefaultTimeoutMs?: number;
 	worktreeSetupHook?: string;
@@ -338,7 +335,6 @@ export interface AsyncRunnerStepBuildParams {
 	progressDir?: string;
 	agentContract?: AgentContract;
 	dynamicFanoutMaxItems?: number;
-	maxSubagentDepth: number;
 	waitToolEnabled?: boolean;
 	waitToolDefaultTimeoutMs?: number;
 	worktreeBaseDir?: string;
@@ -886,7 +882,6 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 		cwd,
 		sessionFilesByFlatIndex,
 		thinkingOverridesByFlatIndex,
-		maxSubagentDepth,
 		worktreeBaseDir,
 		worktreeProvider,
 		worktreeBranchPrefix,
@@ -1158,7 +1153,6 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 			...(namespaceOutputPath ? { namespaceOutputPath: true } : {}),
 			outputMode: behavior.outputMode,
 			sessionFile,
-			maxSubagentDepth: resolveChildMaxSubagentDepth(maxSubagentDepth, a.maxSubagentDepth),
 			timeoutMs: a.defaultTimeoutMs ?? DEFAULT_ASYNC_TIMEOUT_MS,
 			toolTimeoutMs: resolvedToolTimeout.toolTimeoutMs,
 			waitToolEnabled: params.waitToolEnabled,
@@ -1336,7 +1330,6 @@ export function executeAsyncChain(
 		sessionRoot,
 		sessionFilesByFlatIndex,
 		thinkingOverridesByFlatIndex,
-		maxSubagentDepth,
 		worktreeSetupHook,
 		worktreeSetupHookTimeoutMs,
 		worktreeBaseDir,
@@ -1391,7 +1384,6 @@ export function executeAsyncChain(
 		agentContract: params.agentContract,
 		outputBaseDir: artifactsDir ? path.join(artifactsDir, "outputs", id) : undefined,
 		dynamicFanoutMaxItems: params.dynamicFanoutMaxItems,
-		maxSubagentDepth,
 		waitToolEnabled: params.waitToolEnabled,
 		waitToolDefaultTimeoutMs: params.waitToolDefaultTimeoutMs,
 		worktreeBaseDir,
@@ -1647,7 +1639,6 @@ export function executeAsyncSingle(
 		shareEnabled,
 		sessionRoot,
 		sessionFile,
-		maxSubagentDepth,
 		worktreeSetupHook,
 		worktreeSetupHookTimeoutMs,
 		worktreeBaseDir,
@@ -1934,7 +1925,6 @@ export function executeAsyncSingle(
 		...(params.baseRef !== undefined ? { baseRef: params.baseRef } : {}),
 		...(deadlineAt !== undefined ? { absoluteDeadlineAt: deadlineAt } : {}),
 		...(resolvedToolBudget.budget ? { initialToolBudget: resolvedToolBudget.budget } : {}),
-		maxSubagentDepth: resolveChildMaxSubagentDepth(maxSubagentDepth, recoveryAgentConfig.maxSubagentDepth),
 		...(maxOutput ? { maxOutput } : {}),
 		share: shareEnabled,
 		...(resolvedSessionDir ? { sessionDir: resolvedSessionDir } : {}),
@@ -1995,7 +1985,6 @@ export function executeAsyncSingle(
 						...(params.outputClaimPath ? { outputClaimPath: params.outputClaimPath } : {}),
 						outputMode,
 						...(!externalRunner && sessionFile ? { sessionFile } : {}),
-						maxSubagentDepth: resolveChildMaxSubagentDepth(maxSubagentDepth, agentConfig.maxSubagentDepth),
 						waitToolEnabled: params.waitToolEnabled,
 						waitToolDefaultTimeoutMs: params.waitToolDefaultTimeoutMs,
 						...(params.agentContract ? { agentContract: params.agentContract } : {}),

@@ -33,7 +33,6 @@ test("detached spawn does not keep an inherited bundled-layout PI_PACKAGE_DIR", 
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(bundled, "sessions"),
-			maxSubagentDepth: 1,
 			acceptance: false,
 		});
 		assert.match(result.content[0]!.text, /spawn boundary captured/);
@@ -73,7 +72,7 @@ test("detached launch honors the package-root environment override when host det
 			agent: "worker", task: "Inspect files", agentConfig: makeAgent("worker"),
 			ctx: { pi: { events: { emit() {} } }, cwd: override, currentSessionId: "env-package-root" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-			shareEnabled: false, sessionRoot: path.join(override, "sessions"), maxSubagentDepth: 1, acceptance: false,
+			shareEnabled: false, sessionRoot: path.join(override, "sessions"), acceptance: false,
 		});
 		assert.match(result.content[0]!.text, /spawn boundary captured/);
 		assert.equal(spawn.mock.calls[0]!.arguments[2].env[PI_CODING_AGENT_PACKAGE_ROOT_ENV], override);
@@ -103,7 +102,7 @@ test("detached launch ignores a whitespace-only package-root override", async (t
 			agent: "worker", task: "Inspect files", agentConfig: makeAgent("worker"),
 			ctx: { pi: { events: { emit() {} } }, cwd: root, currentSessionId: "blank-package-root" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-			shareEnabled: false, sessionRoot: path.join(root, "sessions"), maxSubagentDepth: 1, acceptance: false,
+			shareEnabled: false, sessionRoot: path.join(root, "sessions"), acceptance: false,
 		});
 		assert.equal(result.isError, true);
 		assert.match(result.content[0]!.text, /installed npm package.*neither is available/);
@@ -136,7 +135,7 @@ test("npm detached launch fails closed when the detected package root is absent"
 			agent: "worker", task: "Inspect files", agentConfig: makeAgent("worker"),
 			ctx: { pi: { events: { emit() {} } }, cwd: root, currentSessionId: "missing-npm-root" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-			shareEnabled: false, sessionRoot: path.join(root, "sessions"), maxSubagentDepth: 1, acceptance: false,
+			shareEnabled: false, sessionRoot: path.join(root, "sessions"), acceptance: false,
 		});
 		assert.equal(result.isError, true);
 		assert.match(result.content[0]!.text, /installed npm package.*neither is available/);

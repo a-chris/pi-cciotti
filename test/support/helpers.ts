@@ -68,7 +68,6 @@ interface AgentConfig {
 	progress?: boolean;
 	toolBudget?: { soft?: number; hard: number; block?: string[] | "*" };
 	mcpDirectTools?: string[];
-	maxSubagentDepth?: number;
 	completionGuard?: boolean;
 }
 

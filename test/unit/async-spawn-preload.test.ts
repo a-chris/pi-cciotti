@@ -59,7 +59,7 @@ test("executeAsyncSingle preloads all peer aliases before the selected runner lo
 				agent: "worker", task: "Inspect launch wiring", agentConfig: makeAgent("worker", configuredExtension ? { extensions: [configuredExtension] } : {}),
 				ctx: { pi: { events: { emit() {} } }, cwd: root, currentSessionId: "spawn-preload-session" },
 				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-				shareEnabled: false, sessionRoot: path.join(root, "sessions"), maxSubagentDepth: 1, acceptance: false,
+				shareEnabled: false, sessionRoot: path.join(root, "sessions"), acceptance: false,
 			});
 			assert.equal(result.isError, true);
 			if (scenario === "missing-pre-chord") {

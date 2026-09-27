@@ -134,7 +134,6 @@ export default function() {
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 			controlConfig: { enabled: true, needsAttentionAfterMs: 999_999, activeNoticeAfterTurns: 1, activeNoticeAfterMs: 999_999, activeNoticeAfterTokens: 999_999, failedToolAttemptsBeforeAttention: 3, notifyOn: ["active_long_running", "needs_attention"], notifyChannels: ["event", "async"] },
 		});
 		assert.notEqual(launched.isError, true);
@@ -210,7 +209,7 @@ setTimeout(() => process.exit(90), 15000).unref();
 					agents: [makeAgent("worker", { completionGuard: false })],
 					ctx: { pi: { events: bus }, cwd: repo, currentSessionId: "session-1" },
 					artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-					shareEnabled: false, sessionRoot: path.join(tempDir, "sessions"), maxSubagentDepth: 2, acceptance: false,
+					shareEnabled: false, sessionRoot: path.join(tempDir, "sessions"), acceptance: false,
 					...(allocatorFailure ? { worktreeProvider: "worktrunk" } : { worktreeProvider: "native", worktreeBaseDir: path.join(baseDir, "trees"), worktreeSetupHook: hook }),
 					...(mode === "deadline" ? { timeoutMs: 4_000 } : {}),
 				});
@@ -343,7 +342,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(result.isError, true);
@@ -372,7 +370,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(singleResult.isError, true);
@@ -395,7 +392,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(chainResult.isError, true);
@@ -426,7 +422,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 				},
 				shareEnabled: false,
 				sessionRoot: path.join(tempDir, "sessions"),
-				maxSubagentDepth: 2,
 			});
 
 			assert.equal(result.isError, true);
@@ -462,7 +457,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(result.isError, true);
@@ -481,8 +475,7 @@ setTimeout(() => process.exit(90), 15000).unref();
 			agent: "worker", task: "Do work", agentConfig: makeAgent("worker"),
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-			shareEnabled: false, sessionRoot: path.join(tempDir, "sessions"), maxSubagentDepth: 2,
-		});
+			shareEnabled: false, sessionRoot: path.join(tempDir, "sessions"),		});
 		await waitForMockPiCall(mockPi, 0, 10_000);
 		const scriptedFinal = path.join(mockPi.dir, "scripted-final.jsonl");
 		const deadline = Date.now() + 10_000;
@@ -512,8 +505,7 @@ setTimeout(() => process.exit(90), 15000).unref();
 				agent: "worker", task: "Do work", agentConfig: makeAgent("worker"),
 				ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-				shareEnabled: false, sessionRoot: path.join(tempDir, "sessions"), maxSubagentDepth: 2,
-			});
+				shareEnabled: false, sessionRoot: path.join(tempDir, "sessions"),			});
 			const payload = await readAsyncPayload(id);
 			assert.equal(payload.success, true, payload.results[0]?.error);
 			assert.equal(payload.results[0]?.output, "after continuation");
@@ -546,7 +538,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			},
 			shareEnabled: false,
 			sessionRoot,
-			maxSubagentDepth: 2,
 		});
 
 		const deadline = Date.now() + 10_000;
@@ -585,7 +576,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		const deadline = Date.now() + 10_000;
@@ -630,7 +620,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		const deadline = Date.now() + 10_000;
@@ -691,7 +680,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 				sessionRoot: path.join(tempDir, "sessions"),
 				output: outputPath,
 				outputMode: "file-only",
-				maxSubagentDepth: 2,
 			});
 
 			const resultPath = await waitForAsyncResultFile(id);
@@ -755,7 +743,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			sessionRoot: path.join(tempDir, "sessions"),
 			output: outputPath,
 			outputMode: "file-only",
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id);
@@ -812,7 +799,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			sessionRoot: path.join(tempDir, "sessions"),
 			output: outputPath,
 			outputMode: "file-only",
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id);
@@ -867,7 +853,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id);
@@ -920,7 +905,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 				ctx: { pi: { events: { emit() {} } }, cwd: repo, currentSessionId: "session-1" },
 				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 				shareEnabled: false,
-				maxSubagentDepth: 2,
 			});
 
 			const payload = await readAsyncPayload(id);
@@ -960,7 +944,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 			controlConfig: {
 				enabled: true,
 				needsAttentionAfterMs: 999_999,
@@ -1028,7 +1011,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 			controlConfig: {
 				enabled: true,
 				needsAttentionAfterMs: 200,
@@ -1091,7 +1073,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 			controlConfig: {
 				enabled: true,
 				needsAttentionAfterMs: 999_999,
@@ -1153,7 +1134,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 			controlConfig: {
 				enabled: true,
 				needsAttentionAfterMs: 999_999,
@@ -1244,7 +1224,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 				},
 				shareEnabled: false,
 				sessionRoot,
-				maxSubagentDepth: 2,
 			});
 
 			const resultPath = await waitForAsyncResultFile(id, 10_000);
@@ -1295,7 +1274,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			},
 			shareEnabled: false,
 			sessionRoot,
-			maxSubagentDepth: 2,
 		});
 
 		const liveDeadline = Date.now() + 10_000;

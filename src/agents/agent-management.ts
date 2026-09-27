@@ -383,7 +383,6 @@ export function preservedAgentFrontmatterFields(agent: AgentConfig, cfg: Record<
 	if (hasKey(cfg, "outputMode")) changed("outputMode");
 	if (hasKey(cfg, "reads")) changed("defaultReads");
 	if (hasKey(cfg, "progress")) changed("defaultProgress");
-	if (hasKey(cfg, "maxSubagentDepth")) changed("maxSubagentDepth");
 	if (hasKey(cfg, "completionGuard")) {
 		changed("completionGuard");
 		if (cfg.completionGuard === true) fields.add("completionGuard");
@@ -600,12 +599,6 @@ function applyAgentConfig(target: AgentConfig, cfg: Record<string, unknown>): st
 		if (typeof cfg.progress !== "boolean") return "config.progress must be a boolean when provided.";
 		target.defaultProgress = cfg.progress;
 	}
-	if (hasKey(cfg, "maxSubagentDepth")) {
-		if (cfg.maxSubagentDepth === false || cfg.maxSubagentDepth === "") delete target.maxSubagentDepth;
-		else if (typeof cfg.maxSubagentDepth === "number" && Number.isInteger(cfg.maxSubagentDepth) && cfg.maxSubagentDepth >= 0) {
-			target.maxSubagentDepth = cfg.maxSubagentDepth;
-		} else return "config.maxSubagentDepth must be an integer >= 0 or false when provided.";
-	}
 	if (hasKey(cfg, "completionGuard")) {
 		if (typeof cfg.completionGuard !== "boolean") return "config.completionGuard must be a boolean when provided.";
 		target.completionGuard = cfg.completionGuard;
@@ -628,7 +621,6 @@ function applyAgentConfig(target: AgentConfig, cfg: Record<string, unknown>): st
 			target.subagentOnlyExtensions?.length ? "subagentOnlyExtensions" : undefined,
 			target.mutationTools?.length ? "mutationTools" : undefined,
 			target.skills?.length || target.skillPath?.length ? "skills" : undefined,
-			target.maxSubagentDepth !== undefined ? "maxSubagentDepth" : undefined,
 			target.completionGuard !== undefined ? "completionGuard" : undefined,
 			target.toolBudget ? "toolBudget" : undefined,
 		].filter((field): field is string => Boolean(field));
@@ -966,7 +958,6 @@ function formatAgentDetail(agent: AgentConfig): string {
 	if (agent.outputMode) lines.push(`Output mode: ${agent.outputMode}`);
 	if (agent.defaultReads?.length) lines.push(`Reads: ${agent.defaultReads.join(", ")}`);
 	if (agent.defaultProgress) lines.push("Progress: true");
-	if (agent.maxSubagentDepth !== undefined) lines.push(`Max subagent depth: ${agent.maxSubagentDepth}`);
 	if (agent.completionGuard === false) lines.push("Completion guard: false");
 	if (agent.toolBudget) lines.push(`Tool budget: ${JSON.stringify(agent.toolBudget)}`);
 	if (agent.memory) lines.push(`Memory: ${agent.memory.scope} scope, path: ${agent.memory.path}`);

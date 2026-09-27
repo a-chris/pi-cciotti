@@ -27,7 +27,7 @@ function createExecutor(authorityPolicy?: AuthorityPolicyConfig) {
 	return createSubagentExecutor({
 		pi: { events: { emit() {}, on() { return () => {}; } }, getSessionName() { return "parent"; } } as any,
 		state: createState(),
-		config: { maxSubagentDepth: 2, control: {}, ...(authorityPolicy ? { authorityPolicy } : {}) } as any,
+		config: { control: {}, ...(authorityPolicy ? { authorityPolicy } : {}) } as any,
 		asyncByDefault: false,
 		tempArtifactsDir: os.tmpdir(),
 		getSubagentSessionRoot: () => os.tmpdir(),

@@ -70,7 +70,6 @@ export function buildRunnerChildLaunch(step: RunnerSubagentStep, ctx: RunnerChil
 		waitToolEnabled: step.waitToolEnabled,
 		waitToolDefaultTimeoutMs: step.waitToolDefaultTimeoutMs,
 		thinkingCeiling: step.thinkingCeiling,
-		maxSubagentDepth: step.maxSubagentDepth,
 		inherited: ctx.inheritedChildRuntime,
 		hostAvailableBuiltins: ctx.hostAvailableBuiltins,
 		host: "runner",

@@ -3661,31 +3661,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		assert.equal(fs.readFileSync(result.artifactPaths.outputPath, "utf-8"), "full saved output\nwith details");
 	});
 
-	it("passes maxSubagentDepth through to the child runtime config", async () => {
-		mockPi.onCall({ output: "ok" });
-		const agents = makeAgentConfigs(["echo"]);
-		const prevDepth = process.env.PI_SUBAGENT_DEPTH;
-		const prevMaxDepth = process.env.PI_SUBAGENT_MAX_DEPTH;
-		delete process.env.PI_SUBAGENT_DEPTH;
-		delete process.env.PI_SUBAGENT_MAX_DEPTH;
-
-		try {
-			const result = await runSync(tempDir, agents, "echo", "Task", {
-				runId: "depth-env",
-				maxSubagentDepth: 1,
-			});
-
-			assert.equal(result.exitCode, 0);
-			assert.equal(readCall().runtime?.depth, 1);
-			assert.equal(readCall().runtime?.maxDepth, 1);
-		} finally {
-			if (prevDepth === undefined) delete process.env.PI_SUBAGENT_DEPTH;
-			else process.env.PI_SUBAGENT_DEPTH = prevDepth;
-			if (prevMaxDepth === undefined) delete process.env.PI_SUBAGENT_MAX_DEPTH;
-			else process.env.PI_SUBAGENT_MAX_DEPTH = prevMaxDepth;
-		}
-	});
-
 	it("passes the effective wait-tool setting through to child execution", async () => {
 		mockPi.onCall({ output: "ok" });
 		const result = await runSync(tempDir, makeAgentConfigs(["echo"]), "echo", "Task", {

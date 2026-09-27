@@ -30,7 +30,6 @@ describe("async permission forwarding session identity", () => {
 				parentSessionId: "session-abc123",
 				permissions: { rules: { write: "ask" } },
 			},
-			maxSubagentDepth: 1,
 			asyncDir: "/tmp/async-run",
 		});
 
@@ -60,7 +59,6 @@ describe("async permission forwarding session identity", () => {
 			},
 			sessionFilesByFlatIndex: [undefined, "/tmp/dynamic-0.jsonl", "/tmp/dynamic-1.jsonl", "/tmp/static-worker.jsonl"],
 			thinkingOverridesByFlatIndex: [undefined, "off", "off", "off"],
-			maxSubagentDepth: 1,
 			asyncDir: "/tmp/async-run",
 		});
 
@@ -86,7 +84,6 @@ describe("async permission forwarding session identity", () => {
 				currentSessionId: "/tmp/parent-session.jsonl",
 			},
 			thinkingOverridesByFlatIndex: ["off"],
-			maxSubagentDepth: 1,
 			asyncDir: "/tmp/async-run",
 		});
 

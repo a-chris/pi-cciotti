@@ -173,7 +173,6 @@ export interface AgentConfig {
 	defaultReads?: string[];
 	defaultProgress?: boolean;
 	interactive?: boolean;
-	maxSubagentDepth?: number;
 	completionGuard?: boolean;
 	toolBudget?: ToolBudgetConfig;
 	permissions?: PermissionRules;
@@ -1943,7 +1942,7 @@ function parseAgentRunnerFrontmatter(raw: string | undefined, agentName: string)
 
 function validateExternalRunnerProfile(frontmatter: Record<string, string>, agentName: string, runner: AgentRunnerConfig | undefined): void {
 	if (runner?.type !== "external-cli" && runner?.type !== "external-job") return;
-	const unsupported = ["tools", "excludeTools", "model", "thinking", "extensions", "subagentOnlyExtensions", "mutationTools", "maxSubagentDepth", "completionGuard", "skills", "skill", "skillPath", "toolBudget", "permission", "permissions"]
+	const unsupported = ["tools", "excludeTools", "model", "thinking", "extensions", "subagentOnlyExtensions", "mutationTools", "completionGuard", "skills", "skill", "skillPath", "toolBudget", "permission", "permissions"]
 		.filter((field) => frontmatter[field] !== undefined);
 	if (unsupported.length > 0) {
 		throw new Error(`Agent '${agentName}' uses runner.type='${runner.type}' and declares unsupported Pi-only fields: ${unsupported.join(", ")}.`);
@@ -2111,13 +2110,15 @@ function loadAgentsFromDefinitionFiles(files: AgentDefinitionFile[], source: Age
 		if (frontmatter.allowNestedSubagents !== undefined) {
 			throw new Error(`Agent '${localName}' sets allowNestedSubagents, which was removed: children cannot launch subagents. Delete this field.`);
 		}
+		if (frontmatter.maxSubagentDepth !== undefined) {
+			throw new Error(`Agent '${localName}' sets maxSubagentDepth, which was removed: there is no subagent depth cap any more. Delete this field.`);
+		}
 
 		const extraFields: Record<string, string> = {};
 		for (const [key, value] of Object.entries(frontmatter)) {
 			if (!KNOWN_FIELDS.has(key)) extraFields[key] = value;
 		}
 
-		const parsedMaxSubagentDepth = Number(frontmatter.maxSubagentDepth);
 		if (frontmatter.permission !== undefined && frontmatter.permissions !== undefined) {
 			throw new Error(`Agent '${localName}' cannot declare both permission and permissions frontmatter.`);
 		}
@@ -2145,9 +2146,6 @@ function loadAgentsFromDefinitionFiles(files: AgentDefinitionFile[], source: Age
 				? true
 				: undefined;
 
-		const maxSubagentDepth = Number.isInteger(parsedMaxSubagentDepth) && parsedMaxSubagentDepth >= 0
-			? parsedMaxSubagentDepth
-			: undefined;
 		const memory = parseMemoryFrontmatter(frontmatter.memory);
 		const agent: AgentConfig = {
 			name: runtimeName,
@@ -2192,7 +2190,6 @@ function loadAgentsFromDefinitionFiles(files: AgentDefinitionFile[], source: Age
 			...(defaultReads?.length ? { defaultReads } : {}),
 			defaultProgress: frontmatter.defaultProgress === "true",
 			interactive: frontmatter.interactive === "true",
-			...(maxSubagentDepth !== undefined ? { maxSubagentDepth } : {}),
 			...(completionGuard !== undefined ? { completionGuard } : {}),
 			...(toolBudget !== undefined ? { toolBudget } : {}),
 			...(permissions !== undefined ? { permissions } : {}),

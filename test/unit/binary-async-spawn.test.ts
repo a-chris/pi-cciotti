@@ -38,7 +38,7 @@ for (const [entry, missingBootstrap] of [
 				agent: "worker", task: "Inspect files", agentConfig: makeAgent("worker"),
 				ctx: { pi: { events: { emit() {} } }, cwd: root, currentSessionId: "binary-spawn" },
 				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-				shareEnabled: false, sessionRoot: path.join(root, "sessions"), maxSubagentDepth: 1, acceptance: false,
+				shareEnabled: false, sessionRoot: path.join(root, "sessions"), acceptance: false,
 			});
 			assert.equal(result.isError, true);
 			if (missingBootstrap) {

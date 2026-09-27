@@ -95,7 +95,7 @@ describe("native runner result publication", { skip: !available ? "pi packages u
 				agents: [makeAgent("producer", { completionGuard: false }), makeAgent("reviewer", { completionGuard: false })],
 				ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: sessionId, completionOwnerId: owner },
 				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-				shareEnabled: false, maxSubagentDepth: 2, acceptance: false,
+				shareEnabled: false, acceptance: false,
 			});
 			assert.notEqual(receipt.isError, true);
 			// Capture only the real tracker's liveness callback; execute it at explicit filesystem boundaries.
@@ -308,7 +308,7 @@ describe("native runner result publication", { skip: !available ? "pi packages u
 					agent: "worker", task: "Complete without a provider", agentConfig: makeAgent("worker", { completionGuard: false }),
 					ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: sessionId, completionOwnerId: owner },
 					artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-					shareEnabled: false, sessionRoot: path.join(tempDir, "sessions"), maxSubagentDepth: 2, acceptance: false,
+					shareEnabled: false, sessionRoot: path.join(tempDir, "sessions"), acceptance: false,
 				});
 				assert.notEqual(receipt.isError, true);
 				watcher.startResultWatcher();

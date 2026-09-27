@@ -239,7 +239,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-result-thinking" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 			acceptance: false,
 		});
 
@@ -263,7 +262,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			artifactConfig: { enabled: true, includeInput: false, includeOutput: true, includeJsonl: false, includeMetadata: true, cleanupDays: 7 },
 			artifactsDir,
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 			acceptance: false,
 		});
 
@@ -287,7 +285,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			availableModels: [{ provider: "mock", id: "test-model", fullId: "mock/test-model", contextWindow: 128_000 }],
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(launch.isError, undefined);
@@ -338,7 +335,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 			acceptance: false,
 			context: "fork",
 		});
@@ -401,7 +397,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 			acceptance: false,
 		});
 
@@ -421,7 +416,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 			acceptance: false,
 		});
 
@@ -631,7 +625,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 			acceptance: false,
 			capabilityCeiling: { version: 1, allowedTools: ["read"], denyExtensions: true, sources: ["test"] },
 		});
@@ -651,7 +644,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 			acceptance: false,
 		});
 
@@ -677,7 +669,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 			acceptance: false,
 		});
 
@@ -809,7 +800,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			artifactConfig: { enabled: true, includeInput: true, includeOutput: true, includeJsonl: false, includeTranscript: true, includeMetadata: true, cleanupDays: 7 },
 			artifactsDir: path.join(tempDir, ".pi/subagents", "artifacts"),
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 			acceptance: false,
 		});
 
@@ -846,7 +836,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			artifactConfig: { enabled: true, includeInput: true, includeOutput: true, includeJsonl: false, includeMetadata: true, cleanupDays: 7 },
 			artifactsDir: path.join(tempDir, ".pi/subagents", "artifacts"),
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 			acceptance: false,
 		});
 
@@ -873,7 +862,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			artifactConfig: { enabled: true, includeInput: true, includeOutput: true, includeJsonl: false, includeMetadata: true, cleanupDays: 7 },
 			artifactsDir,
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 			acceptance: false,
 		});
 
@@ -904,7 +892,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			artifactConfig: { enabled: true, includeInput: true, includeOutput: true, includeJsonl: false, includeMetadata: true, cleanupDays: 7 },
 			artifactsDir,
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 			acceptance: false,
 		});
 

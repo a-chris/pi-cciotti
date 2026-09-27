@@ -785,7 +785,6 @@ export interface SteeringRecoveryDescriptor {
 	context?: "fresh" | "fork" | "summary";
 	absoluteDeadlineAt?: number;
 	initialToolBudget?: ResolvedToolBudget;
-	maxSubagentDepth: number;
 	maxOutput?: MaxOutputConfig;
 	capabilityCeiling?: ResolvedSubagentCapabilityCeiling;
 	launchResolvedExtensions?: LaunchResolvedChildExtensions;
@@ -2215,7 +2214,6 @@ export interface RunSyncOptions {
 	outputPath?: string;
 	outputClaimPath?: string;
 	outputMode?: OutputMode;
-	maxSubagentDepth?: number;
 	/** Effective parent wait-tool setting propagated to the child runtime. */
 	waitToolEnabled?: boolean;
 	/** Effective parent default wait window propagated to the child runtime. */
@@ -2377,7 +2375,6 @@ export interface ExtensionConfig {
 	waitTool?: WaitToolConfig;
 	defaultSessionDir?: string;
 	singleRunOutputBaseDir?: string;
-	maxSubagentDepth?: number;
 	/** Optional cumulative session cap. Unset or 0 means unlimited. */
 	maxSubagentSpawnsPerSession?: number;
 	/** Cumulative logical-child cap for one top-level run tree. Defaults to 64. */
@@ -2548,7 +2545,6 @@ export const SLASH_SUBAGENT_CANCEL_EVENT = "subagent:slash:cancel";
 export const POLL_INTERVAL_MS = 250;
 export const WIDGET_ANIMATION_INTERVAL_MS = 1000;
 export const MAX_WIDGET_JOBS = 4;
-export const DEFAULT_SUBAGENT_MAX_DEPTH = 2;
 export const SUBAGENT_ACTIONS = ["list", "get", "models", "children.list", "guide", "validate", "create", "update", "delete", "eject", "disable", "enable", "reset", "mission.create", "worktree.discard", "worktree.cleanup", "refine", "refine.show", "refine.rollback", "inspector.open", "inspector.command", "inspector.status", "inspector.close", "status", "debug.run", "grant-spawn-budget", "interrupt", "resume", "steer", "stop", "dismiss", "doctor"] as const;
 
 export const DEFAULT_FORK_PREAMBLE =
@@ -2588,60 +2584,10 @@ export function wrapForkTask(task: string, preamble?: string | false): string {
 	return `${wrappedPrefix}${task}`;
 }
 
-// ============================================================================
-// Recursion Depth Guard
-// ============================================================================
-
 function normalizeNonNegativeInteger(value: unknown): number | undefined {
 	const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
 	if (!Number.isInteger(parsed) || parsed < 0) return undefined;
 	return parsed;
-}
-
-export function normalizeMaxSubagentDepth(value: unknown): number | undefined {
-	return normalizeNonNegativeInteger(value);
-}
-
-/** Depth context of the executor's own child runtime, when it runs as an in-process child. */
-export interface SubagentDepthContext {
-	depth: number;
-	maxDepth?: number;
-}
-
-/** Operator override for the top-level parent; children inherit their limit through their runtime config. */
-export const SUBAGENT_MAX_DEPTH_ENV = "PI_SUBAGENT_MAX_DEPTH";
-
-export function resolveCurrentMaxSubagentDepth(configMaxDepth?: number, runtime?: SubagentDepthContext): number {
-	return normalizeMaxSubagentDepth(runtime ? runtime.maxDepth : process.env[SUBAGENT_MAX_DEPTH_ENV])
-		?? normalizeMaxSubagentDepth(configMaxDepth)
-		?? DEFAULT_SUBAGENT_MAX_DEPTH;
-}
-
-export function resolveChildMaxSubagentDepth(parentMaxDepth: number, agentMaxDepth?: number): number {
-	const normalizedParent = normalizeMaxSubagentDepth(parentMaxDepth) ?? DEFAULT_SUBAGENT_MAX_DEPTH;
-	const normalizedAgent = normalizeMaxSubagentDepth(agentMaxDepth);
-	return normalizedAgent === undefined ? normalizedParent : Math.min(normalizedParent, normalizedAgent);
-}
-
-/** Depth of the executor itself: 0 for a top-level parent, its own child depth otherwise. */
-export function resolveCurrentSubagentDepth(runtime?: SubagentDepthContext): number {
-	const depth = runtime ? runtime.depth : 0;
-	return Number.isFinite(depth) ? depth : 0;
-}
-
-export function checkSubagentDepth(configMaxDepth?: number, runtime?: SubagentDepthContext): { blocked: boolean; depth: number; maxDepth: number } {
-	const depth = resolveCurrentSubagentDepth(runtime);
-	const maxDepth = resolveCurrentMaxSubagentDepth(configMaxDepth, runtime);
-	const blocked = depth >= maxDepth;
-	return { blocked, depth, maxDepth };
-}
-
-/** Depth context handed to a child launched by an executor at `runtime` (undefined for a top-level parent). */
-export function resolveChildDepth(maxDepth?: number, runtime?: SubagentDepthContext): Required<SubagentDepthContext> {
-	return {
-		depth: resolveCurrentSubagentDepth(runtime) + 1,
-		maxDepth: normalizeMaxSubagentDepth(maxDepth) ?? resolveCurrentMaxSubagentDepth(undefined, runtime),
-	};
 }
 
 export function normalizeMaxSubagentSpawnsPerSession(value: unknown): number | undefined {

@@ -25,7 +25,6 @@ export async function verifySharedRun(
 		artifactsDir: "/stage/shared-artifacts",
 		shareEnabled: false,
 		sessionRoot: "/stage/shared-sessions",
-		maxSubagentDepth: 2,
 		globalConcurrencyLimit: 2,
 		controlConfig: resolveControlConfig(undefined, { enabled: true }),
 		timeoutMs: 20000,

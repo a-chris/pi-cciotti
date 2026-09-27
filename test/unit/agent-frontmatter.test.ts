@@ -1465,24 +1465,7 @@ Validate changes
 });
 
 describe("agent frontmatter maxSubagentDepth", () => {
-	it("serializes maxSubagentDepth into agent frontmatter", () => {
-		const agent: AgentConfig = {
-			name: "scout",
-			description: "Scout",
-			systemPrompt: "Inspect code",
-			systemPromptMode: "replace",
-			inheritProjectContext: false,
-			inheritSkills: false,
-			source: "project",
-			filePath: "/tmp/scout.md",
-			maxSubagentDepth: 1,
-		};
-
-		const serialized = serializeAgent(agent);
-		assert.match(serialized, /maxSubagentDepth: 1/);
-	});
-
-	it("parses maxSubagentDepth from discovered agent frontmatter", () => {
+	it("rejects the removed maxSubagentDepth field", () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-frontmatter-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
@@ -1497,8 +1480,21 @@ Inspect code
 `, "utf-8");
 
 		const result = discoverAgents(dir, "project");
-		const scout = result.agents.find((agent) => agent.name === "scout");
-		assert.equal(scout?.maxSubagentDepth, 1);
+		assert.match(result.agentDiagnostics?.find((diagnostic) => diagnostic.name === "scout")?.error ?? "", /maxSubagentDepth, which was removed/);
+	});
+
+	it("serializes no maxSubagentDepth", () => {
+		const agent: AgentConfig = {
+			name: "scout",
+			description: "Scout",
+			systemPrompt: "Inspect code",
+			systemPromptMode: "replace",
+			inheritProjectContext: false,
+			inheritSkills: false,
+			source: "project",
+			filePath: "/tmp/scout.md",
+		};
+		assert.doesNotMatch(serializeAgent(agent), /maxSubagentDepth/);
 	});
 });
 

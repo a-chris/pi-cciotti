@@ -74,7 +74,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				cleanupDays: 7,
 			},
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const payload = JSON.parse(fs.readFileSync(await waitForAsyncResultFile(id), "utf-8"));
@@ -106,7 +105,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				cleanupDays: 7,
 			},
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id);
@@ -136,7 +134,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id);
@@ -176,7 +173,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 				shareEnabled: false,
-				maxSubagentDepth: 2,
 			});
 
 			const resultPath = await waitForAsyncResultFile(id);
@@ -224,7 +220,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				cleanupDays: 7,
 			},
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id);
@@ -274,7 +269,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 				cleanupDays: 7,
 			},
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id);
@@ -313,7 +307,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			sessionRoot: path.join(tempDir, "sessions"),
 			output: outputPath,
 			outputMode: "file-only",
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(run.details.asyncId, id);
@@ -364,7 +357,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			sessionRoot: path.join(tempDir, "sessions"),
 			output: outputPath,
 			acceptance: false,
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id);
@@ -396,7 +388,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			sessionRoot: path.join(tempDir, "sessions"),
 			output: "context.md",
 			outputBaseDir,
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(run.details.asyncId, id);
@@ -434,7 +425,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
 			output: outputPath,
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(run.details.asyncId, id);
@@ -468,7 +458,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
 			output: "false",
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(run.details.asyncId, id);
@@ -506,7 +495,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			},
 			shareEnabled: false,
 			sessionRoot,
-			maxSubagentDepth: 2,
 		});
 
 		const deadline = Date.now() + 10_000;
@@ -612,8 +600,7 @@ export default function() {
 				output: outputPath,
 				ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-				shareEnabled: false, maxSubagentDepth: 2,
-			});
+				shareEnabled: false,			});
 			assert.notEqual(launched.isError, true, `${scenario.name}: ${JSON.stringify(launched)}`);
 			const payload = JSON.parse(fs.readFileSync(await waitForAsyncResultFile(id), "utf8"));
 			await waitForAsyncEvent(id, "subagent.run.process_terminal");
@@ -656,7 +643,6 @@ export default function() {
 			},
 			shareEnabled: false,
 			sessionRoot,
-			maxSubagentDepth: 2,
 		});
 
 		const deadline = Date.now() + 10_000;
@@ -746,7 +732,6 @@ export default function() {
 				ctx: { pi: { events: { emit: observer.emit } }, cwd: repo, currentSessionId: "session-1" },
 				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 				shareEnabled: false,
-				maxSubagentDepth: 2,
 			}));
 			runnerStarted = !launch.isError;
 
@@ -825,7 +810,6 @@ export default function() {
 			},
 			shareEnabled: false,
 			sessionRoot,
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id, 10_000);
@@ -860,7 +844,6 @@ export default function() {
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 			agentContract: { version: 1 },
 			acceptance: { level: "checked", criteria: ["Return required proof"] },
 		});
@@ -904,7 +887,6 @@ export default function() {
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 			acceptance: false,
 			output: outputPath,
 			structuredOutputSchema: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" }, note: { type: "string" } } },
@@ -982,7 +964,6 @@ export default function() {
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 			acceptance: { level: "checked", report: "on" },
 			structuredOutputSchema: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } },
 		});
@@ -1014,7 +995,6 @@ export default function() {
 			},
 			shareEnabled: false,
 			sessionRoot,
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id, 10_000);
@@ -1060,7 +1040,6 @@ export default function() {
 			},
 			shareEnabled: false,
 			sessionRoot,
-			maxSubagentDepth: 2,
 		});
 
 		const deadline = Date.now() + 10_000;
@@ -1112,11 +1091,7 @@ export default function() {
 		const context = makeMinimalCtx(tempDir);
 		context.sessionManager.getSessionFile = () => null;
 		context.sessionManager.getSessionId = () => "session-cap";
-		const previousDepth = process.env.PI_SUBAGENT_DEPTH;
-		process.env.PI_SUBAGENT_DEPTH = "0";
 		const result = await executor.execute("cap-rejected", { agent: "worker", task: "Must not start", async: true }, new AbortController().signal, undefined, context);
-		if (previousDepth === undefined) delete process.env.PI_SUBAGENT_DEPTH;
-		else process.env.PI_SUBAGENT_DEPTH = previousDepth;
 		assert.equal(result.isError, true);
 		assert.match(result.content[0]?.type === "text" ? result.content[0].text : "", /Active async run capacity exhausted: 1\/1 used/);
 		assert.equal(fs.existsSync(rejectedAsyncDir), false);
@@ -1239,7 +1214,6 @@ export default function() {
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id, 10_000);
@@ -1435,7 +1409,6 @@ export default function() {
 			modelOverride: luna.fullId,
 			availableModels: [luna],
 			fast: true,
-			maxSubagentDepth: 2,
 		});
 		await readAsyncPayload(sourceId);
 		assert.equal(JSON.parse(fs.readFileSync(path.join(ASYNC_DIR, sourceId, "recovery-descriptor.json"), "utf-8")).fast, true);
@@ -1470,7 +1443,6 @@ export default function() {
 			sessionFile,
 			modelOverride: "gateway/parent-model",
 			modelOverrideFromParent: true,
-			maxSubagentDepth: 2,
 		});
 		await readAsyncPayload(sourceId);
 		const descriptor = JSON.parse(fs.readFileSync(path.join(ASYNC_DIR, sourceId, "recovery-descriptor.json"), "utf-8"));
@@ -1652,7 +1624,6 @@ export default function() {
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id, 10_000);
@@ -1691,7 +1662,6 @@ export default function() {
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		const resultPath = await waitForAsyncResultFile(id, 10_000);
@@ -1728,7 +1698,6 @@ export default function() {
 				},
 				shareEnabled: false,
 				sessionRoot: path.join(tempDir, "sessions"),
-				maxSubagentDepth: 2,
 			});
 
 			const deadline = Date.now() + 10_000;
@@ -1763,7 +1732,6 @@ export default function() {
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		await waitForAsyncResultFile(id);
@@ -1790,7 +1758,6 @@ export default function() {
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
-			maxSubagentDepth: 2,
 		});
 
 		await waitForAsyncResultFile(id);
@@ -1821,7 +1788,6 @@ export default function() {
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
 			skills: ["pi-subagents"],
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(result.isError, true);
@@ -1845,7 +1811,6 @@ export default function() {
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(result.isError, true);
@@ -1877,7 +1842,6 @@ export default function() {
 				},
 				shareEnabled: false,
 				sessionRoot: path.join(tempDir, "sessions"),
-				maxSubagentDepth: 2,
 			});
 
 			const deadline = Date.now() + 10_000;
@@ -1925,7 +1889,6 @@ export default function() {
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		const statusPath = path.join(asyncDir, "status.json");
@@ -1976,7 +1939,6 @@ export default function() {
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			maxSubagentDepth: 2,
 		});
 
 		assert.equal(result.isError, true);
@@ -1997,7 +1959,6 @@ export default function() {
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
 			sessionFile,
-			maxSubagentDepth: 2,
 		});
 		const initialResult = JSON.parse(fs.readFileSync(await waitForAsyncResultFile(sourceId, 60_000), "utf8")) as { success: boolean };
 		assert.equal(initialResult.success, true);
@@ -2096,7 +2057,6 @@ syncBuiltinESMExports();
 				sessionFile,
 				revivalLease: { sessionFile, runId: id, sourceRunId: `source-${id}`, parentSessionId: sessionId },
 				activeAsyncCapacity: capacity,
-				maxSubagentDepth: 2,
 			}));
 		} finally {
 			childProcessChannel.unsubscribe(observeProcess);

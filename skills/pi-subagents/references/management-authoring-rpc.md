@@ -122,7 +122,6 @@ That is only a starting point. Omit `package` for the traditional unqualified ru
 - `skills`
 - `skillPath`
 - `memory`
-- `maxSubagentDepth`
 - `acceptance`
 - `acceptanceRole`
 - `async` — single-agent default for background launch (`true`/`false`); explicit tool-call `async` wins

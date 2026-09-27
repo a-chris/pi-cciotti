@@ -62,7 +62,6 @@ describe("in-process foreground child", () => {
 			assert.equal(session.launch.runtime.childIndex, 3);
 			assert.equal(session.launch.runtime.waitTool.enabled, false);
 			assert.equal(session.launch.runtime.steerInbox, undefined, "in-process children have no steer inbox");
-			assert.equal(session.launch.runtime.depth, 1);
 			assert.equal(session.task?.startsWith("Task: Task"), true);
 			assert.equal(session.launch.systemPrompt?.startsWith('<active_agent name="echo"/>'), true);
 			assert.deepEqual(session.launch.storage, { kind: "memory" });

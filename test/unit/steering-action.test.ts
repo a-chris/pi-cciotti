@@ -158,7 +158,6 @@ function recoveryDescriptor(runId: string): SteeringRecoveryDescriptor {
 		outputMode: "inline",
 		absoluteDeadlineAt: Date.now() + 10_000,
 		initialToolBudget: { soft: 8, hard: 12, block: ["read"] },
-		maxSubagentDepth: 2,
 		share: false,
 	};
 }

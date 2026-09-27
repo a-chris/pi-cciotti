@@ -46,7 +46,6 @@ function writeRecoveryDescriptor(asyncRoot: string, runId: string, agent: string
 		inheritGlobalContext: false,
 		inheritProjectContext: false,
 		inheritSkills: false,
-		maxSubagentDepth: 0,
 		share: false,
 		runFanoutBudget: createRunFanoutBudget(runId, 64),
 	}), "utf-8");

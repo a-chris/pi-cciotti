@@ -74,7 +74,6 @@ function writeRetainedRun(root: string, index: number, options: WriteRunOptions 
 			inheritProjectContext: false,
 			inheritSkills: false,
 			outputMode: "inline",
-			maxSubagentDepth: 2,
 			share: false,
 		}), "utf-8");
 	}

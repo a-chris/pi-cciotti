@@ -394,7 +394,6 @@ async function runSingleAttempt(
 		waitToolDefaultTimeoutMs: options.waitToolDefaultTimeoutMs,
 		capabilityCeiling: options.capabilityCeiling,
 		thinkingCeiling: options.thinkingCeiling,
-		maxSubagentDepth: options.maxSubagentDepth,
 		runtimeSnapshotHost: options.runtimeSnapshotHost,
 		hostAvailableBuiltins: options.hostAvailableBuiltins,
 		inherited: options.childRuntime,

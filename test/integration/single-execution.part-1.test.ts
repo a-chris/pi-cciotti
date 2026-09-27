@@ -2964,7 +2964,6 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 			inheritSkills: true,
 			outputPath: retainedOutputPath,
 			outputMode: "inline",
-			maxSubagentDepth: 1,
 			share: false,
 		}), "utf-8");
 		mockPi.onCall({ output: "resumed report", matchArgIncludes: "Resume" });

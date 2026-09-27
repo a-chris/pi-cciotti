@@ -88,6 +88,13 @@ describe("M4 config-enriched keys: validated and wired", () => {
 		assert.deepEqual(loadConfig(), {});
 	});
 
+	it("rejects the removed maxSubagentDepth key instead of ignoring it", () => {
+		// Before removal the key had no validator, so a hand-edited value failed the load
+		// generically and silently replaced the operator's file with defaults.
+		writeRawConfig('{"maxSubagentDepth": 1, "asyncByDefault": false}');
+		assert.throws(() => loadConfig(), /maxSubagentDepth was removed/);
+	});
+
 	it("rejects the removed toolDescriptionMode key instead of ignoring it", () => {
 		writeRawConfig('{"toolDescriptionMode": "compact"}');
 		assert.throws(() => loadConfig(), /toolDescriptionMode was removed/);

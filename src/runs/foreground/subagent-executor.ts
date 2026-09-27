@@ -175,9 +175,6 @@ import {
 	SUBAGENT_ACTIONS,
 	SUBAGENT_CONTROL_EVENT,
 	SUBAGENT_FOREGROUND_COMPLETE_EVENT,
-	checkSubagentDepth,
-	resolveChildMaxSubagentDepth,
-	resolveCurrentMaxSubagentDepth,
 	resolveMaxSubagentSpawnsPerRun,
 	wrapForkTask,
 	type SteeringTargetState,
@@ -1303,7 +1300,6 @@ async function appendStepToAsyncChain(input: {
 		cwd: status.cwd ?? input.requestCwd,
 		chainSkills,
 		dynamicFanoutMaxItems: input.deps.config.chain?.dynamicFanout?.maxItems,
-		maxSubagentDepth: resolveCurrentMaxSubagentDepth(input.deps.config.maxSubagentDepth, input.deps.childRuntime),
 		waitToolEnabled: input.deps.waitToolEnabled,
 		waitToolDefaultTimeoutMs: input.deps.waitToolDefaultTimeoutMs,
 		contextForAgent: contextPolicy.contextForAgent,
@@ -1628,11 +1624,7 @@ async function resumeExternalJobFollowUp(input: {
 		return externalJobFollowUpStarted({ sourceRunId: input.target.runId, runId, asyncDir, duplicate: true, interactive: input.ctx.hasUI });
 	}
 
-	const depthState = checkSubagentDepth(input.deps.config.maxSubagentDepth, input.deps.childRuntime);
-	if (depthState.blocked) {
-		return { content: [{ type: "text", text: `Nested subagent resume blocked (depth=${depthState.depth}, max=${depthState.maxDepth}). Complete the follow-up directly instead.` }], isError: true, details: { mode: "management", results: [] } };
-	}
-	const topLevelResume = depthState.depth === 0 && !inheritedNestedRoute(input.deps) && !input.deps.state.workflowControllers?.has(input.target.runId);
+	const topLevelResume = !inheritedNestedRoute(input.deps) && !input.deps.state.workflowControllers?.has(input.target.runId);
 	let activeAsyncCapacity: ActiveAsyncCapacityHandle | undefined;
 	try {
 		activeAsyncCapacity = topLevelResume ? acquireActiveAsyncCapacity({
@@ -1678,7 +1670,6 @@ async function resumeExternalJobFollowUp(input: {
 		artifactConfig,
 		shareEnabled: false,
 		...(input.parentSessionFile ? { sessionRoot: input.deps.getSubagentSessionRoot(input.parentSessionFile) } : {}),
-		maxSubagentDepth: resolveCurrentMaxSubagentDepth(input.deps.config.maxSubagentDepth, input.deps.childRuntime),
 		waitToolEnabled: input.deps.waitToolEnabled,
 		waitToolDefaultTimeoutMs: input.deps.waitToolDefaultTimeoutMs,
 		worktreeSetupHook: input.deps.config.worktreeSetupHook,
@@ -1784,15 +1775,6 @@ async function resumeAsyncRun(input: {
 		};
 	}
 
-	const { blocked, depth, maxDepth } = checkSubagentDepth(input.deps.config.maxSubagentDepth, input.deps.childRuntime);
-	if (blocked) {
-		return {
-			content: [{ type: "text", text: `Nested subagent resume blocked (depth=${depth}, max=${maxDepth}). Complete the follow-up directly instead.` }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-
 	input.deps.state.currentSessionId = resolveCurrentSessionId(input.ctx.sessionManager);
 	const effectiveCwd = target.cwd ?? input.requestCwd;
 	const scope: AgentScope = resolveExecutionAgentScope(input.params.agentScope);
@@ -1867,7 +1849,7 @@ async function resumeAsyncRun(input: {
 			return { content: [{ type: "text", text: `Cannot resume: ${acceptanceErrors.join(" ")}` }], isError: true, details: { mode: "chain", results: [] } };
 		}
 		const runId = randomUUID();
-		const topLevelResume = depth === 0 && !inheritedNestedRoute(input.deps) && !input.params.workflowParentRunId;
+		const topLevelResume = !inheritedNestedRoute(input.deps) && !input.params.workflowParentRunId;
 		let activeAsyncCapacity: ActiveAsyncCapacityHandle | undefined;
 		try {
 			activeAsyncCapacity = topLevelResume ? acquireActiveAsyncCapacity({
@@ -1943,7 +1925,6 @@ async function resumeAsyncRun(input: {
 			agentContract: input.params.agentContract,
 			fast: input.params.fast,
 			dynamicFanoutMaxItems: input.deps.config.chain?.dynamicFanout?.maxItems,
-			maxSubagentDepth: resolveCurrentMaxSubagentDepth(input.deps.config.maxSubagentDepth, input.deps.childRuntime),
 			waitToolEnabled: input.deps.waitToolEnabled,
 			waitToolDefaultTimeoutMs: input.deps.waitToolDefaultTimeoutMs,
 			worktreeSetupHook: input.deps.config.worktreeSetupHook,
@@ -2006,7 +1987,7 @@ async function resumeAsyncRun(input: {
 		return { content: [{ type: "text", text: `Cannot resume: ${acceptanceErrors.join(" ")}` }], isError: true, details: { mode: "management", results: [] } };
 	}
 	const runId = randomUUID();
-	const topLevelResume = depth === 0 && !inheritedNestedRoute(input.deps) && !input.params.workflowParentRunId;
+	const topLevelResume = !inheritedNestedRoute(input.deps) && !input.params.workflowParentRunId;
 	let activeAsyncCapacity: ActiveAsyncCapacityHandle | undefined;
 	try {
 		activeAsyncCapacity = !topLevelResume ? undefined : target.source === "async"
@@ -2078,7 +2059,6 @@ async function resumeAsyncRun(input: {
 		extensionBindings: recoveryDescriptor?.extensionBindings ?? ("extensionBindings" in target ? target.extensionBindings : undefined),
 		requiredExtensions: recoveryDescriptor?.requiredExtensions ?? (target as { requiredExtensions?: SteeringRecoveryDescriptor["requiredExtensions"] }).requiredExtensions,
 		outputBaseDir: resolveSingleRunOutputBaseDir(input.deps, artifactsDir, runId),
-		maxSubagentDepth: recoveryDescriptor?.maxSubagentDepth ?? resolveCurrentMaxSubagentDepth(input.deps.config.maxSubagentDepth, input.deps.childRuntime),
 		waitToolEnabled: input.deps.waitToolEnabled,
 		waitToolDefaultTimeoutMs: input.deps.waitToolDefaultTimeoutMs,
 		worktreeSetupHook: input.deps.config.worktreeSetupHook,
@@ -3168,7 +3148,6 @@ async function runAsyncPath(data: ExecutionContextData, deps: ExecutorDeps): Pro
 		childRuntime: deps.childRuntime,
 	});
 	const availableModels: ModelInfo[] = ctx.modelRegistry.getAvailable().map(toModelInfo);
-	const currentMaxSubagentDepth = resolveCurrentMaxSubagentDepth(deps.config.maxSubagentDepth, deps.childRuntime);
 	const currentProvider = parentModel?.provider;
 
 	if (hasSingle) {
@@ -3185,8 +3164,7 @@ async function runAsyncPath(data: ExecutionContextData, deps: ExecutorDeps): Pro
 		const effectiveOutputMode = params.outputMode ?? a.outputMode ?? "inline";
 		const normalizedSkills = normalizeSkillInput(params.skill);
 		const skills = normalizedSkills === false ? [] : normalizedSkills;
-		const maxSubagentDepth = resolveChildMaxSubagentDepth(currentMaxSubagentDepth, a.maxSubagentDepth);
-		const externalRunnerWithoutExplicitModel = (a.runner?.type === "external-cli" || a.runner?.type === "external-job")
+			const externalRunnerWithoutExplicitModel = (a.runner?.type === "external-cli" || a.runner?.type === "external-job")
 			&& params.model === undefined
 			&& (a.model === undefined || (a.modelSource?.type === "subagents.defaultModel" && a.model === a.modelSource.model));
 		if ((a.runner?.type === "external-cli" || a.runner?.type === "external-job") && (params.fast ?? a.fast) === true) {
@@ -3236,7 +3214,6 @@ async function runAsyncPath(data: ExecutionContextData, deps: ExecutorDeps): Pro
 			modelOrigin,
 			thinkingOverride: externalRunnerWithoutExplicitModel ? undefined : thinkingOverrideForTask(),
 			thinkingCeiling: a.maxThinking,
-			maxSubagentDepth,
 			waitToolEnabled: deps.waitToolEnabled,
 			waitToolDefaultTimeoutMs: deps.waitToolDefaultTimeoutMs,
 			...(params.worktree === true ? { worktree: true } : {}),
@@ -3653,8 +3630,6 @@ async function runSinglePath(data: ExecutionContextData, deps: ExecutorDeps): Pr
 	const rawOutput = params.output !== undefined ? params.output : agentConfig.output;
 	let effectiveOutput = normalizeSingleOutputOverride(rawOutput, agentConfig.output);
 	const effectiveOutputMode = params.outputMode ?? agentConfig.outputMode ?? "inline";
-	const currentMaxSubagentDepth = resolveCurrentMaxSubagentDepth(deps.config.maxSubagentDepth, deps.childRuntime);
-	const maxSubagentDepth = resolveChildMaxSubagentDepth(currentMaxSubagentDepth, agentConfig.maxSubagentDepth);
 
 
 	const sourceCwd = effectiveCwd;
@@ -3833,7 +3808,6 @@ async function runSinglePath(data: ExecutionContextData, deps: ExecutorDeps): Pr
 			outputPath,
 			outputClaimPath: params.workflowOutputClaimPath,
 			outputMode: effectiveOutputMode,
-			maxSubagentDepth,
 			waitToolEnabled: deps.waitToolEnabled,
 			waitToolDefaultTimeoutMs: deps.waitToolDefaultTimeoutMs,
 			onUpdate: forwardSingleUpdate,
@@ -4758,10 +4732,8 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			const scriptFirstLine = requestParams.workflowScript.split(/\r?\n/).map((line) => line.trim()).find(Boolean) || "Workflow";
 			const boundedScriptPreview = scriptFirstLine.length > 100 ? `${scriptFirstLine.slice(0, 97)}...` : scriptFirstLine;
 			const derivedObjective = previewAgent ? `Workflow: ${previewAgent}` : boundedScriptPreview;
-			const workflowDepth = checkSubagentDepth(deps.config.maxSubagentDepth, deps.childRuntime).depth;
 			const asyncWorkflow = requestParams.async !== false;
 			const topLevelAsyncWorkflow = asyncWorkflow
-				&& workflowDepth === 0
 				&& !inheritedNestedRoute(deps)
 				&& !requestParams.workflowParentRunId;
 			const workflowRunId = asyncWorkflow ? randomUUID() : undefined;
@@ -6318,23 +6290,6 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			});
 		}
 
-		const { blocked, depth, maxDepth } = checkSubagentDepth(deps.config.maxSubagentDepth, deps.childRuntime);
-		if (blocked) {
-			return {
-				content: [
-					{
-						type: "text",
-						text:
-							`Nested subagent call blocked (depth=${depth}, max=${maxDepth}). ` +
-							"You are running at the maximum subagent nesting depth. " +
-							"Complete your current task directly without delegating to further subagents.",
-					},
-				],
-				isError: true,
-				details: { mode: "single" as const, results: [] },
-			};
-		}
-
 		const normalized = normalizeRepeatedParallelCounts(paramsWithResolvedCwd);
 		if (normalized.error) return normalized.error;
 		const normalizedParams = normalized.params!;
@@ -6343,7 +6298,6 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 
 		let effectiveParams = applyForceTopLevelAsyncOverride(
 			normalizedParams,
-			depth,
 			deps.config.forceTopLevelAsync === true,
 		);
 		const runToolBudget = resolveToolBudget(
@@ -6489,7 +6443,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 		const asyncRunId = requestedWorkflowChildAsyncId && path.basename(requestedWorkflowChildAsyncId) === requestedWorkflowChildAsyncId
 			? requestedWorkflowChildAsyncId
 			: randomUUID();
-		const topLevelAsyncCapacityEligible = depth === 0 && !inheritedNestedRouteValue && !effectiveParams.workflowParentRunId;
+		const topLevelAsyncCapacityEligible = !inheritedNestedRouteValue && !effectiveParams.workflowParentRunId;
 		const topLevelAsync = effectiveAsync && topLevelAsyncCapacityEligible;
 		let activeAsyncCapacity: ActiveAsyncCapacityHandle | undefined;
 		if (topLevelAsync) {
@@ -6898,8 +6852,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 		const normalizedAction = typeof params.action === "string" ? params.action.trim() : params.action;
 		const requestParams = normalizedAction ? { ...params, action: normalizedAction } : params;
 		if (normalizedAction) return execute(id, requestParams, signal, onUpdate, ctx).then(withAggregatedToolUsage);
-		const { depth } = checkSubagentDepth(deps.config.maxSubagentDepth, deps.childRuntime);
-		const dispatchParams = applyForceTopLevelAsyncOverride(requestParams, depth, deps.config.forceTopLevelAsync === true);
+		const dispatchParams = applyForceTopLevelAsyncOverride(requestParams, deps.config.forceTopLevelAsync === true);
 		const runsForeground = dispatchParams.clarify === true || (dispatchParams.async ?? deps.asyncByDefault) !== true;
 		if (!runsForeground) return execute(id, requestParams, signal, onUpdate, ctx).then(withAggregatedToolUsage);
 		if (deps.state.subagentInProgress === true) return duplicateSubagentCallResult(requestParams);

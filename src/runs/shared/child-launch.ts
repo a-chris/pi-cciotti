@@ -9,7 +9,6 @@ import * as path from "node:path";
 import type { ThinkingLevel } from "../../shared/model-info.ts";
 import { intersectThinkingCeilings } from "../../shared/thinking-ceiling.ts";
 import {
-	resolveChildDepth,
 	type LaunchResolvedChildExtensions,
 	type ResolvedToolBudget,
 	type RunFanoutBudgetDescriptor,
@@ -42,13 +41,11 @@ export const MCP_DIRECT_TOOLS_ENV = "MCP_DIRECT_TOOLS";
  * launches inherits. Serialized into the background runner config; the
  * foreground path passes the executor's full `ChildRuntimeConfig`.
  */
-export type InheritedChildRuntime = Pick<ChildRuntimeConfig, "depth" | "maxDepth" | "nestedRoute" | "nestedParent" | "capabilityCeiling" | "thinkingCeiling" | "runFanoutBudget" | "requiredExtensions">;
+export type InheritedChildRuntime = Pick<ChildRuntimeConfig, "nestedRoute" | "nestedParent" | "capabilityCeiling" | "thinkingCeiling" | "runFanoutBudget" | "requiredExtensions">;
 
 export function inheritedChildRuntime(config: ChildRuntimeConfig | undefined): InheritedChildRuntime | undefined {
 	if (!config) return undefined;
 	return {
-		depth: config.depth,
-		...(config.maxDepth !== undefined ? { maxDepth: config.maxDepth } : {}),
 		...(config.nestedRoute ? { nestedRoute: config.nestedRoute } : {}),
 		...(config.nestedParent ? { nestedParent: config.nestedParent } : {}),
 		...(config.capabilityCeiling ? { capabilityCeiling: config.capabilityCeiling } : {}),
@@ -96,7 +93,6 @@ export interface BuildInProcessChildLaunchInput {
 	waitToolDefaultTimeoutMs?: number;
 	capabilityCeiling?: ResolvedSubagentCapabilityCeiling;
 	thinkingCeiling?: ThinkingLevel;
-	maxSubagentDepth?: number;
 	runtimeSnapshotHost?: McpRuntimeSnapshotHost;
 	/** The launching executor's own child runtime when it is itself an in-process child. */
 	inherited?: InheritedChildRuntime;
@@ -199,7 +195,6 @@ export function buildInProcessChildLaunch(input: BuildInProcessChildLaunchInput)
 	});
 
 	const inherited = input.inherited;
-	const childDepth = resolveChildDepth(input.maxSubagentDepth, inherited);
 	const permissions = input.permissionRules && Object.keys(input.permissionRules).length > 0
 		? { rules: input.permissionRules, ...(input.permissionAuditPath ? { auditPath: input.permissionAuditPath } : {}) }
 		: undefined;
@@ -216,8 +211,6 @@ export function buildInProcessChildLaunch(input: BuildInProcessChildLaunchInput)
 		childIndex: input.childIndex,
 		...(input.sessionName?.trim() ? { sessionName: input.sessionName.trim() } : {}),
 				...(input.parentSessionId ? { orchestratorSessionId: input.parentSessionId, parentSessionId: input.parentSessionId } : {}),
-		depth: childDepth.depth,
-		maxDepth: childDepth.maxDepth,
 		...(toolPlan.capabilityCeiling ? { capabilityCeiling: toolPlan.capabilityCeiling } : {}),
 		...(thinkingCeiling ? { thinkingCeiling } : {}),
 		...(toolPlan.requiredExtensions.length > 0 ? { requiredExtensions: toolPlan.requiredExtensions } : {}),

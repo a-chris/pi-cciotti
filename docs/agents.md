@@ -200,7 +200,6 @@ acceptance: {"level":"none","reason":"lightweight lookup"}
 acceptanceRole: read-only
 completionGuard: false
 interactive: true
-maxSubagentDepth: 1
 ---
 
 Your system prompt goes here.
@@ -246,7 +245,6 @@ Field notes:
 | `mutationTools` | Comma-separated extension tool names whose calls count as mutation attempts for the completion guard. This declares evidence only; list and load each tool through `tools` and its extension provider as usual. |
 | `completionGuard` | Set `false` only for non-implementation agents that may mention implementation words while using mutation-capable tools such as `bash`. |
 | `interactive` | Parsed for compatibility but not currently enforced. |
-| `maxSubagentDepth` | Depth cap recorded for this agent's child runs. Children cannot launch subagents, so this no longer gates nested delegation. |
 | `memory` | Opt-in role-specific persistent memory. See below. |
 
 ### Required host extensions

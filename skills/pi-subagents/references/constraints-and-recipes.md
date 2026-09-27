@@ -12,8 +12,8 @@ This file is a detailed reference loaded from `skills/pi-subagents/SKILL.md`.
   session exists.
 - **Forked runs inherit parent history.** They are branched threads, not fresh
   filtered contexts. Use fresh context for adversarial reviewers unless the user explicitly asks for forked context.
-- **Default subagent nesting depth is 2.** Deeper recursive delegation is blocked
-  unless configured otherwise.
+- **Children cannot delegate.** A child session never registers a `subagent` tool,
+  so all delegation lives with the parent — express fan-out as one parent workflow.
 - **Attention signals are not lifecycle state.** `needs_attention` means no activity has been observed past the configured threshold. `paused` means the child turn was intentionally interrupted or is awaiting direction; it is not the same as `failed`.
 - **Children report one-shot.** There is no parent↔child messaging channel; a child that cannot safely finish returns `BLOCKED:` and the parent decides the follow-up.
   ask wait state at a time.
@@ -61,7 +61,6 @@ its overhead. Recipes select a shape; they do not authorize delegation:
 
 - **Unknown agent:** run `subagent({ action: "list" })`; check scope/precedence and author new orchestration with `workflowScript`, not legacy chains.
 - **Setup or discovery confusion:** run `subagent({ action: "doctor" })`.
-- **Max subagent depth exceeded:** flatten the workflow or raise `maxSubagentDepth` in config.
 - **Missing session file for a fork:** persist the parent session before using `context: "fork"`.
 
 - **Parallel output-path conflict:** give each task a distinct output path, or disable output where no artifact is needed.

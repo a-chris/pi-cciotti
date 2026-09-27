@@ -374,14 +374,6 @@ Session directory precedence is: `params.sessionDir`, then `config.defaultSessio
 
 Routes relative `output` paths for single-agent `/run` calls under this directory. Absolute per-call or agent output paths are still used as-is. When unset, relative single-run outputs go under the run's output artifact directory instead of the project root.
 
-## `maxSubagentDepth`
-
-```json
-{ "maxSubagentDepth": 1 }
-```
-
-Retained for the detached runner's own chain bookkeeping. Children cannot launch subagents at all, so this never gates child-initiated delegation: an agent that lists `subagent` in `tools` fails launch preflight with a removal error.
-
 ## `PI_SUBAGENT_PI_BINARY`
 
 ```bash

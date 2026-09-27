@@ -78,7 +78,6 @@ async function runFixture(host: Host, response: MockPiResponse, withStructuredOu
 		artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 		shareEnabled: false,
 		sessionRoot: path.join(tempDir, "sessions"),
-		maxSubagentDepth: 2,
 		waitToolEnabled: false,
 		acceptance: false as const,
 	};

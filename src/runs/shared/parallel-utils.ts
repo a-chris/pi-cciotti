@@ -63,7 +63,6 @@ export interface RunnerSubagentStep {
 	namespaceOutputPath?: boolean;
 	outputMode?: "inline" | "file-only";
 	sessionFile?: string;
-	maxSubagentDepth?: number;
 	timeoutMs?: number;
 	/** Resolved configured hard per-tool-call timeout (ms); fast tools still have a default when undefined. */
 	toolTimeoutMs?: number;

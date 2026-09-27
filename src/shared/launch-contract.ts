@@ -69,7 +69,6 @@ export function projectAgentDefinition(agent: AgentConfig): Record<string, unkno
 		defaultAcceptance: agent.defaultAcceptance,
 		acceptanceRole: agent.acceptanceRole,
 		interactive: agent.interactive,
-		maxSubagentDepth: agent.maxSubagentDepth,
 		completionGuard: agent.completionGuard,
 		toolBudget: agent.toolBudget,
 		memory: agent.memory,

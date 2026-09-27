@@ -37,7 +37,6 @@ export const KNOWN_FIELDS = new Set([
 	"defaultReads",
 	"defaultProgress",
 	"interactive",
-	"maxSubagentDepth",
 	"completionGuard",
 	"toolBudget",
 	"permission",
@@ -131,10 +130,6 @@ export function serializeAgent(config: AgentConfig, options: SerializeAgentOptio
 
 	if (config.defaultProgress) lines.push("defaultProgress: true");
 	if (config.interactive) lines.push("interactive: true");
-	const maxSubagentDepth = config.maxSubagentDepth;
-	if (typeof maxSubagentDepth === "number" && Number.isInteger(maxSubagentDepth) && maxSubagentDepth >= 0) {
-		lines.push(`maxSubagentDepth: ${maxSubagentDepth}`);
-	}
 	if (config.completionGuard === false || preserve("completionGuard")) {
 		lines.push(`completionGuard: ${config.completionGuard === undefined ? "" : config.completionGuard ? "true" : "false"}`);
 	}

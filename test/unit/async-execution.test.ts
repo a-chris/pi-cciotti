@@ -42,7 +42,6 @@ describe("async runner execution", () => {
 				agents: [agent("discovered")],
 			},
 			ctx,
-			maxSubagentDepth: 1,
 			asyncDir: path.join(process.cwd(), ".tmp-missing-agent"),
 		});
 		assert.ok("error" in result);
@@ -58,7 +57,6 @@ describe("async runner execution", () => {
 			agents: [agent("arbitrary")],
 			ctx,
 			cwd: override,
-			maxSubagentDepth: 1,
 			asyncDir: path.join(process.cwd(), ".tmp-missing-agent-cwd"),
 		});
 		assert.ok("error" in result);
@@ -103,7 +101,6 @@ describe("async runner execution", () => {
 			agents: [agent("worker", { hard: 4, block: ["read"] })],
 			ctx,
 			asyncDir: path.join(process.cwd(), ".tmp-async-test"),
-			maxSubagentDepth: 2,
 			waitToolEnabled: false,
 			toolBudget: { hard: 3, block: ["find"] },
 			configToolBudget: { hard: 5, block: ["ls"] },
@@ -121,7 +118,6 @@ describe("async runner execution", () => {
 			availableModels: [{ provider: "mock", id: "context", fullId: "mock/context", contextWindow: 128_000 }],
 			ctx,
 			asyncDir: path.join(process.cwd(), ".tmp-async-context-limit-test"),
-			maxSubagentDepth: 2,
 		});
 
 		assert.ok("steps" in result, "expected successful step build");
@@ -142,7 +138,6 @@ describe("async runner execution", () => {
 			agents: [agent("default-worker"), { ...agent("custom-worker"), defaultTimeoutMs: 7_000 }],
 			ctx,
 			asyncDir: path.join(process.cwd(), ".tmp-async-timeout-test"),
-			maxSubagentDepth: 2,
 		});
 
 		assert.ok("steps" in result, "expected successful step build");
@@ -158,7 +153,6 @@ describe("async runner execution", () => {
 			agents: [agent("worker", { hard: 4, block: ["read"] })],
 			ctx,
 			asyncDir: path.join(process.cwd(), ".tmp-async-test"),
-			maxSubagentDepth: 2,
 			configToolBudget: { hard: 5, block: ["ls"] },
 		});
 
@@ -176,7 +170,6 @@ describe("async runner execution", () => {
 			agents: [external],
 			ctx,
 			asyncDir: path.join(process.cwd(), ".tmp-external-test"),
-			maxSubagentDepth: 2,
 		});
 		assert.ok("steps" in built);
 		assert.deepEqual(built.steps[0]?.runner, external.runner);
@@ -188,7 +181,6 @@ describe("async runner execution", () => {
 			agents: [external],
 			ctx,
 			asyncDir: path.join(process.cwd(), ".tmp-external-test"),
-			maxSubagentDepth: 2,
 		});
 		assert.deepEqual(rejected, { error: "Agent 'external' uses runner.type='external-cli' and does not support: model override." });
 	});
@@ -199,7 +191,6 @@ describe("async runner execution", () => {
 			agents: [agent("worker")],
 			ctx,
 			asyncDir: path.join(process.cwd(), ".tmp-async-test"),
-			maxSubagentDepth: 2,
 			configToolBudget: { hard: 5, block: ["ls"] },
 		});
 

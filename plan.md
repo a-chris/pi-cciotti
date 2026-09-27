@@ -374,9 +374,21 @@ it documents and each rejected key throws. 2715 / 0 / 11.
     resolution and the runner's own self-events read it (`buildNestedRouteIndex`,
     `projectNestedRegistryForRoot`, `findNestedRouteForRootId`, `readNestedRegistry`). Keep the
     nested-event surface; only the child-side route/nestedParent writes are dead.
-  - **`maxSubagentDepth` is not a pure delete:** it gates `checkSubagentDepth` on the *parent* path
-    (executor 1632/1788/4762/6358/6938). Removing it means removing that gate too — owner decision:
-    drop the depth cap entirely, or keep it for detached-runner chains.
+  - **`maxSubagentDepth` — OPEN DECISION for the owner, do not delete unilaterally.** Measured after
+    U2a: (a) it is **not** in the plan's Config-enriched or Remove buckets; (b) `config.ts` has **no
+    loader/validator** for it — it reaches `deps.config` only as a JSON passthrough, while
+    `docs/configuration.md:377` documents it as a settings key; (c) the *gate* it feeds
+    (`checkSubagentDepth`, executor 1632/1788/4762/6358/6938) can never fire in production, because
+    `depth` is 0 for any real executor — `childRuntime` is never passed (`index.ts:391` returns for
+    child sessions; index never sets the dep), and the detached runner's `depth` stays 0 as well; so
+    `blocked = depth >= max` is only reachable via `PI_SUBAGENT_MAX_DEPTH=0` or `{"maxSubagentDepth":
+    0}`, i.e. the one live behaviour is an undocumented **total kill switch**. Options: (1) keep the
+    depth cap and give it a validated config key (M4 done-when demands this if it stays
+    config-enriched); (2) remove the cap entirely (frontmatter field + config key + `checkSubagentDepth`
+    + `depth`/`maxDepth` bookkeeping) as dead-but-documented complexity; (3) keep as-is and document
+    depth-0 as the intentional kill switch. **Default: option 2** (VISION: removal over compatibility;
+    a capability with no reachable non-zero depth is not a capability), but it is a user-facing removal
+    of a documented key, so it needs the owner's yes.
 - **U3** trim the 68-key pool to facade/RPC-derivable keys, delete dead schemas
   (`ChainItem`, `ParallelTaskSchema`, `Dynamic*Schema`); **U4** add `topic`/script-source/`mission`
   to the control facade + `normalizeControlParams`; **U5** the REMOVE-list params end-to-end.

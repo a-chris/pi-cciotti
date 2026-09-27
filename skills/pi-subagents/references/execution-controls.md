@@ -54,8 +54,8 @@ must resume it by key.
 ### Forked context
 
 ```typescript
-subagent({
-  workflowScript: `return runs.run("oracle-check", { agent: "oracle", task: "Review my current direction and challenge assumptions.", context: "fork" })`
+subagent_workflow({
+  source: `return runs.run("oracle-check", { agent: "oracle", task: "Review my current direction and challenge assumptions.", context: "fork" })`
 })
 ```
 
@@ -83,8 +83,8 @@ reviews, review plus gate monitor, worker then monitor setup, cross-repo prep
 steps, or a fanout that the parent will consume together.
 
 ```js
-subagent({
-  workflowScript: `
+subagent_workflow({
+  source: `
     const scan = await runs.run("scan", { label: "Map target behavior", agent: "scout", task: "Map the target" });
     const reviews = await runs.all([
       { key: "correctness", label: "Review target correctness", agent: "reviewer", task: "Review correctness: " + scan.output },

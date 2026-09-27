@@ -24,10 +24,10 @@ of convening a council.
 - Otherwise list agents with `subagent_control({ action: "list" })`, then prefer 2–3
   executable names that start with `council-`.
 - If fewer than two profiles are available, fill the roster with `oracle`, then
-  `reviewer`, until it has two advisors. Launch fallback `oracle` with
-  `context: "fork"` so global defaults cannot remove its parent-chat context.
-  Let `reviewer` use its normal profile context. Note the fallback and known
-  context modes in the memo.
+  `reviewer`, until it has two advisors. Context mode belongs to the agent, not the
+  call: packaged `oracle` declares forked context, so the fallback keeps its
+  parent-chat context, and `reviewer` declares a summary brief. Note the fallback
+  and each advisor's declared context mode in the memo.
 - Use the normal single-oracle loop only when a requested roster or unavailable
   builtins leaves fewer than two advisors. Label the memo as degraded mode.
 

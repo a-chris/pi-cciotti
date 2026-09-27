@@ -18,7 +18,7 @@ Before launch, read:
 
 Run `subagent_control({ action: "list" })`, then choose 2-3 executable advisor names that start with `council-`. The prefix is convention only. Never use more than four advisors.
 
-If fewer than two council profiles are available, fill with `oracle`, then `reviewer`. Launch fallback `oracle` with `context: "fork"`; let fallback `reviewer` use its normal profile context. Note fallbacks and known context modes in the memo. If fewer than two advisors remain, use the normal one-oracle consultation loop and label it degraded mode.
+If fewer than two council profiles are available, fill with `oracle`, then `reviewer`. Context mode is declared by the agent, not the call: packaged `oracle` declares forked context and `reviewer` declares a summary brief. Note fallbacks and known context modes in the memo. If fewer than two advisors remain, use the normal one-oracle consultation loop and label it degraded mode.
 
 `council-*` profiles live in user or project agent directories, not this package. A profile defines model, tools, context, output defaults, and persistent stance. Keep advisors read-only, disable inherited skills unless needed, and put stance in the profile body instead of inventing per-run role labels.
 

@@ -85,15 +85,14 @@ Default guardrails:
 Example shape:
 
 ```typescript
-subagent({
-  workflowScript: `
+subagent_workflow({
+  source: `
     const results = await runs.all([
       { key: "deslop", agent: "reviewer", task: "Apply the available 'deslop' skill to review the current diff for concrete cleanup findings only. Do not modify files.", skill: "deslop" },
       { key: "accessibility", agent: "reviewer", task: "Apply the available 'accessibility' skill to review the UI changes for concrete issues only. Do not modify files.", skill: "accessibility" }
     ]);
     return results.map(result => result.output);
   `,
-  context: "fresh"
 })
 ```
 
@@ -136,10 +135,9 @@ When one child returns a structured target list, use ordinary JavaScript to vali
 Example shape:
 
 ```typescript
-subagent({
+subagent_workflow({
   async: true,
-  context: "fresh",
-  workflowScript: `
+  source: `
     // Stage 1: parallel read-only planning fanout (stable keys, one per issue cluster)
     const plans = await runs.all([
       { key: "deploy-plan", agent: "reviewer", phase: "Planning", label: "Deploy docs", task: "Plan fixes for deploy docs/workflow. Inspect the current diff. Do not modify project/source files; returning findings via the configured output artifact is allowed.", output: "plans/deploy.md", outputMode: "file-only" },

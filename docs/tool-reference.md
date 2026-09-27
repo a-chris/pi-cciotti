@@ -82,11 +82,11 @@ Bound writer work with a narrow task and an outer `timeoutMs` or `maxRuntimeMs` 
 
 ### Fork context details
 
-Explicit `context: "fork"` fails fast when the parent session is not persisted, the current leaf is missing, or the branched child session cannot be created. By contrast, an agent-level `defaultContext: fork` is a preference: when the parent has no persisted session file or current leaf yet, the launch uses `fresh` immediately instead of failing and requiring a retry. Explicit `context: "fresh"` always wins over agent defaults.
+A strictly forked launch fails fast when the parent session is not persisted, the current leaf is missing, or the branched child session cannot be created. By contrast, an agent-level `defaultContext: fork` is a preference: when the parent has no persisted session file or current leaf yet, the launch uses `fresh` immediately instead of failing and requiring a retry. Explicit `context: "fresh"` always wins over agent defaults.
 
 When the inherited transcript contains signed Anthropic `thinking` / `redacted_thinking` blocks, `pi-subagents` strips those provider-private blocks from the forked child session: a thinking signature is bound to the session that produced it and cannot be replayed into a branch. The child keeps its requested thinking level and reasons fresh from its first turn; sanitizing the inherited transcript is not a downgrade. Explicit `context: "fork"` never silently downgrades to `fresh`.
 
-In workflow runs that omit `context`, each `runs.run` child follows its own agent's `defaultContext`, with `fresh` when the agent declares none. A fresh-default scout can run fresh beside a fork-default oracle. If the parent session file or current leaf is not available yet, implicit fork-default children run fresh. Pass explicit `context: "fork"` or `context: "fresh"` when you intentionally want one context for every child.
+Each `runs.run` child follows its own agent's `defaultContext`, with `fresh` when the agent declares none. A fresh-default scout can run fresh beside a fork-default oracle. If the parent session file or current leaf is not available yet, implicit fork-default children run fresh. Pass explicit `context: "fork"` or `context: "fresh"` when you intentionally want one context for every child.
 
 ### Workflow steering
 

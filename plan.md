@@ -1,6 +1,6 @@
 # Plan: Facade rewrite of the subagent tool surface
 
-> Status: **M4 in progress — U1, U2a, U2b-1, U2b-2, U3a, U2b-3 (depth cap removed), U3b-1 (chatProgress), U3b-2 (served docs ↔ facade contract), U3b-3 (skills/prompts truth sweep) committed. Next: the 18 off-facade workflow examples, then U5. One owner-gated decision open: the three control verbs that cannot receive their inputs (see U3b-3 log).**
+> Status: **M4 in progress — U1, U2a, U2b-1, U2b-2, U3a, U2b-3 (depth cap removed), U3b-1 (chatProgress), U3b-2/U3b-3/U3b-4 (all model-read prose now matches the three facades, enforced by a 6-rule contract test) committed. Next: U5, the REMOVE-list params end-to-end. One owner-gated decision open: the three control verbs that cannot receive their inputs (see the U3b-3 log).**
 > VISION updated; decisions resolved.
 > Current milestone: **M4 — Enrichment + param sweep** (config keys for config-enriched params
 > before removing per-call forms; delete REMOVE params end-to-end — types, executor, preflight,
@@ -363,12 +363,28 @@ rule 1 silently skipped `grant-spawn-budget` sitting in `docs/configuration.md`.
 planted in a skill reference to prove skill files are scanned. `tsc` 0, ratchet clean, unit
 2658 pass / 0 fail / 11 skipped, integration 914 pass / 0 fail / 1 skipped.
 
-**Next unit (measured, mechanical):** 18 delegation/workflow examples still use pre-facade names —
-14 of them `subagent({ workflowScript ... })` / `workflowScriptPath` in `docs/workflows.md` plus
-`skills/.../execution-controls.md` (the facades merged both into `source`), two `context:` uses in
-`prompting-and-roles.md` (removed per D4), and the `docs/configuration.md` spawn-budget example
-already fixed here. A rule 6 (delegation/workflow examples must use facade params) should land with
-that sweep, since the current rules only police control examples.
+**U3b-4 (same session, follow-on) — the delegation/workflow half, DONE.** The rules above only
+policed control examples, so a sixth rule now covers the other two tools: *every delegation and
+workflow literal may use only that facade's params*. It derives the sets from the schemas
+(`SubagentDelegationParams` / `SubagentWorkflowParams` properties) rather than hardcoding them, and
+it found 25 offenders in three files:
+
+| Fix | Where |
+|---|---|
+| `subagent({ workflowScript })` → `subagent_workflow({ source })` | `docs/workflows.md` ×11, `execution-controls.md` ×2, `prompting-and-roles.md` ×1 |
+| `subagent({ workflowScriptPath })` → `subagent_workflow({ source: { path } })` | `docs/workflows.md` |
+| `subagent({ workflow, args })` → `subagent_workflow({ ... })` | `docs/workflows.md` ×4 |
+| dropped `timeoutMs` / `toolBudget` from the call example | they are validated config keys (U1), so the prose now attributes the bound to configuration |
+| dropped `context` (per D4, mode is agent-owned) | the literal in `prompting-and-roles.md`, the imperative in `prompts/council.md` and `skills/council-mode/SKILL.md`, and descriptive prose in `tool-reference.md` / `workflows.md` / `observability.md` reworded to agent-owned framing |
+
+`docs/extension-api.md`'s `context:` and `workflowScript:` examples are **left alone on purpose**:
+those are RPC and preflight contracts, which plan.md buckets as internal-contract fields, not model
+tool calls. Orphaned validate prose in `workflows.md`/`tool-reference.md` was folded into statements
+about launch-time validation, which does run (subagent-executor.ts:4677).
+
+Rule 6 mutation-verified (a `subagent({ workflowScript })` planted in a skill reference → red →
+restore → green). `tsc` 0, ratchet clean, unit 2659 pass / 0 fail / 11 skipped, integration
+914 pass / 0 fail / 1 skipped.
 
 ### M4 execution log — U3b-2 (docs ↔ facade contract)
 

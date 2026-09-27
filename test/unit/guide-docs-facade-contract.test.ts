@@ -1,27 +1,27 @@
 /**
  * Docs ↔ facade contract (M4).
  *
- * The model reads the packaged guide topics at runtime (`action: "guide"`), so a
- * doc that teaches a verb or param the tool schema rejects is an instruction to
- * do the impossible. That drift survived the whole facade cutover because
- * nothing compared the prose to the schemas — 37 examples told the model to call
- * control verbs on a tool whose schema requires `task`, and dozens more named
- * actions (`children.list`, `worktree.discard`, `inspector.*`, agent CRUD,
- * `doctor`, `refine.*`) that the control enum rejects.
+ * The model loads these files at runtime — the guide topics through
+ * `action: "guide"`, the skills through the skill loader, the prompt templates
+ * through slash commands. A doc that teaches a verb or param the tool schema
+ * rejects is an instruction to do the impossible, and that drift survived the
+ * whole facade cutover because nothing compared the prose to the schemas.
  *
- * This test is the comparison:
- *   1. every `action: "..."` in a served topic must be a verb the control schema
- *      accepts;
- *   2. a control example must name `subagent_control` — the same verb called as
- *      `subagent({...})` fails the delegation schema's required `task`;
- *   3. except where listed as a tracked gap, no control example may pass a param
- *      the facade normalization drops before the executor sees it.
+ * Measured before the rules landed: 37 control examples named `subagent` (whose
+ * schema requires `task`, so `{ action: "status" }` could not run at all), 40 more
+ * named actions the control enum rejects (`children.list`, `worktree.discard`,
+ * `inspector.*`, `doctor`, `refine*`, agent CRUD), the parameter reference
+ * described the removed 81-param tool, and 18 delegation/workflow examples still
+ * used pre-facade names such as `workflowScript`.
+ *
+ * The rules below derive the real surface from the schemas, so they cannot drift
+ * from it, and every one is mutation-verified.
  */
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { SUBAGENT_CONTROL_ACTIONS } from "../../src/extension/schemas.ts";
+import { SUBAGENT_CONTROL_ACTIONS, SubagentControlParams, SubagentDelegationParams, SubagentWorkflowParams } from "../../src/extension/schemas.ts";
 import { normalizeControlParams } from "../../src/extension/facade.ts";
 import { SUBAGENT_GUIDE_TOPICS } from "../../src/extension/subagent-guide.ts";
 
@@ -33,8 +33,34 @@ const servedFiles = [
 	"prompts/council.md",
 	...readdirSync("skills/pi-subagents/references").filter((name) => name.endsWith(".md")).map((name) => `skills/pi-subagents/references/${name}`),
 ];
+
 const CONTROL_VERBS = new Set<string>(SUBAGENT_CONTROL_ACTIONS);
+const facadeParams = (schema: unknown): Set<string> => new Set(Object.keys((schema as { properties?: Record<string, unknown> }).properties ?? {}));
+const DELEGATION_PARAMS = facadeParams(SubagentDelegationParams);
+const WORKFLOW_PARAMS = facadeParams(SubagentWorkflowParams);
+const MODEL_FACING_PARAMS = new Set([...DELEGATION_PARAMS, ...WORKFLOW_PARAMS, ...facadeParams(SubagentControlParams)]);
+
 const read = (file: string): string => readFileSync(join(process.cwd(), file), "utf-8");
+
+/**
+ * Control verbs whose required input cannot cross the tool boundary, so a
+ * tool-call example for one always fails:
+ *   get            needs `agent`     — delegation owns it and the facade invariant forbids sharing
+ *   validate       needs a script    — workflow owns `source`/`args`
+ *   mission.create needs `mission`   — plan.md buckets `mission` as internal-contract only
+ * The verbs stay on the enum (plan.md D2/D5/D6); only their examples are forbidden.
+ */
+const UNREACHABLE_VERBS = new Set(["get", "validate", "mission.create"]);
+
+/**
+ * Params plan.md's disposition table removes from the model surface or moves to
+ * config / internal contracts. An example that passes one is teaching a
+ * capability the model does not have.
+ */
+const NEVER_MODEL_PARAMS = new Set([
+	"topic", "view", "lines", "mode", "index", "childId", "handoffPath", "repo",
+	"additional", "share", "sessionDir", "steeringRecovery", "agentScope", "capabilities", "mission",
+]);
 
 /** Every `action: "verb"` mention, including bare `{ action: "x" }` examples. */
 function mentionedVerbs(): { file: string; line: number; verb: string }[] {
@@ -55,12 +81,13 @@ interface CallExample {
 	file: string;
 	line: number;
 	tool: string;
-	verb: string;
+	/** The `action` value, when the literal carries one. */
+	verb: string | undefined;
 	/** Keys at depth 1 of the argument literal (string bodies and nesting skipped). */
 	keys: string[];
 }
 
-/** Parse `subagent*({...})` literals with brace matching that ignores strings. */
+/** Parse `subagent*({...})` literals with brace matching that ignores string bodies. */
 function toolCallExamples(): CallExample[] {
 	const found: CallExample[] = [];
 	for (const file of servedFiles) {
@@ -104,28 +131,14 @@ function toolCallExamples(): CallExample[] {
 			if (end < 0) continue;
 			const body = text.slice(match.index, end + 1);
 			const verb = /action:\s*\\?"([a-zA-Z][a-zA-Z.0-9-]*)\\?"/.exec(body)?.[1];
-			if (!verb) continue;
 			found.push({ file, line: text.slice(0, match.index).split("\n").length, tool: match[1]!, verb, keys: [...new Set(keys)] });
 		}
 	}
 	return found;
 }
 
-/**
- * Control verbs whose required input cannot cross the tool boundary, so a tool-call
- * example for them is an instruction that always fails:
- *   get          needs `agent`      (delegation owns `agent`; the invariant forbids sharing)
- *   validate     needs a script     (workflow owns `source`/`args`)
- *   mission.create needs `mission`  (plan.md buckets `mission` as internal-contract only)
- * The verbs stay on the enum per D2/D5/D6; only their examples are forbidden.
- */
-const UNREACHABLE_VERBS = new Set(["get", "validate", "mission.create"]);
-
-/** Params the plan removes from the model surface or moves to config / internal contracts. */
-const NEVER_MODEL_PARAMS = new Set([
-	"topic", "view", "lines", "mode", "index", "childId", "handoffPath", "repo",
-	"additional", "share", "sessionDir", "steeringRecovery", "agentScope", "capabilities", "mission",
-]);
+/** Examples that name a control verb, i.e. the ones the control rules police. */
+const controlExamples = (): CallExample[] => toolCallExamples().filter((example) => example.verb !== undefined && CONTROL_VERBS.has(example.verb));
 
 describe("served docs match the facade contract", () => {
 	it("teaches only control verbs the control schema accepts", () => {
@@ -138,7 +151,7 @@ describe("served docs match the facade contract", () => {
 	});
 
 	it("routes control verbs to the subagent_control tool", () => {
-		const offenders = toolCallExamples().filter((e) => CONTROL_VERBS.has(e.verb) && e.tool !== "subagent_control");
+		const offenders = controlExamples().filter((example) => example.tool !== "subagent_control");
 		assert.deepEqual(
 			offenders.map((e) => `${e.file}:${e.line} ${e.tool}({ action: "${e.verb}" })`),
 			[],
@@ -147,7 +160,7 @@ describe("served docs match the facade contract", () => {
 	});
 
 	it("never shows a control example for a verb that cannot receive its input", () => {
-		const offenders = toolCallExamples().filter((e) => UNREACHABLE_VERBS.has(e.verb));
+		const offenders = controlExamples().filter((example) => UNREACHABLE_VERBS.has(example.verb!));
 		assert.deepEqual(
 			offenders.map((e) => `${e.file}:${e.line} ${e.tool}({ action: "${e.verb}" })`),
 			[],
@@ -158,22 +171,38 @@ describe("served docs match the facade contract", () => {
 	it("does not pass control params the model surface does not carry", () => {
 		const forwarded = new Set(Object.keys(normalizeControlParams({ id: "x", action: "status", message: "m" })).filter((key) => key !== undefined));
 		const offenders: string[] = [];
-		for (const example of toolCallExamples()) {
-			if (!CONTROL_VERBS.has(example.verb)) continue;
+		for (const example of controlExamples()) {
+			if (UNREACHABLE_VERBS.has(example.verb!)) continue;
 			for (const key of example.keys) {
 				if (forwarded.has(key)) continue;
-				const why = NEVER_MODEL_PARAMS.has(key) ? "removed/config/internal by plan.md" : "never reaches the executor";
+				const why = NEVER_MODEL_PARAMS.has(key) ? "removed, config-owned, or internal per plan.md" : "never reaches the executor";
 				offenders.push(`${example.file}:${example.verb}+${key} (${why})`);
 			}
 		}
 		assert.deepEqual([...new Set(offenders)].sort(), [], "control examples pass params the model surface does not carry");
 	});
 
-	it("keeps the parameter reference to facade params", () => {
+	it("uses only that facade's params in every delegation and workflow example", () => {
+		const byTool: Record<string, Set<string>> = { subagent: DELEGATION_PARAMS, subagent_workflow: WORKFLOW_PARAMS };
+		const offenders: string[] = [];
+		for (const example of toolCallExamples()) {
+			const allowed = byTool[example.tool];
+			if (!allowed) continue;
+			for (const key of example.keys) {
+				if (!allowed.has(key)) offenders.push(`${example.file}:${example.line} ${example.tool}+${key}`);
+			}
+		}
+		assert.deepEqual(
+			[...new Set(offenders)].sort(),
+			[],
+			"these literals pass params their tool does not accept (workflowScript/workflowScriptPath were merged into source; context moved to the agent)",
+		);
+	});
+
+	it("keeps the parameter reference to model-facing params", () => {
 		const [table = ""] = read("docs/tool-reference.md").split("### Budget guidance for writers");
 		const documented = [...table.matchAll(/^\| `([a-zA-Z]+)` \|/gm)].map((match) => match[1]!);
-		const facadeParams = new Set(["task", "agent", "prequel", "reads", "cwd", "workflow", "source", "args", "baseRef", "async", "worktree", "output", "action", "id", "message"]);
 		assert.ok(documented.length >= 15, `expected the facade parameter table, found ${documented.length} rows`);
-		assert.deepEqual(documented.filter((key) => !facadeParams.has(key)), [], "parameter reference documents params the facades do not expose");
+		assert.deepEqual(documented.filter((key) => !MODEL_FACING_PARAMS.has(key)), [], "parameter reference documents params the facades do not expose");
 	});
 });

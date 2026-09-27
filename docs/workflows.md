@@ -10,7 +10,7 @@ Use orchestration as parent-agent guidance, not as a runtime workflow mode. For 
 clarify → scout → worker → fresh reviewers → worker
 ```
 
-Packaged `worker`, `oracle`, and `advisor` default to forked context when a launch omits `context`. If the parent has no persisted session file or current leaf yet, that implicit default falls back to `fresh`. Pass `context: "fresh"` when you intentionally want a fresh child run, or `context: "fork"` when fork must remain strict.
+Packaged `worker`, `oracle`, and `advisor` declare forked context in their agent definitions. If the parent has no persisted session file or current leaf yet, that implicit default falls back to `fresh`. Pass `context: "fresh"` when you intentionally want a fresh child run, or `context: "fork"` when fork must remain strict.
 
 Child-safety boundaries are enforced at runtime:
 
@@ -65,7 +65,7 @@ Compose the script on `subagent_workflow` instead. Relative paths resolve agains
 Inline and file-backed scripts accept bounded plain-JSON `args`:
 
 ```js
-subagent({ workflowScriptPath: "workflows/review.js", args: { target: "src/workflows" } });
+subagent_workflow({ source: { path: "workflows/review.js" }, args: { target: "src/workflows" } });
 // workflows/review.js
 return runs.run("review", { agent: "reviewer", task: `Review ${args.target}` });
 ```
@@ -77,38 +77,36 @@ Omitted arguments are an empty object. The `args` object, its nested objects, an
 Use a named workflow resource when a permission or policy extension needs to distinguish extension-resolved workflow content from raw model-authored scripts:
 
 ```js
-subagent({ workflow: "review", args: { task: "Review the change" } });
-subagent({ workflow: "run-ci", args: { command: "npm test" } });
+subagent_workflow({ workflow: "review", args: { task: "Review the change" } });
+subagent_workflow({ workflow: "run-ci", args: { command: "npm test" } });
 ```
 
 The host resolves the name and validates bounded plain-JSON `args` before starting the workflow. Resource provenance is recorded in workflow details and receipts for downstream permission/policy checks. Resource authority is not caller-supplied: `runs.host` is available only when the resolved resource explicitly grants the requested host key and command. Inline `workflowScript` and `workflowScriptPath` remain raw, unknown-provenance inputs, so their `runs.host` calls are unavailable through the public execution boundary. Named resources cannot be combined with `agent`, `task`, `workflowScript`, or `workflowScriptPath`; this first slice ships only the package-owned `review` and `run-ci` resources, not a user/project resource registry.
 
 ### Opt-in bounded workflows
 
-Composite workflows have no default parent deadline. Add bounds only when the workflow contract calls for them:
+Composite workflows have no default parent deadline. Set the `timeoutMs` and `toolBudget` config keys only when the workflow contract calls for a bound:
 
 ```js
-subagent({
-  workflowScript: `
+subagent_workflow({
+  source: `
     const scan = await runs.run("scan", { agent: "scout", task: "Inspect the named files." });
     return runs.run("review", { agent: "reviewer", task: "Review:\n" + scan.output });
   `,
-  timeoutMs: 900000,
-  toolBudget: { soft: 40, hard: 60 }
 });
 ```
 
-- `timeoutMs` sets the workflow deadline and bounds child deadlines to the remaining time.
-- `toolBudget` becomes the default for each child unless that child supplies a narrower value.
+- The validated `timeoutMs` config key sets the workflow deadline and bounds child deadlines to the remaining time.
+- The validated `toolBudget` config key becomes the default for each child unless that child supplies a narrower value in its `runs.run` item.
 - Budget and timeout stops return a structured `terminalOutcome` with `state: "partial"` and reason `budget_exhausted` or `timeout`. Workflow receipts keep settled child evidence for recovery.
 - After an async workflow receipt is successfully published, `workflowReceiptPath` exposes its exact path in wait completion details, completion notifications, and exact status/debug details. Text responses also identify the receipt. Pending runs and failed receipt publications omit the reference; older status records are not backfilled. The reference records publication, not a guarantee against later retention cleanup. Raw result files retain `workflowReceipt: { path, receipt }`.
 
 These controls are opt-in. Avoid tight hard budgets for mutation-capable workers unless the workflow has an explicit checkpoint and handoff path.
 
-The result is `{ ok, errors }`. Invalid scripts return a tool error and include line and column data when available. Validation checks syntax, portable nested-async rules, literal `runs.run` and `runs.all` keys and child `baseRef` values, duplicate literal keys in one `runs.all` group, direct keyed access to a known `runs.all` result, and statically clear non-JSON boundary values. Dynamic keys and other runtime-only values are accepted without a warning. Validation does not discover agents, launch children, or create run artifacts.
+A script that fails to parse returns a tool error with line and column data when available. Validation checks syntax, portable nested-async rules, literal `runs.run` and `runs.all` keys and child `baseRef` values, duplicate literal keys in one `runs.all` group, direct keyed access to a known `runs.all` result, and statically clear non-JSON boundary values. Dynamic keys and other runtime-only values are accepted without a warning. Validation does not discover agents, launch children, or create run artifacts.
 
 ```js
-subagent({ workflowScript: `
+subagent_workflow({ source: `
   const scan = await runs.run("scan", { label: "Map codebase behavior", agent: "scout", task: "Scan the codebase" });
   const reviews = await runs.all([
     { key: "correctness", label: "Review codebase correctness", agent: "reviewer", task: "Review correctness: " + scan.output },
@@ -121,7 +119,7 @@ subagent({ workflowScript: `
 Keep helper functions portable across Node and Bun. Use top-level `await`, plain helper functions that return `runs.run(...)`, or explicit Promise chains. Do not define nested `async function` helpers, async arrows, or async methods inside `workflowScript`; native async helpers hide child-launch observation in Bun and are rejected.
 
 ```js
-subagent({ workflowScript: `
+subagent_workflow({ source: `
   function scan() {
     return runs.run("scan", { label: "Map codebase behavior", agent: "scout", task: "Scan the codebase" });
   }
@@ -133,7 +131,7 @@ subagent({ workflowScript: `
 Chaining is still supported. The supported form is scripted chaining: await one `runs.run(...)` result, then pass its output into the next step. Parallel fanout uses `runs.all(...)` inside the same script.
 
 ```js
-subagent({ workflowScript: `
+subagent_workflow({ source: `
   const plan = await runs.run("plan", { label: "Plan migration behavior", agent: "scout", task: "Plan the migration" });
   const patch = await runs.run("patch", { label: "Implement migration behavior", agent: "worker", task: "Implement this plan:\n" + plan.output });
   return patch.output;
@@ -145,7 +143,7 @@ subagent({ workflowScript: `
 Use the named `run-ci` resource when a permission/policy extension needs to admit one supported non-interactive command as workflow evidence instead of a child-agent run:
 
 ```js
-subagent({ workflow: "run-ci", args: { command: "npm test", timeoutMs: 120000 } });
+subagent_workflow({ workflow: "run-ci", args: { command: "npm test", timeoutMs: 120000 } });
 ```
 
 The first named resource version supports only `npm test` and `npm run typecheck`, with bounded timeout values. Its resolved script uses `runs.host("ci", ...)` and the resource authority admits only the selected command. **There is no per-step `cwd` field:** the command and relative output path use the workflow cwd. Set `cwd` on the outer `subagent({...})` request when the workflow should run in another directory. The command has no stdin, receives the workflow cwd, and must be awaited or returned. Stdout, stderr, and the saved log are bounded. A nonzero exit, timeout, abort, or output-write failure fails the workflow. Async status and terminal receipts store the bounded host-step state; renderers do not run commands or read command output.
@@ -155,7 +153,7 @@ The first named resource version supports only `npm test` and `npm run typecheck
 Use `await runs.steer(key, message, options?)` after `runs.run` or `runs.all` has launched that stable key. Scripts do not target raw run ids. The optional fields are `mode: "steer" | "follow_up" | "auto"`, a non-negative child `index`, and a positive `ackTimeoutMs`.
 
 ```js
-subagent({ workflowScript: `
+subagent_workflow({ source: `
   const writer = runs.run("writer", { agent: "worker", task: "Implement the change" });
   const evidence = await runs.run("evidence", { agent: "scout", task: "Find the exact contract" });
   const receipt = await runs.steer("writer", "Also check: " + evidence.output, { mode: "follow_up" });
@@ -172,7 +170,7 @@ Always await or return a `runs.steer` promise. The workflow waits for an observe
 `runs.run` starts a keyed child when you call it. You do not need separate `runs.start`, `runs.next`, or `runs.collect` helpers for rolling councils or staged reviews. This is the advanced exception to ordinary `runs.all` fanout: keep launched promises only when the script later observes each one with direct `await`, `Promise.race`, or `Promise.all`. Use `Promise.race` to wait for the next completed child, steer a still-running sibling by its stable key, and use `Promise.all` to collect the remaining children.
 
 ```js
-subagent({ workflowScript: `
+subagent_workflow({ source: `
   let pending = [
     { key: "analysis-a", promise: runs.run("analysis-a", { agent: "reviewer", task: "Analyze option A" }).then((result) => ({ key: "analysis-a", result })) },
     { key: "analysis-b", promise: runs.run("analysis-b", { agent: "reviewer", task: "Analyze option B" }).then((result) => ({ key: "analysis-b", result })) },
@@ -195,7 +193,7 @@ The workflow trace records the run completions and steering receipt. Scripts sti
 Use named outputs when later workflow steps need structured data or durable references:
 
 ```js
-subagent({ workflowScript: `
+subagent_workflow({ source: `
   const inventory = await runs.run("inventory", {
     agent: "scout",
     task: "List the files that need review.",
@@ -216,7 +214,7 @@ subagent({ workflowScript: `
 For dynamic fanout, have one step return a structured list, check it in JavaScript, then map the bounded entries into `runs.all(...)`:
 
 ```js
-subagent({ workflowScript: `
+subagent_workflow({ source: `
   const targets = await runs.run("targets", {
     agent: "scout",
     task: "Return up to five source files that need review.",
@@ -239,7 +237,7 @@ subagent({ workflowScript: `
 For intermediate data that only later steps need, prefer the prior child's returned output or `structuredOutput` instead of writing shared files:
 
 ```js
-subagent({ workflowScript: `
+subagent_workflow({ source: `
   const scan = await runs.run("scan", { agent: "scout", task: "Find the files that need fixes." });
   return runs.run("fix", { agent: "worker", task: "Implement these findings:\n" + scan.output });
 ` });

@@ -23,36 +23,18 @@ Behavior:
 - Set `missions.enabled: false` to disable automatic mission creation; explicit mission fields still work.
 - A workflow with a mission can use `await state.get(key)` and `await state.set(key, value)` for durable JSON state. Missing keys return `undefined`. Keys use the same format as `runs.run` keys. Each set takes the state-file lock, reads the latest file, merges the key, and atomically writes `<mission-directory>/<mission-id>/state.json`. The complete file cannot exceed 256 KiB. Each workflow caches the file on its first `get`. A `mission:false` workflow has no `state` global.
 
-An explicit `mission` object must have exactly one non-empty `title` or `summary`. `objective` and `labels` are optional. When supplied, `goal` must be `true` and requires `budget: { tokens: <positive integer> }`.
+A workflow and its children share one mission, created automatically for the run. The explicit `mission` object and the `mission.create` verb are not on the model surface: `subagent_control` carries only `id`, `action`, and `message`, so a mission that needs an authored title, objective, or budget is set up by the operator (or through the extension API) before the work runs.
 
-```ts
-const created = subagent_control({
-  action: "mission.create",
-  mission: { title: "Ship auth refresh", objective: "Implement and validate token refresh" }
-})
-
-// Or create and attach in one launch
-subagent({
-  workflowScript: `return runs.run("main", { agent: "worker", task: "Implement the approved plan" })`,
-  mission: { title: "Ship auth refresh" }
-})
+```js
+// The workflow and its children share the run's mission automatically.
+{ workflowScript: `return runs.run("main", { agent: "worker", task: "Implement the approved plan" })` }
 ```
 
 ### Goal missions
 
 Set `goal: true` with a token budget to make an open mission an active continuation driver:
 
-```ts
-subagent_control({
-  action: "mission.create",
-  mission: {
-    title: "Ship auth refresh",
-    objective: "Implement and validate token refresh",
-    goal: true,
-    budget: { tokens: 400000 }
-  }
-})
-```
+A goal mission is configured where the mission is created, by the operator or the extension API — not from a tool call. `goal: true` requires a `budget: { tokens }`.
 
 After each parent turn, an idle goal mission sends one needs-attention notice with its title, remaining token budget, and next ready action. The action comes from `state.nextReadyAction`, `state.nextAction`, a state item with `status: "ready"`, an open decision, or linked-run state. A workflow can write `state.nextReadyAction` to tell the next notice exactly what work is ready. When the latest linked workflow has a resumable retained child, the notice names that child as the `resume` target. Non-resumable retained children stay visible in `children.list` with their reason, but goal notices do not present them as resume targets. The extension never launches or replans goal work by itself.
 

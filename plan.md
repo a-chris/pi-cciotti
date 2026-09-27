@@ -1,6 +1,6 @@
 # Plan: Facade rewrite of the subagent tool surface
 
-> Status: **M4 in progress — U1, U2a, U2b-1, U2b-2, U3a, U2b-3 (depth cap removed) committed. Next: U3b/U5 param sweep. No open owner decisions.**
+> Status: **M4 in progress — U1, U2a, U2b-1, U2b-2, U3a, U2b-3 (depth cap removed), U3b-1 (chatProgress), U3b-2 (served docs ↔ facade contract), U3b-3 (skills/prompts truth sweep) committed. Next: the 18 off-facade workflow examples, then U5. One owner-gated decision open: the three control verbs that cannot receive their inputs (see U3b-3 log).**
 > VISION updated; decisions resolved.
 > Current milestone: **M4 — Enrichment + param sweep** (config keys for config-enriched params
 > before removing per-call forms; delete REMOVE params end-to-end — types, executor, preflight,
@@ -328,6 +328,48 @@ is a safe checkpoint on its own.
 4. **End:** suite green; measurement recorded when applicable; plan.md status + current-milestone
    updated; committed. A milestone is never "mostly done" — it is done (done-when met) or not.
 
+### M4 execution log — U3b-3 (skills/prompts truth sweep + repo-wide record)
+
+Same defect class as U3b-2, in the other surfaces the model loads: `skills/pi-subagents/SKILL.md`,
+its four `references/*.md`, `skills/council-mode/SKILL.md`, and `prompts/council.md`.
+
+| Measured before | Detail |
+|---|---|
+| 8 control examples on the wrong tool | `subagent({ action: "list" })` fails the delegation schema's required `task`, so `/council` and the skill's own instructions could not list agents at all |
+| 15 dead-verb examples | `children.list`, `doctor`, `refine`/`refine.show`/`refine.rollback`, and agent CRUD write verbs |
+| `management-authoring-rpc.md` built on the removed write surface | 14 of its call examples were `create`/`update`/`delete`/`eject`/`disable`/`enable`/`reset` |
+| stale subsystem text | RPC section described "child-safety depth" (removed in U2b-3) and told readers to "list children first" via a verb that no longer exists |
+
+Rewrote `management-authoring-rpc.md` around the real surface (registry reads on `subagent_control`,
+file-based authoring in place of the write verbs, the slash route for refinement), and corrected the
+other six files. Also swept `docs/` for the params the disposition table removes rather than adds:
+`topic`, `view`, `lines`, `index`, `mode`, `capabilities`, `additional`, `agentScope` no longer appear
+as call params anywhere the model reads.
+
+**Guard rewritten, not extended.** The U3b-2 test tracked the dropped params as an allow-list of
+"U4 will fix these" gaps — which was wrong, because the table removes them. `trackedFacadeGaps` is
+gone; the rules are now hard assertions:
+1. only enum verbs may be mentioned;
+2. control verbs must be shown on `subagent_control`;
+3. **no** tool-call example for `get`/`validate`/`mission.create` (their inputs cannot cross the tool boundary);
+4. **no** control example may pass a param the surface does not carry — `NEVER_MODEL_PARAMS` names the plan's removal set, and the failure message says which rule applies;
+5. the parameter reference carries facade params only;
+and the scanned file list now includes the skills and prompt templates, not just the guide topics.
+
+**Found by the guard, in the guard:** the verb regex used `[a-zA-Z.]`, which cannot match a hyphen, so
+rule 1 silently skipped `grant-spawn-budget` sitting in `docs/configuration.md`. Widened to
+`[a-zA-Z][a-zA-Z.0-9-]*`; it immediately flagged the offending line. All five rules mutation-verified
+(planted offender → red → restore → green), including a hyphenated dead verb and a removed param
+planted in a skill reference to prove skill files are scanned. `tsc` 0, ratchet clean, unit
+2658 pass / 0 fail / 11 skipped, integration 914 pass / 0 fail / 1 skipped.
+
+**Next unit (measured, mechanical):** 18 delegation/workflow examples still use pre-facade names —
+14 of them `subagent({ workflowScript ... })` / `workflowScriptPath` in `docs/workflows.md` plus
+`skills/.../execution-controls.md` (the facades merged both into `source`), two `context:` uses in
+`prompting-and-roles.md` (removed per D4), and the `docs/configuration.md` spawn-budget example
+already fixed here. A rule 6 (delegation/workflow examples must use facade params) should land with
+that sweep, since the current rules only police control examples.
+
 ### M4 execution log — U3b-2 (docs ↔ facade contract)
 
 **Live defect, not a param trim.** The guide topics are served to the model at
@@ -523,8 +565,21 @@ it documents and each rejected key throws. 2715 / 0 / 11.
     `schemas.ts`, so U3 is only the key trim, not a second subsystem pass.
   - **M6's byte-budget test already exists** (`schemas.test.ts:740`, < 3000 chars across the three
     facades); U3a removed dead weight, threshold untouched.
-- **U3b** trim the 56-key pool to facade/RPC-derivable keys; **U4** add `topic`/script-source/`mission`
-  to the control facade + `normalizeControlParams`; **U5** the REMOVE-list params end-to-end.
+- **U3b** trim the 56-key pool to facade/RPC-derivable keys; **U5** the REMOVE-list params end-to-end.
+  - **U4 as previously written here is CANCELLED — it contradicted the disposition table above.**
+    An earlier session recorded "U4: add `topic`/script-source/`mission` to the control facade". The
+    param-disposition table is the owner's, and it says the opposite: `topic`, `view`, `lines`, `mode`,
+    `index`, `childId`, `handoffPath`, `repo`, `additional`, `share`, `sessionDir` are **Remove
+    entirely**; `agentScope` is **Config-enriched**; `capabilities` and `mission` are
+    **Extension/API-only**. So the control facade stays `id`/`action`/`message`, and the fix for the
+    dropped params is to stop teaching them (done in U3b-3), not to add params back.
+  - **Owner-gated residue:** `get`, `validate`, and `mission.create` are on the control enum (D5/D6/D2
+    keep them) but cannot receive their required inputs — `agent` (delegation owns it; the M1
+    invariant forbids sharing), a script body (`source`/`args` are workflow-owned), and `mission`
+    (bucketed internal-only). Measured: `handleGet` returns "Specify 'agent' for get." with no agent;
+    `validateMissionLaunch(undefined)` throws "mission must be an object"; `validate` with no script
+    returns an error payload. Resolution is an owner call: drop the three verbs from the enum, or
+    admit the params (grow the exempt set / add `source` to control / put `mission` on a facade).
   - **Do not blind-remove `steeringRecovery`.** It is absent from all three facades (delegation 8 keys,
     workflow 6, control 3) so the model cannot pass it, but the two internal callers (`rpc.ts:526`,
     `slash-commands.ts:1091`) pass `false` to *suppress* a `recover` callback the executor builds

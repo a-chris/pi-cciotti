@@ -50,23 +50,17 @@ Workflow-level child controls default onto each `runs.run`/`runs.all` launch; ex
 
 Child results cross into the script as plain JSON data. Non-JSON host metadata is omitted, so use returned fields such as `runId`, `ok`, `output`, and `structuredOutput` for workflow control.
 
-Validate a script without launching children:
+Scripts are supplied as `source`: either an inline statement body or `{ path }` to load one from a
+file. The two shapes are mutually exclusive.
 
 ```js
-subagent_control({ action: "validate", workflowScript: `
-  const results = await runs.all([{ key: "scan", agent: "scout", task: "Scan" }]);
-  return results[0].output;
-` });
+subagent_workflow({ source: "return runs.run('main', { agent: 'scout', task: 'Scan' })" });
+subagent_workflow({ source: { path: "workflows/review.js" } });
 ```
 
-For a script stored in a file, use `workflowScriptPath` instead of `workflowScript`:
-
-```js
-subagent({ workflowScriptPath: "workflows/review.js", cwd: "/path/to/project" });
-subagent_control({ action: "validate", workflowScriptPath: "workflows/review.js" });
-```
-
-The fields are mutually exclusive. Relative paths resolve against the request `cwd`; absolute paths pass through. The host reads the file before validation or workflow sandbox execution. The sandbox still has no filesystem access. Missing, unreadable, and empty files return file input errors instead of script syntax errors.
+Static lint is not available to the model: the `validate` verb needs the script body, which only
+`subagent_workflow` carries, so the control tool returns an error asking for input it cannot receive.
+Compose the script on `subagent_workflow` instead. Relative paths resolve against the request `cwd`; absolute paths pass through. The host reads the file before validation or workflow sandbox execution. The sandbox still has no filesystem access. Missing, unreadable, and empty files return file input errors instead of script syntax errors.
 
 Inline and file-backed scripts accept bounded plain-JSON `args`:
 

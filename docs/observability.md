@@ -38,7 +38,7 @@ async subagent worker · background
     Press configured-expand-key for live detail
 ```
 
-To inspect one background child in text, use `subagent_control({ action: "status", id: "...", view: "transcript" })`; add `index` for a specific child in a parallel or chain run.
+To inspect one background child in text, use `subagent_control({ action: "status", id: "..." })`. For a specific child of a parallel or chain run, target that child's own run id, taken from the `(runId, index)` rows in the parent's status output.
 
 In Pi fullscreen mode with mouse dispatch (verified with Pi TUI 0.85.1), left-click
 anywhere on the async widget's header row to fold it into a live one-line status
@@ -113,7 +113,7 @@ Default keys:
 Set `fleetKeybindings` in the extension config to replace inspector-level keys when a terminal intercepts keys such as `PgUp`, `PgDn`, `Home`, or `End`. Prompt modes keep fixed keys such as `Esc`, `Enter`, `Tab`, and stop-confirmation `Y`/`N`.
 
 Enter and `H` use the available Inspect plugin. On macOS with Ghostty 1.3+ (TERM_PROGRAM=ghostty), this includes the other bundled open-only plugin using Ghostty's preview AppleScript API; status and close are unavailable because no binding is written. In a child-specific inspector, type ordinary guidance and press Enter to send it through the acknowledged steer channel; `steer <message>`, `status`, and `stop` remain available as explicit controls. 
-Without a TUI, `/subagents-fleet` retains the textual `subagent_control({ action: "status", view: "fleet" })` fallback, and mutations use explicit commands: run `/subagents-stop` and pick from the selector, or use `/subagents-stop <run-id>` / `subagent_control({ action: "stop", id: "..." })` when you already know the id.
+Without a TUI, `/subagents-fleet` retains its textual fallback and `subagent_control({ action: "status" })` reports the current fleet in text, while mutations use explicit commands: run `/subagents-stop` and pick from the selector, or use `/subagents-stop <run-id>` / `subagent_control({ action: "stop", id: "..." })` when you already know the id.
 
 Use `/subagents-detach [run-id]` only for an active foreground single-subagent run you want to leave running without terminating; the eventual result remains available through status/wait.
 

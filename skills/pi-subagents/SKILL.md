@@ -67,13 +67,13 @@ result necessary before this turn ends. For
 immediate action remains; if only async runs are running, record the revisit
 trigger and yield.
 
-Package agents appear in `subagent({ action: "list" })`. External CLI/job agents
+Package agents appear in `subagent_control({ action: "list" })`. External CLI/job agents
 use their own runner contract. Do not pass native Pi child options to them unless
 that runner explicitly supports the option.
 
 ## Read the reference for the branch
 
-For exact API fields and worked examples, call `subagent({action:"guide",topic:"tool-reference"})` or `topic:"workflows"`. The compact tool definition is not the recipe catalog; use `topic:"missions"` for mission records and goal missions.
+For exact API fields and worked examples, read `/subagents-guide tool-reference` or `/subagents-guide workflows`, or `subagent_control({ action: "guide" })` for the packaged overview. The compact tool definition is not the recipe catalog; use `topic:"missions"` for mission records and goal missions.
 
 | Branch | Read |
 | --- | --- |

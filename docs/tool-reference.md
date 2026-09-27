@@ -180,19 +180,14 @@ For other subagent-governed workflows, external/foreground/CLI fallback requires
 
 ```ts
 subagent_control({ action: "status" })
-subagent_control({ action: "status", view: "fleet" })
 subagent_control({ action: "status", id: "<run-id>" })
-subagent_control({ action: "status", id: "<run-id>", view: "transcript", index: 0, lines: 80 })
 subagent_control({ action: "status", id: "<nested-run-id>" })
 subagent_control({ action: "interrupt", id: "<run-id>" })
 subagent_control({ action: "interrupt", id: "<nested-run-id>" })
 subagent_control({ action: "stop", id: "<run-id>" })
 subagent_control({ action: "resume", id: "<run-id>", message: "follow-up question after it pauses or finishes" })
-subagent_control({ action: "resume", id: "<run-id>", index: 1, message: "follow-up for child 2" })
 subagent_control({ action: "resume", id: "<nested-run-id>", message: "follow-up for a nested child" })
 subagent_control({ action: "steer", id: "<run-id>", message: "guidance for the running child" })
-subagent_control({ action: "steer", id: "<run-id>", mode: "follow_up", message: "check this after the current turn" })
-subagent_control({ action: "steer", id: "<run-id>", index: 1, mode: "auto", message: "guidance for child 2" })
 ```
 
 ### status

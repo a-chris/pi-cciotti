@@ -59,10 +59,10 @@ its overhead. Recipes select a shape; they do not authorize delegation:
 
 ## Error Handling
 
-- **Unknown agent:** run `subagent({ action: "list" })`; check scope/precedence and author new orchestration with `workflowScript`, not legacy chains.
-- **Setup or discovery confusion:** run `subagent({ action: "doctor" })`.
+- **Unknown agent:** run `subagent_control({ action: "list" })`; check scope/precedence and author new orchestration with `workflowScript`, not legacy chains.
+- **Setup or discovery confusion:** run `/subagents-doctor`; `subagent_control({ action: "list" })` shows the discovered registry and `subagent_control({ action: "models" })` shows the models available to it.
 - **Missing session file for a fork:** persist the parent session before using `context: "fork"`.
 
 - **Parallel output-path conflict:** give each task a distinct output path, or disable output where no artifact is needed.
 - **Worktree launch failure:** ensure the git tree is clean and task cwd overrides match the shared cwd.
-- **Child fails before starting:** inspect `subagent({ action: "status", id: "..." })`, artifact metadata, output logs, and `doctor`; loader errors usually appear in child logs.
+- **Child fails before starting:** inspect `subagent_control({ action: "status", id: "..." })`, artifact metadata, output logs, and `/subagents-doctor`; loader errors usually appear in child logs.

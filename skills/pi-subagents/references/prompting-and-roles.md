@@ -205,7 +205,7 @@ For one run, use inline config:
 /run reviewer[model=provider/review-model] "Review this diff"
 ```
 
-For persistent tweaks, edit `subagents.agentOverrides` in user or project settings. User overrides apply everywhere. Project overrides apply only in that repo and win over user overrides. Use `/subagents-models` or `subagent({ action: "models" })` to inspect the live mapping after settings and overrides load.
+For persistent tweaks, edit `subagents.agentOverrides` in user or project settings. User overrides apply everywhere. Project overrides apply only in that repo and win over user overrides. Use `/subagents-models` or `subagent_control({ action: "models" })` to inspect the live mapping after settings and overrides load.
 
 Provider-scoped entries can layer on top of the default override for the active parent session provider. The provider is selected once from the parent model. Within each settings file, the provider entry wins per field; project settings still win over user settings.
 

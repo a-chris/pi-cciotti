@@ -448,8 +448,8 @@ Hosts reach it through the surfaces that actually dispatch it:
   child inspection request with a correlated widget payload and starts no model turn. The reply is
   emitted through `ctx.ui.setWidget` prefixed with `PI_SUBAGENT_INSPECT_JSON:` and retracted in the
   same handler, so the host correlates the payload by `requestId` without accumulating visible
-  state. Inspection replies are available only on RPC surfaces; in TUI mode use `/subagents` or
-  `subagent_control({ action: "status", view: "transcript" })`.
+  state. Inspection replies are available only on RPC surfaces; in TUI mode use `/subagents-fleet` for
+the live fleet inspector, or `/subagents` for one run's metadata.
 
 An available inspector plugin owns the run binding; without one, open fails closed with an
 actionable message and ordinary launches stay headless. Closing an inspector never stops the run.

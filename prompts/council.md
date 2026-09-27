@@ -21,7 +21,7 @@ of convening a council.
 
 - If `--advisors` is given, use exactly those agent names. Fail clearly on an
   unknown agent. Do not require or invent per-advisor role labels.
-- Otherwise list agents with `subagent({ action: "list" })`, then prefer 2–3
+- Otherwise list agents with `subagent_control({ action: "list" })`, then prefer 2–3
   executable names that start with `council-`.
 - If fewer than two profiles are available, fill the roster with `oracle`, then
   `reviewer`, until it has two advisors. Launch fallback `oracle` with
@@ -39,7 +39,7 @@ at 2–3 and never exceed 4.
 Package advisors such as Surf's `gpt-pro` are valid only when the package Pi
 extension is installed and its external-job provider is registered. For Surf,
 that means the `surf-cli` Pi extension has loaded and `surf-oracle` appears in
-`subagent({ action: "list" })` or the advisor is explicitly requested in
+`subagent_control({ action: "list" })` or the advisor is explicitly requested in
 `--advisors` after that install. Treat them as external-runner advisors: omit
 child `async` for normal attached council results, do not pass `outputSchema`,
 include any needed evidence in the prompt, and use the fresh fallback cross-exam

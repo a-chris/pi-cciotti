@@ -421,8 +421,30 @@ it documents and each rejected key throws. 2715 / 0 / 11.
     is exactly what the pool trim should take. `createSubagentParamsSchema` (schemas.ts:231) has zero
     callers and should go with them.
   - **`tsconfig.json` includes only `index.ts` + `src/**` — `tsc` cannot see `test/`.** This is the
-    mechanism behind the U2b-3 local-interface lesson, and it generalises: any signature/shape change to
-    an exported helper needs the test files swept by hand, because typecheck will stay green regardless.
+    mechanism behind the U2b-3 local-interface lesson. **Corrected after measuring:** the obvious
+    prescription ("just add `test/**` to the typecheck") does **not** fix the U2b-3 class. A minimal
+    probe showed why — the trap files resolve the module through `tryImport<LocalShape>` and then call
+    *through the locally declared shape*, so call and declaration agree with each other and `tsc` is
+    blind either way. It caught only drift where the local copy and its call sites disagreed.
+  - **U3b-1b — process fix landed instead: a test-aware typecheck ratchet.** Adding `test/**` to the
+    gate reports **2093 errors across 118 files** (only 88 come from `noUncheckedIndexedAccess`), which
+    is its own milestone, not a param trim. So `tsconfig.test.json` + `scripts/typecheck-tests.mjs`
+    typecheck src+test and enforce a **committed per-file baseline** (`test/typecheck-baseline.json`,
+    2091 errors / 117 files): a file may only ever go *down*, new files start at zero, and a shrunken
+    count must be refreshed with `--update`. `--files <paths>` gates just the files a unit touched,
+    which is what M4 units use — it makes stale test-side signatures visible on the next edit instead of
+    silently green. Wired as `npm run typecheck:tests` and into CI (Linux job only: per-file *counts* can
+    drift across platforms, the scoped mode cannot). Verified by mutation in both modes (planted error →
+    red → restore → green); publish `files` untouched, `build:pkg` unaffected.
+  - **Two real defects the ratchet exposed and fixed** (`add71be3` + this unit): (1)
+    `agent-overrides.test.ts` called `removeBuiltinAgentOverride` with a 4th `{ preserveMachine }`
+    argument the function lost in the saved-machine removal — invisible at runtime (extra args are
+    discarded) and invisible to `tsc`, so the test was green while asserting nothing about its own
+    title; rewritten against the live contract and mutation-verified. (2) `test/support/helpers.ts`
+    declares its **own local `AgentConfig`** (the trap again) that was missing `inheritGlobalContext`,
+    a field both its factories always set. `machine`/`machineCwd` in `AsyncRunnerStepBuildParams` had
+    zero producers and zero readers and went with them. **The ratchet's first run found two live masked
+    defects — that is the case for it.**
   - **U3b-1 DONE — `chatProgress` removed** (pool 56 → 55). Unreachable from every entry point *and* on
     the REMOVE list. With no way to request a mode, `auto` is the only behaviour, so
     `resolveWorkflowChatProgress` lost its `requested` input and both error returns (both were

@@ -55,6 +55,7 @@
     "build:pkg": "node scripts/build-package.mjs",
     "pack:pkg": "npm run build:pkg && npm pack ./dist-pkg",
     "typecheck": "tsc --noEmit",
+    "typecheck:tests": "node scripts/typecheck-tests.mjs",
     "test": "npm run test:unit",
     "test:unit": "node --experimental-strip-types --import ./test/support/isolated-temp-root.mjs --test test/unit/*.test.ts",
     "test:integration": "node --experimental-strip-types --import ./test/support/register-loader.mjs --test test/integration/*.test.ts",

@@ -61,6 +61,7 @@ interface AgentConfig {
 	thinking?: string;
 	systemPromptMode?: string;
 	inheritProjectContext?: boolean;
+	inheritGlobalContext?: boolean;
 	inheritSkills?: boolean;
 	scope?: string;
 	output?: string | false;

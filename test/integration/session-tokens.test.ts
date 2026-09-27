@@ -4,9 +4,9 @@ import * as path from "node:path";
 import { describe, it } from "node:test";
 import { createTempDir, removeTempDir, tryImport } from "../support/helpers.ts";
 
-interface SessionTokensModule {
-	parseSessionTokens(sessionDir: string): { input: number; output: number; total: number; window?: number; windowPeak?: number } | null;
-}
+// Typed against the real module so signature drift is a compile error here,
+// not a silently stale local copy of the signature.
+type SessionTokensModule = typeof import("../../src/shared/session-tokens.ts");
 
 const tokensMod = await tryImport<SessionTokensModule>("./src/shared/session-tokens.ts");
 const available = !!tokensMod;

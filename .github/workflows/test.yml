@@ -23,6 +23,12 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Typecheck
         run: npm run typecheck
+      - name: Typecheck tests (ratchet)
+        # Per-file error counts can differ slightly across platforms, so the
+        # committed baseline is enforced from one platform only. The per-file
+        # `--files` mode used by local tooling has no such dependency.
+        if: runner.os == 'Linux'
+        run: npm run typecheck:tests
       - name: Unit tests
         run: node --experimental-strip-types --import ./test/support/isolated-temp-root.mjs --test ${{ runner.os == 'Windows' && '--test-concurrency=2' || '' }} test/unit/*.test.ts
       - name: Integration tests

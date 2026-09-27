@@ -326,8 +326,6 @@ export interface AsyncRunnerStepBuildParams {
 	ctx: AsyncExecutionContext;
 	availableModels?: AvailableModelInfo[];
 	cwd?: string;
-	machine?: string;
-	machineCwd?: string;
 	chainSkills?: string[];
 	sessionFilesByFlatIndex?: (string | undefined)[];
 	thinkingOverridesByFlatIndex?: (AgentConfig["thinking"] | undefined)[];

@@ -930,13 +930,16 @@ describe("builtin agent overrides", () => {
 		assert.equal(fs.existsSync(settingsPath), false);
 	});
 
-	it("does not preserve empty or whitespace machine values when clearing other override fields", () => {
+	it("prunes settings completely when a removed override holds leftover unknown keys", () => {
 		const settingsPath = path.join(tempHome, ".pi", "agent", "settings.json");
-		for (const machine of ["", " \t "]) {
-			writeJson(settingsPath, { subagents: { agentOverrides: { reviewer: { machine, model: "openai/gpt-5.4" } } } });
-			removeBuiltinAgentOverride(tempProject, "reviewer", "user", { preserveMachine: true });
-			assert.equal((JSON.parse(fs.readFileSync(settingsPath, "utf-8")) as { subagents?: unknown }).subagents, undefined);
-		}
+		writeJson(settingsPath, { subagents: { agentOverrides: { reviewer: { machine: "studio", model: "openai/gpt-5.4" } } } });
+
+		removeBuiltinAgentOverride(tempProject, "reviewer", "user");
+
+		// The `machine` key belongs to the removed saved-machine feature: an
+		// override entry is deleted whole, so unknown keys inside it must not
+		// keep the parent objects (and therefore `subagents`) alive.
+		assert.equal((JSON.parse(fs.readFileSync(settingsPath, "utf-8")) as { subagents?: unknown }).subagents, undefined);
 	});
 
 	it("surfaces malformed settings files instead of silently ignoring them", () => {

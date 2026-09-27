@@ -328,12 +328,16 @@ const controlDescriptions = {
 	action: "What to do; omitted = status.",
 	message: "Guidance for steer/resume.",
 	topic: "Guide topic served by the guide action. Omit to read the overview.",
+	agent: "Agent name for `get` and `models`.",
+	mission: "Mission object for `mission.create`: `title` or `summary` (exactly one), optional `objective`, `goal: true` requires `budget.tokens`, optional `labels`.",
 };
 const controlProperties = {
 	id: withFacadeDescription(poolField("id"), controlDescriptions.id),
 	action: Type.Optional(Type.String({ enum: [...SUBAGENT_CONTROL_ACTIONS], description: controlDescriptions.action })),
 	message: withFacadeDescription(poolField("message"), controlDescriptions.message),
 	topic: withFacadeDescription(poolField("topic"), controlDescriptions.topic),
+	agent: withFacadeDescription(poolField("agent"), controlDescriptions.agent),
+	mission: withFacadeDescription(poolField("mission"), controlDescriptions.mission),
 };
 export const SubagentControlParams = keepTopLevelParameterDescriptions(Type.Object(controlProperties));
 

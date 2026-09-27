@@ -40,6 +40,8 @@ export interface SubagentControlFacadeParams {
 	action?: SubagentControlAction;
 	message?: string;
 	topic?: string;
+	agent?: string;
+	mission?: { title?: string; summary?: string; objective?: string; goal?: true; budget?: { tokens: number }; labels?: string[] };
 }
 
 /**
@@ -97,13 +99,16 @@ export function normalizeWorkflowParams(params: SubagentWorkflowFacadeParams): S
 }
 
 export function normalizeControlParams(params: SubagentControlFacadeParams): SubagentParamsLike {
-	// SAFETY: id/action/message/topic are the only control params the facade owns and
-	// action is constrained to the closed enum by the control schema.
+	// SAFETY: id/action/message/topic/agent/mission are the only control params the
+	// facade owns; action is constrained to the closed enum by the control schema;
+	// agent and mission carry 1:1 to the internal SubagentParamsLike contract.
 	return {
 		id: params.id,
 		action: params.action,
 		message: params.message,
 		topic: params.topic,
+		agent: params.agent,
+		mission: params.mission,
 	} as SubagentParamsLike;
 }
 

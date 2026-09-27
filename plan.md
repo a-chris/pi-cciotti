@@ -1,6 +1,6 @@
 # Plan: Facade rewrite of the subagent tool surface
 
-> Status: **M4 in progress — U1 (config layer) + U2a (child delegation removed) committed. Next: U2b (dead depth/nested plumbing).**
+> Status: **M4 in progress — U1, U2a, U2b-1 (child-safe boundary), U2b-2 (project.* / projectOpen) committed. Next: U3 (param pool trim). Open owner decision: `maxSubagentDepth` (see M4 log).**
 > VISION updated; decisions resolved.
 > Current milestone: **M4 — Enrichment + param sweep** (config keys for config-enriched params
 > before removing per-call forms; delete REMOVE params end-to-end — types, executor, preflight,
@@ -398,6 +398,14 @@ it documents and each rejected key throws. 2715 / 0 / 11.
     `project.*`; do it as one narrow unit (enum entries, policy action + default, 2 schema descriptions,
     docs row, `test/unit/authority-policy.test.ts` assertions, CHANGELOG — user-facing key removal).
     `focus` (REMOVE list) is the adjacent same-file edit.
+  - **U2b-2 DONE** (`4cfe6a1c`): removed the three dead action entries, the `projectOpen` authority
+    action + default + executor mapping, and the two stale schema descriptions. `focus` **stays** — the
+    owner ruling (top of this plan) keeps it inspector-owned; only its description lost the project-pane
+    reference. Because `projectOpen` is a *documented* key, it follows the U1 precedent: a named removal
+    throw, plus the fail-closed config list extracted into `FAIL_CLOSED_CONFIG_KEYS` with a nested-key
+    check, so a stale file reports the removal instead of degrading to defaults. Proven by mutation:
+    neutralising the nested check turns the new regression test red, restoring it is green.
+    2686 pass / 0 fail / 11 skipped, integration part-1 98/98, `tsc` clean.
 - **U3** trim the 68-key pool to facade/RPC-derivable keys, delete dead schemas
   (`ChainItem`, `ParallelTaskSchema`, `Dynamic*Schema`); **U4** add `topic`/script-source/`mission`
   to the control facade + `normalizeControlParams`; **U5** the REMOVE-list params end-to-end.

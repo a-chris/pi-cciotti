@@ -58,9 +58,9 @@ subagent_workflow({ source: "return runs.run('main', { agent: 'scout', task: 'Sc
 subagent_workflow({ source: { path: "workflows/review.js" } });
 ```
 
-Static lint is not available to the model: the `validate` verb needs the script body, which only
-`subagent_workflow` carries, so the control tool returns an error asking for input it cannot receive.
-Compose the script on `subagent_workflow` instead. Relative paths resolve against the request `cwd`; absolute paths pass through. The host reads the file before validation or workflow sandbox execution. The sandbox still has no filesystem access. Missing, unreadable, and empty files return file input errors instead of script syntax errors.
+There is no separate static-lint verb on the model surface: linting a script needs the script body,
+which only `subagent_workflow` carries, and the same script run reports the same syntax and
+spawn-budget errors before any child launches. Relative paths resolve against the request `cwd`; absolute paths pass through. The host reads the file before validation or workflow sandbox execution. The sandbox still has no filesystem access. Missing, unreadable, and empty files return file input errors instead of script syntax errors.
 
 Inline and file-backed scripts accept bounded plain-JSON `args`:
 

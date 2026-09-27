@@ -52,7 +52,7 @@ The host resolves the script and authority internally and records bounded proven
 | Param | Type | Default | Available on | Description |
 |-------|------|---------|--------------|-------------|
 | `task` | string | agent default | `subagent_delegation` | The child's task. Required; `agent` names the agent that runs it. |
-| `agent` | string | - | `subagent_delegation` | Named child agent. |
+| `agent` | string | required for `subagent` | `subagent_delegation`, `subagent_control` | Named agent: the child to delegate to, or the agent to inspect with `get` / `models`. There is no default agent — name one (`subagent_control({ action: "list" })` prints the names). |
 | `prequel` | string | - | `subagent_delegation` | Model-authored summary of the conversation that led here. Consumed when the agent resolves to `fork` or `summary` context; ignored for `fresh`. |
 | `reads` | string[] | agent `defaultReads` | `subagent_delegation` | Plain list of file paths the child should read, composed with the agent's declared defaults. |
 | `cwd` | string | runtime cwd | `subagent_delegation` | Override the child's working directory. |
@@ -63,10 +63,11 @@ The host resolves the script and authority internally and records bounded proven
 | `async` | boolean | default-on | `subagent_delegation`, `subagent_workflow` | Background execution; workflows default to background. `async:false` blocks the parent until completion. A local foreground child runs inside the parent Pi process and never loads the parent's ambient extensions, but it does inherit the providers those extensions registered. Agents that need MCP tools (`mcpDirectTools`, or MCP tools from an ambient adapter such as pi-mcp-adapter) must run as background children, which load them inside the detached runner process. |
 | `worktree` | boolean | - | `subagent_delegation`, `subagent_workflow` | Run the child in a managed Git worktree instead of the shared cwd. |
 | `output` | string \| boolean | `true` | `subagent_delegation` | Bind durable child output: a path, or `false` to withhold it. |
-| `action` | string | `status` | `subagent_control` | One of `status`, `resume`, `steer`, `stop`, `interrupt`, `validate`, `list`, `get`, `models`, `guide`, `mission.create`. Anything else is rejected by the tool schema. |
+| `action` | string | `status` | `subagent_control` | One of `status`, `resume`, `steer`, `stop`, `interrupt`, `list`, `get`, `models`, `guide`, `mission.create`. Anything else is rejected by the tool schema. |
 | `id` | string | - | `subagent_control`, `bg_wait` | Run id or id prefix for run-targeting actions. |
-| `message` | string | - | `subagent_control` | Guidance for `steer`, follow-up text for `resume`, or the objective for `mission.create`. |
+| `message` | string | - | `subagent_control` | Guidance for `steer`, follow-up text for `resume`. |
 | `topic` | string | `overview` | `subagent_control` | Guide topic for `action: "guide"`. Omit to read the overview. |
+| `mission` | object \| boolean | - | `subagent_control` | Mission record for `action: "mission.create"`: exactly one non-empty `title` or `summary`, optional `objective` and `labels`; `goal: true` requires `budget.tokens`. `false` disables an automatic mission on the internal contract only and is invalid here. |
 
 Options that shape a child's runtime (tool budgets, deadlines, attention
 thresholds, output truncation, model and context policy) are **not** per-call
@@ -155,9 +156,19 @@ Agent definitions are not loaded into context by default. The read verbs let the
 ```ts
 { action: "list" }
 { action: "models" }
+{ action: "models", agent: "reviewer" }
+{ action: "get", agent: "reviewer" }
 ```
 
-`list` prints one line per discovered agent. `models` prints the provider/model ids and which agents resolve to them. Neither narrows to a single agent: the agent-registry read verbs that need an agent name (`get`, and `models` for one agent) cannot receive it on this tool, so read the agent file for one agent's full field set. Scope selection and the capability rows (`runner.available`, ceiling sources, and the rest) belong to the `/subagents` admin surface, not to a call param.
+`list` prints one line per discovered agent. `models` prints the provider/model ids and which agents resolve to them; with `agent` it narrows to that agent's effective model, thinking level, and where the value came from. `get` prints one agent's full field set. Scope selection (`agentScope`) and the capability rows (`runner.available`, ceiling sources, and the rest) belong to the `/subagents` admin surface, not to a call param.
+
+### Opening a mission
+
+```ts
+{ action: "mission.create", mission: { title: "Ship the facade release", objective: "Land D10, docs, and a green suite", labels: ["release"] } }
+```
+
+`mission.create` writes one durable mission record and returns its id; see [missions.md](missions.md). A workflow run creates its enclosing mission automatically, so reach for this verb only when the mission needs an authored title, objective, or budget before the work starts. Registry writes (create/update/delete/enable/disable/reset) are not on the model surface; agent files and `/subagents` are the authoring routes.
 
 ### Refinement overlays
 

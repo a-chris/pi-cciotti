@@ -44,22 +44,27 @@ const read = (file: string): string => readFileSync(join(process.cwd(), file), "
 
 /**
  * Control verbs whose required input cannot cross the tool boundary, so a
- * tool-call example for one always fails:
- *   get            needs `agent`     — delegation owns it and the facade invariant forbids sharing
- *   validate       needs a script    — workflow owns `source`/`args`
- *   mission.create needs `mission`   — plan.md buckets `mission` as internal-contract only
- * The verbs stay on the enum (plan.md D2/D5/D6); only their examples are forbidden.
+ * tool-call example for one always fails.
+ *
+ * D10 shrank this list to empty: `agent` now rides on control, so `get` and
+ * `models <agent>` are drivable, and `mission` rides on control for
+ * `mission.create`. `validate` left the enum together with its script input —
+ * the static lint survives on the internal contract (`preflight`, RPC), not on
+ * the model surface. A new verb is only allowed with its input on this tool.
  */
-const UNREACHABLE_VERBS = new Set(["get", "validate", "mission.create"]);
+const UNREACHABLE_VERBS = new Set<string>([]);
 
 /**
  * Params plan.md's disposition table removes from the model surface or moves to
  * config / internal contracts. An example that passes one is teaching a
  * capability the model does not have.
+ *
+ * `agent` and `mission` left this list with D10: both are on the control facade
+ * and the executor reads them (`agent-management.ts` get/models, `missions/actions.ts`).
  */
 const NEVER_MODEL_PARAMS = new Set([
 	"view", "lines", "mode", "index", "childId", "handoffPath", "repo",
-	"additional", "share", "sessionDir", "steeringRecovery", "agentScope", "capabilities", "mission",
+	"additional", "share", "sessionDir", "steeringRecovery", "agentScope", "capabilities",
 ]);
 
 /** Every `action: "verb"` mention, including bare `{ action: "x" }` examples. */
@@ -85,6 +90,8 @@ interface CallExample {
 	verb: string | undefined;
 	/** Keys at depth 1 of the argument literal (string bodies and nesting skipped). */
 	keys: string[];
+	/** True when the literal sits inside a ``` fence (a copyable example). */
+	fenced: boolean;
 }
 
 /**
@@ -94,8 +101,12 @@ interface CallExample {
  * tool, so only the rules that do not depend on a tool name apply to them; that
  * hole is exactly how `{ action: "guide", topic: ... }` and
  * `{ action: "list", capabilities: true }` survived earlier sweeps.
+ *
+ * `fenced` marks literals inside ``` fences — the copyable ones. Inline prose
+ * (`subagent({...})` in a sentence) is real text but not an example the model
+ * pastes, so shape rules that prose could not satisfy police fences only.
  */
-function toolCallExamples(): CallExample[] {
+function allCallLiterals(): CallExample[] {
 	const found: CallExample[] = [];
 	for (const file of servedFiles) {
 		const text = read(file);
@@ -138,18 +149,22 @@ function toolCallExamples(): CallExample[] {
 			if (end < 0) continue;
 			const body = text.slice(match.index, end + 1);
 			const verb = /action:\s*\\?"([a-zA-Z][a-zA-Z.0-9-]*)\\?"/.exec(body)?.[1];
-			if (!verb) continue;
 			found.push({
 				file,
 				line: text.slice(0, match.index).split("\n").length,
 				tool: toolMatch ? toolMatch[1]! : "(bare)",
 				verb,
 				keys: [...new Set(keys)],
+				fenced: ((text.slice(0, match.index).match(/^```/gm) ?? []).length % 2) === 1,
 			});
 			consumedTo = end + 1;
 		}
 	}
 	return found;
+}
+
+function toolCallExamples(): CallExample[] {
+	return allCallLiterals().filter((example) => example.verb !== undefined);
 }
 
 /** Examples that name a control verb, i.e. the ones the control rules police. */
@@ -183,6 +198,42 @@ describe("served docs match the facade contract", () => {
 		);
 	});
 
+	it("keeps every control verb drivable, with no orphan inputs", () => {
+		// Rule P1 (plan.md): a verb belongs on the surface only if its required input
+		// can arrive on that surface. D10 removed `validate` for exactly this reason,
+		// so the test fails again if the verb returns without its script params — or
+		// if the schema re-shares a script param with control.
+		const controlKeys = facadeParams(SubagentControlParams);
+		for (const forbidden of ["source", "workflowScript", "workflowScriptPath"]) {
+			assert.ok(!controlKeys.has(forbidden), `control must not carry ${forbidden}; the workflow facade owns the script body`);
+		}
+		const controlActions = (SubagentControlParams as { properties: { action: { enum?: string[] } } }).properties.action.enum ?? [];
+		assert.ok(!controlActions.includes("validate"), "validate needs a script body the control tool cannot carry");
+		assert.ok(controlKeys.has("agent"), "get/models need agent on the control facade");
+		assert.ok(controlKeys.has("mission"), "mission.create needs mission on the control facade");
+		// Every verb on the enum must be reachable through the facade normalizer.
+		for (const action of controlActions) {
+			assert.equal(normalizeControlParams({ action: action as never }).action, action, `${action} must survive facade normalization`);
+		}
+	});
+
+	it("keeps model and provider off every model-facing facade", () => {
+		// Which model and provider a child runs on is operator policy: it comes from
+		// the agent definition and extension settings (subagents.defaultModel,
+		// subagents.agentOverrides), never from a call. The surface only reads the
+		// resolution back via `models <agent>`.
+		const byTool: Record<string, Set<string>> = {
+			subagent: DELEGATION_PARAMS,
+			subagent_workflow: WORKFLOW_PARAMS,
+			subagent_control: facadeParams(SubagentControlParams),
+		};
+		for (const [tool, keys] of Object.entries(byTool)) {
+			for (const forbidden of ["model", "provider", "thinking", "fast"]) {
+				assert.ok(!keys.has(forbidden), `${tool} must not accept ${forbidden}; extension settings own it`);
+			}
+		}
+	});
+
 	it("does not pass control params the model surface does not carry", () => {
 		const forwarded = new Set(Object.keys(normalizeControlParams({ id: "x", action: "status", message: "m" })).filter((key) => key !== undefined));
 		const offenders: string[] = [];
@@ -200,7 +251,7 @@ describe("served docs match the facade contract", () => {
 	it("uses only that facade's params in every delegation and workflow example", () => {
 		const byTool: Record<string, Set<string>> = { subagent: DELEGATION_PARAMS, subagent_workflow: WORKFLOW_PARAMS };
 		const offenders: string[] = [];
-		for (const example of toolCallExamples()) {
+		for (const example of allCallLiterals()) {
 			const allowed = byTool[example.tool];
 			if (!allowed) continue;
 			for (const key of example.keys) {
@@ -211,6 +262,25 @@ describe("served docs match the facade contract", () => {
 			[...new Set(offenders)].sort(),
 			[],
 			"these literals pass params their tool does not accept (workflowScript/workflowScriptPath were merged into source; context moved to the agent)",
+		);
+	});
+
+	it("gives every copyable delegation example its required params", () => {
+		// A fenced `subagent({...})` literal is something the model pastes verbatim, so
+		// one missing a required param teaches a call that always fails. This is how the
+		// "Default agent when omitted" description survived: nothing checked the examples.
+		const required = (schema: unknown): string[] => (schema as { required?: string[] }).required ?? [];
+		const offenders: string[] = [];
+		for (const example of allCallLiterals()) {
+			if (!example.fenced || example.tool !== "subagent") continue;
+			for (const key of required(SubagentDelegationParams)) {
+				if (!example.keys.includes(key)) offenders.push(`${example.file}:${example.line} missing ${key}`);
+			}
+		}
+		assert.deepEqual(
+			[...new Set(offenders)].sort(),
+			[],
+			"copyable subagent examples must include every required param (task, agent)",
 		);
 	});
 

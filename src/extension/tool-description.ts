@@ -21,8 +21,8 @@ export function buildSubagentToolPromptMetadata(): SubagentToolPromptMetadata {
 	};
 }
 
-export const SUBAGENT_DELEGATION_DESCRIPTION = "Delegate one child agent for a focused task. task states what to do or solve; prequel states current work and what led here (consumed only for fork/summary contexts). Optional: agent (installed name via subagent_control action:list), reads (files), cwd, async (background), output (durable path), worktree (isolate). Delegate only when authorized. Depth: guide topics tool-reference, agents.";
+export const SUBAGENT_DELEGATION_DESCRIPTION = "Delegate one child agent for a focused task: agent (installed name via subagent_control action:list) plus task. prequel states current work and what led here (consumed only for fork/summary contexts). Optional: reads (files), cwd, async (background), output (durable path), worktree (isolate). Delegate only when authorized. Depth: guide topics tool-reference, agents.";
 
 export const SUBAGENT_WORKFLOW_DESCRIPTION = "Run a multi-child workflow by named resource (workflow) or an inline script (source string) / script file (source { path }), with bounded JSON args. async backgrounds it; worktree isolates in a managed git worktree; baseRef sets the worktree base branch/ref. Depth: guide topic workflows.";
 
-export const SUBAGENT_CONTROL_DESCRIPTION = "Manage runs by id: status, resume, steer (with message), stop, interrupt; validate lints a script; list/get/models/guide read runs and the agent registry; mission.create starts a mission. Omit action for status. Depth: guide topic tool-reference.";
+export const SUBAGENT_CONTROL_DESCRIPTION = "Manage runs by id: status, resume, steer (with message), stop, interrupt. Read with list, get (agent), models (agent), guide (topic). mission.create (mission) opens a mission. Omit action for status. Depth: guide topic tool-reference.";

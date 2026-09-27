@@ -278,7 +278,7 @@ function withFacadeDescription<T extends TSchema>(schemaNode: T, description: st
 // only descriptions (and the purely-facade prequel/reads fields) are authored here.
 const delegationDescriptions = {
 	task: "The action to do or problem to solve.",
-	agent: "One of the installed agent names (via subagent_control action:list). Default agent when omitted.",
+	agent: "One of the installed agent names (via subagent_control action:list). Required: no default agent exists.",
 	cwd: "Working directory; default: session directory.",
 	async: "Background run; default false.",
 	output: "Durable result path, or false.",
@@ -295,7 +295,7 @@ const delegationProperties = {
 	prequel: Type.Optional(Type.String({ description: "Current state of the work and what led here — separate from task. Consumed when the agent's declared context mode is fork|summary; stays empty with fresh." })),
 	reads: Type.Optional(Type.Array(Type.String(), { description: "Task-specific file paths the child reads before running; the agent's defaultReads still apply." })),
 };
-export const SubagentDelegationParams = keepTopLevelParameterDescriptions(Type.Object(delegationProperties, { required: ["task"] }));
+export const SubagentDelegationParams = keepTopLevelParameterDescriptions(Type.Object(delegationProperties, { required: ["task", "agent"] }));
 
 // --- subagent_workflow (run a workflow) ------------------------------------
 const workflowDescriptions = {
@@ -317,8 +317,11 @@ const workflowProperties = {
 };
 export const SubagentWorkflowParams = keepTopLevelParameterDescriptions(Type.Object(workflowProperties));
 
+// D10: `validate` left this enum. Its only input is a script body, which lives
+// on subagent_workflow (`source`), so on this tool the verb could never receive
+// what it needs; the static lint stays on the internal contract (RPC/preflight).
 export const SUBAGENT_CONTROL_ACTIONS = [
-	"status", "resume", "steer", "stop", "interrupt", "validate",
+	"status", "resume", "steer", "stop", "interrupt",
 	"list", "get", "models", "guide", "mission.create",
 ] as const;
 
@@ -336,6 +339,7 @@ const controlProperties = {
 	action: Type.Optional(Type.String({ enum: [...SUBAGENT_CONTROL_ACTIONS], description: controlDescriptions.action })),
 	message: withFacadeDescription(poolField("message"), controlDescriptions.message),
 	topic: withFacadeDescription(poolField("topic"), controlDescriptions.topic),
+	// D10 drivable verbs: get/models read `agent`; mission.create reads `mission`.
 	agent: withFacadeDescription(poolField("agent"), controlDescriptions.agent),
 	mission: withFacadeDescription(poolField("mission"), controlDescriptions.mission),
 };

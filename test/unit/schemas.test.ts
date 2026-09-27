@@ -652,11 +652,19 @@ describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available
 		const delegation = schemas.SubagentDelegationParams as JsonSchemaNode;
 		assert.ok(delegation, "SubagentDelegationParams schema should exist");
 		const props = properties(delegation);
-		assert.deepEqual(delegation.required, ["task"]);
+		// `agent` is required because no default agent exists: an agent-less call
+		// cannot be carried out, so it must not be representable.
+		assert.deepEqual(delegation.required, ["task", "agent"]);
 		assert.deepEqual(Object.keys(props).sort(), [
 			"agent", "async", "cwd", "output", "prequel", "reads", "task", "worktree",
 		].sort());
 		assert.equal(props.task?.type, "string");
+		assert.equal(props.agent?.type, "string");
+		assert.doesNotMatch(String(props.agent?.description ?? ""), /default agent when omitted/i);
+		// Model and provider are never call inputs; they come from settings/agent defs.
+		for (const forbidden of ["model", "provider", "thinking", "fast"]) {
+			assert.equal(props[forbidden], undefined, `${forbidden} must not be a subagent input`);
+		}
 		assert.match(String(props.task?.description ?? ""), /action to do or problem to solve/);
 		assert.equal(props.prequel?.type, "string");
 		assert.match(String(props.prequel?.description ?? ""), /separate from task/i);
@@ -693,24 +701,35 @@ describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available
 		const control = schemas.SubagentControlParams as JsonSchemaNode;
 		assert.ok(control, "SubagentControlParams schema should exist");
 		const props = properties(control);
-		assert.deepEqual(Object.keys(props).sort(), ["action", "id", "message", "topic"].sort());
+		assert.deepEqual(Object.keys(props).sort(), ["action", "agent", "id", "message", "mission", "topic"].sort());
 		assert.equal(props.id?.type, "string");
 		assert.equal(props.message?.type, "string");
 		assert.equal(props.action?.type, "string");
 		assert.deepEqual(props.action?.enum, [
-			"status", "resume", "steer", "stop", "interrupt", "validate",
+			"status", "resume", "steer", "stop", "interrupt",
 			"list", "get", "models", "guide", "mission.create",
 		]);
 		assert.equal(props.topic?.type, "string");
 		assert.deepEqual(props.topic?.enum, [...SUBAGENT_GUIDE_TOPICS]);
 		assert.ok(Boolean(props.topic?.description), "topic should carry a description");
+		// D10: the verbs must be drivable — get/models read agent, mission.create reads mission.
+		assert.equal(props.agent?.type, "string");
+		assert.match(String(props.agent?.description ?? ""), /get/);
+		assert.equal(hasAnyOfType(props.mission, "object"), true);
+		assert.equal(hasAnyOfType(props.mission, "boolean"), true);
+		assert.match(String(props.mission?.description ?? ""), /mission\.create/);
+		assert.ok(!(props.action?.enum as readonly string[]).includes("validate"), "validate left the model surface together with its script input");
 	});
 
 	it("keeps exactly the declared cross-cutting params shared and all others one-per-tool", () => {
-		// async and worktree are identical-meaning execution switches shared by
-		// the delegation and workflow facades by design. Every other param name
-		// must appear on exactly one facade, and the exempt set may never grow.
-		const exempt = new Set(["async", "worktree"]);
+		// D10 relaxed the M1 invariant from a fixed exempt set to this declared share
+		// list (plan.md §3): growing it is a reviewable one-line change with a
+		// "same meaning on each tool" rationale, not a forbidden step.
+		const sharedRationale: Record<string, string> = {
+			async: "background run, default false — identical switch on delegation and workflow",
+			worktree: "isolate in a managed git worktree — identical switch on delegation and workflow",
+			agent: "name the agent to delegate to / the agent to inspect — same name, same registry",
+		};
 		const deleg = new Set(Object.keys(properties(schemas.SubagentDelegationParams)));
 		const workflows = new Set(Object.keys(properties(schemas.SubagentWorkflowParams)));
 		const control = new Set(Object.keys(properties(schemas.SubagentControlParams)));
@@ -719,14 +738,20 @@ describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available
 		for (const name of [...deleg, ...workflows, ...control]) occurrences.set(name, (occurrences.get(name) ?? 0) + 1);
 		for (const [name, count] of occurrences) {
 			if (count < 2) continue;
-			assert.ok(exempt.has(name), `param ${name} appears on ${count} facades but is not in the allowed shared set`);
+			assert.ok(sharedRationale[name], `param ${name} appears on ${count} facades but is not in the declared share list with a rationale`);
 			assert.equal(count, 2, `shared param ${name} should appear on exactly two facades`);
 		}
-		// The exempt set is fixed: a third colliding name (or one landing on
-		// three facades) fails the test.
+		// The share list stays exactly what is declared: a third colliding name (or
+		// one landing on three facades) fails the test, and every listed param must
+		// actually be shared.
 		assert.deepEqual(
-			[...exempt].filter((name) => (occurrences.get(name) ?? 0) > 1).sort(),
-			["async", "worktree"],
+			Object.keys(sharedRationale).filter((name) => (occurrences.get(name) ?? 0) > 1).sort(),
+			["agent", "async", "worktree"],
+		);
+		assert.deepEqual(
+			Object.keys(sharedRationale).filter((name) => (occurrences.get(name) ?? 0) === 1),
+			[],
+			"every declared share-list entry must actually appear on two facades",
 		);
 	});
 
@@ -745,7 +770,7 @@ describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available
 		const sharedByFacade: string[][] = [
 			["task", "agent", "cwd", "async", "worktree", "output"],
 			["async", "worktree", "baseRef"],
-			["id", "message", "topic"],
+			["id", "message", "topic", "agent", "mission"],
 		];
 		const facades = [delegationProps, workflowProps, controlProps];
 		const stripDescription = (node: JsonSchemaNode | undefined): JsonSchemaNode | undefined => {

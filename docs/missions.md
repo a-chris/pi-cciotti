@@ -23,23 +23,27 @@ Behavior:
 - Set `missions.enabled: false` to disable automatic mission creation.
 - A workflow with a mission can use `await state.get(key)` and `await state.set(key, value)` for durable JSON state. Missing keys return `undefined`. Keys use the same format as `runs.run` keys. Each set takes the state-file lock, reads the latest file, merges the key, and atomically writes `<mission-directory>/<mission-id>/state.json`. The complete file cannot exceed 256 KiB. Each workflow caches the file on its first `get`. A `mission:false` workflow has no `state` global.
 
-A workflow and its children share one mission, created automatically for the run. The explicit `mission` object and the `mission.create` verb are not on the model surface: `subagent_control` carries only `id`, `action`, and `message`, so a mission that needs an authored title, objective, or budget is set up by the operator (or through the extension API) before the work runs.
+A workflow and its children share one mission, created automatically for the run. When a mission needs an authored title, objective, labels, or budget before the work starts, `subagent_control({ action: "mission.create", mission: { ... } })` writes the record and returns its id; the extension API is the other route. `mission` accepts exactly one non-empty `title` or `summary`, an optional `objective`, `labels`, and `goal` with `budget.tokens`; unknown keys and malformed values are rejected loudly before anything is written.
 
 ```js
 // The workflow and its children share the run's mission automatically.
 { source: `return runs.run("main", { agent: "worker", task: "Implement the approved plan" })` }
 ```
 
+```ts
+// Or author the mission first, then link runs to it.
+subagent_control({ action: "mission.create", mission: { title: "Harden the parser", objective: "Close the fuzz findings with tests", budget: { tokens: 200000 }, goal: true } })
+```
+
 ### Goal missions
 
 Set `goal: true` with a token budget to make an open mission an active continuation driver:
 
-A goal mission is configured where the mission is created, by the operator or the extension API — not from a tool call. `goal: true` requires a `budget: { tokens }`.
+A goal mission is configured where the mission is created — `mission.create` with `goal: true` and `budget: { tokens }`, an operator edit to the record, or the extension API. `goal: true` requires a `budget: { tokens }`.
 
-After each parent turn, an idle goal mission sends one needs-attention notice with its title, remaining token budget, and next ready action. The action comes from `state.nextReadyAction`, `state.nextAction`, a state item with `status: "ready"`, an open decision, or linked-run state. A workflow can write `state.nextReadyAction` to tell the next notice exactly what work is ready. When the latest linked workflow has a resumable retained child, the notice names that child as the `resume` target. Non-resumable retained children stay visible in `children.list` with their reason, but goal notices do not present them as resume targets. The extension never launches or replans goal work by itself.
+After each parent turn, an idle goal mission sends one needs-attention notice with its title, remaining token budget, and next ready action. The action comes from `state.nextReadyAction`, `state.nextAction`, a state item with `status: "ready"`, an open decision, or linked-run state. A workflow can write `state.nextReadyAction` to tell the next notice exactly what work is ready. When the latest linked workflow has a resumable retained child, the notice names that child as the `resume` target. Non-resumable retained children stay visible in the run records with their reason, but goal notices do not present them as resume targets. The extension never launches or replans goal work by itself.
 
 Linked-run token totals are stored on each run and folded into mission `usage`. An active linked run suppresses notices. Reaching the token budget changes the goal status to `budget-exhausted` and stops notices without closing the mission or reporting success. Pausing or disabling goal mode is an operator edit to the mission record (`goal.status: "paused"`, or removing `goal`); the notices also stop once the mission reaches a terminal status.
-
 ### Recovering missions
 
 Mission records are durable JSON on disk: `<mission-directory>/<mission-id>.json` with a sibling `state.json` holding the workflow state. After compaction or restart, read the record to recover the objective, linked run ids, and workflow-child heartbeats, then use the normal `status`, `steer`, `resume`, or `stop` actions on those run ids. The ledger is a recovery record only. It does not schedule or restart children.

@@ -6,28 +6,33 @@ This file is a detailed reference loaded from `skills/pi-subagents/SKILL.md`.
 
 Three tools split one job each: `subagent` runs one child, `subagent_workflow` runs a script or
 named resource, and `subagent_control` carries the run and registry verbs. The verbs you can use
-here are `status`, `resume`, `steer`, `stop`, `interrupt`, `list`, `models`, and `guide`; anything
-else is rejected by the tool schema before the executor sees it, so do not invent control verbs.
-
-The control schema also accepts `get`, `validate`, and `mission.create`, but their required inputs
-(one agent's name, a script body, a mission object) are not on the tool boundary, so those three
-return an error asking for input you cannot pass. Read an agent file for one agent's full field set,
-pass a script body to `subagent_workflow` rather than asking control to lint it, and rely on the
-mission created automatically for a workflow run.
+here are `status`, `resume`, `steer`, `stop`, `interrupt`, `list`, `get`, `models`, `guide`, and
+`mission.create`; anything else is rejected by the tool schema before the executor sees it, so do
+not invent control verbs. There is no script-lint verb: `source` lives on `subagent_workflow`, and
+running a script reports the same syntax and budget errors before any child launches.
 
 ### Reading the registry
 
 ```typescript
-subagent_control({ action: "list" })    // discovered agents, one row each
-subagent_control({ action: "models" })  // provider/model ids, and which agents resolve to them
+subagent_control({ action: "list" })                      // discovered agents, one row each
+subagent_control({ action: "models" })                    // provider/model ids, and which agents resolve to them
+subagent_control({ action: "models", agent: "reviewer" }) // one agent's effective model and its source
+subagent_control({ action: "get", agent: "reviewer" })    // one agent's full field set
 ```
 
 Run `models` before choosing a `model` for a child or an agent. `list` reports the discovered
-registry one line per agent and accepts no narrowing argument.
+registry one line per agent and accepts no narrowing argument. `get` and `models` take the agent
+name; an unknown name returns the available names rather than a guess.
 
-Per-agent detail and every registry write are not on the model surface. To inspect one agent's
-full field set, read its file; to change metadata interactively, use `/subagents`. Agent files are
-the authoring surface — see [Authoring agents by file](#authoring-agents-by-file).
+Registry writes stay off the model surface. To change an agent, edit its file; to change
+metadata interactively, use `/subagents`. Agent files are the authoring surface — see [Authoring
+agents by file](#authoring-agents-by-file).
+
+A workflow run creates its enclosing mission automatically; `mission.create` with a `mission`
+object is the route when the mission needs an authored title, objective, labels, or budget first
+— `subagent_control({ action: "mission.create", mission: { title: "Harden the parser", objective:
+"Close the fuzz findings" } })`. Read the `missions` guide topic (`subagent_control({ action:
+"guide", topic: "missions" })`) for the record layout and goal budgets.
 
 ### Retained children
 

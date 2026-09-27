@@ -48,7 +48,9 @@ describe("subagent facade tool descriptions", () => {
 
 	it("keeps delegation authorization guidance on the delegation tool", () => {
 		assert.match(SUBAGENT_DELEGATION_DESCRIPTION, /Delegate only when authorized/i);
-		assert.match(SUBAGENT_DELEGATION_DESCRIPTION, /task states what to do or solve/);
+		// agent is required, so the description names it as part of the core pair.
+		assert.match(SUBAGENT_DELEGATION_DESCRIPTION, /agent \(installed name via subagent_control action:list\) plus task/);
+		assert.match(SUBAGENT_DELEGATION_DESCRIPTION, /Optional: reads \(files\), cwd, async \(background\)/);
 		assert.match(SUBAGENT_DELEGATION_DESCRIPTION, /prequel states current work and what led here/);
 	});
 
@@ -127,6 +129,6 @@ describe("registered facade tools", { timeout: 120000 }, () => {
 		assert.equal(byName.subagent_control.description, SUBAGENT_CONTROL_DESCRIPTION);
 		assert.deepEqual(byName.subagent.properties.sort(), ["agent", "async", "cwd", "output", "prequel", "reads", "task", "worktree"].sort());
 		assert.deepEqual(byName.subagent_workflow.properties.sort(), ["args", "async", "baseRef", "source", "workflow", "worktree"].sort());
-		assert.deepEqual(byName.subagent_control.properties.sort(), ["action", "id", "message", "topic"].sort());
+		assert.deepEqual(byName.subagent_control.properties.sort(), ["action", "agent", "id", "message", "mission", "topic"].sort());
 	});
 });

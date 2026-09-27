@@ -100,8 +100,9 @@ export function normalizeWorkflowParams(params: SubagentWorkflowFacadeParams): S
 
 export function normalizeControlParams(params: SubagentControlFacadeParams): SubagentParamsLike {
 	// SAFETY: id/action/message/topic/agent/mission are the only control params the
-	// facade owns; action is constrained to the closed enum by the control schema;
-	// agent and mission carry 1:1 to the internal SubagentParamsLike contract.
+	// facade owns; action is constrained to the closed enum by the control schema, and
+	// agent and mission carry 1:1 to the internal SubagentParamsLike contract, where the
+	// executor validates the untrusted mission object loudly (missions/actions.ts).
 	return {
 		id: params.id,
 		action: params.action,

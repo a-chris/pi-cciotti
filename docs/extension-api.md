@@ -438,7 +438,7 @@ The async runner process does not import provider internals. It writes operation
 
 Inspect is the portable command and surface for an existing async run. It is **not** a model
 tool action: `subagent_control` accepts only `status`, `resume`, `steer`, `stop`, `interrupt`,
-`validate`, `list`, `get`, `models`, `guide`, and `mission.create`, and an `inspector.*` action is
+`list`, `get`, `models`, `guide`, and `mission.create`, and an `inspector.*` action is
 rejected by that tool's schema before it reaches the executor.
 
 Hosts reach it through the surfaces that actually dispatch it:

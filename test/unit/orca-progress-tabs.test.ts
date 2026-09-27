@@ -146,7 +146,6 @@ test("hung Orca terminal creation does not delay the owning process", { skip: pr
 	const pidFile = path.join(dir, "orca.pid");
 	const moduleUrl = new URL("../../src/runs/shared/orca-progress-tabs.ts", import.meta.url).href;
 	const ownerScript = `import {createOrcaProgressTab} from ${JSON.stringify(moduleUrl)};const tab=createOrcaProgressTab({cwd:${JSON.stringify(dir)},runId:'progress-hung-owner',agent:'worker',index:0,config:{enabled:true},command:${JSON.stringify(fakeOrca)},env:{...process.env,ORCA_TEST_PID:${JSON.stringify(pidFile)}}});if(!tab)throw new Error('tab unavailable');`;
-	const startedAt = Date.now();
 	const owner = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "--eval", ownerScript], { cwd: dir, stdio: "ignore" });
 	const ownerClosed = new Promise<number | null>((resolve, reject) => {
 		owner.once("error", reject);
@@ -154,11 +153,15 @@ test("hung Orca terminal creation does not delay the owning process", { skip: pr
 	});
 	let fakePid: number | undefined;
 	try {
-		assert.equal(await ownerClosed, 0);
-		assert.ok(Date.now() - startedAt < 2_000, "the Orca observer delayed runner completion");
+		// Hang guard only (20× the loaded-suite spawn time): if the owner ever
+		// blocked on terminal creation, the production watchdog would kill the
+		// hung Orca at ORCA_CREATE_TIMEOUT_MS (20s) before the owner exits, so
+		// liveness below fails — wall-clock latency itself is not the assertion.
+		const hangGuard = new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 30_000).unref());
+		assert.equal(await Promise.race([ownerClosed, hangGuard]), 0, "the owner process never exited cleanly while terminal creation was still running");
 		await waitForFile(pidFile);
 		fakePid = Number.parseInt(fs.readFileSync(pidFile, "utf-8"), 10);
-		process.kill(fakePid, 0);
+		assert.doesNotThrow(() => process.kill(fakePid!, 0), "the hung Orca create was reaped before the owner exited, so terminal creation delayed the owning process");
 	} finally {
 		if (fakePid !== undefined) {
 			try { process.kill(fakePid, "SIGKILL"); } catch { /* already stopped */ }
@@ -438,7 +441,6 @@ test("a missing predecessor marker does not delay the next tab", { skip: process
 	fs.writeFileSync(path.join(progressRoot, `counter-${key}`), `4\n${stalePending}\n`, { encoding: "utf-8", mode: 0o600 });
 	const capture = path.join(dir, "capture.json");
 	const fakeOrca = writeCaptureOrca(dir);
-	const startedAt = Date.now();
 	const tab = createOrcaProgressTab({
 		cwd: dir,
 		runId: "stale-predecessor",
@@ -449,8 +451,10 @@ test("a missing predecessor marker does not delay the next tab", { skip: process
 		env: { ...process.env, ORCA_TEST_CAPTURE: capture },
 	});
 	assert.ok(tab);
-	await waitForFile(capture);
-	assert.ok(Date.now() - startedAt < 2_000, "a missing predecessor delayed tab creation");
+	// A broken stale-predecessor path waits ORCA_CREATE_WAIT_TIMEOUT_MS (25s)
+	// before creating, so a capture within 10s proves the marker was skipped
+	// without asserting on machine speed.
+	await waitForFile(capture, 10_000);
 	const args = JSON.parse(fs.readFileSync(capture, "utf-8")) as string[];
 	assert.equal(args[args.indexOf("--title") + 1], "subagents · worker · 5");
 	tab.finish("failed");

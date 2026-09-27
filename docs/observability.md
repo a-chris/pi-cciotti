@@ -21,8 +21,8 @@ Sequential chains show a flow line like `done scout → running worker`. Chains 
 Background runs keep working after control returns to you. Inspect them with:
 
 ```ts
-subagent({ action: "status" })                 // all active runs
-subagent({ action: "status", id: "..." })      // one run
+subagent_control({ action: "status" })                 // all active runs
+subagent_control({ action: "status", id: "..." })      // one run
 ```
 
 Or ask naturally: "Show me the current async runs."
@@ -38,7 +38,7 @@ async subagent worker · background
     Press configured-expand-key for live detail
 ```
 
-To inspect one background child in text, use `subagent({ action: "status", id: "...", view: "transcript" })`; add `index` for a specific child in a parallel or chain run.
+To inspect one background child in text, use `subagent_control({ action: "status", id: "...", view: "transcript" })`; add `index` for a specific child in a parallel or chain run.
 
 In Pi fullscreen mode with mouse dispatch (verified with Pi TUI 0.85.1), left-click
 anywhere on the async widget's header row to fold it into a live one-line status
@@ -53,7 +53,7 @@ widget is removed or Pi reloads. Regular mode keeps the existing keyboard contro
 
 ### Reducing status display noise
 
-Chat records tool-call history; FleetView and the async widget show live run/child updates. Separate `subagent({ action: "status", id: "..." })` calls leave separate historical entries even when their `Status target: run …` labels match. A matching run ID identifies the queried run, not the tool call, and is not evidence of duplicate execution. Live Fleet/widget refreshes do not merge those entries.
+Chat records tool-call history; FleetView and the async widget show live run/child updates. Separate `subagent_control({ action: "status", id: "..." })` calls leave separate historical entries even when their `Status target: run …` labels match. A matching run ID identifies the queried run, not the tool call, and is not evidence of duplicate execution. Live Fleet/widget refreshes do not merge those entries.
 
 For compact chat results with FleetView as the only live editor surface, merge these top-level keys into `~/.pi/agent/extensions/subagent/config.json` (not Pi's `settings.json` or a `subagents` object), then restart Pi:
 
@@ -113,7 +113,7 @@ Default keys:
 Set `fleetKeybindings` in the extension config to replace inspector-level keys when a terminal intercepts keys such as `PgUp`, `PgDn`, `Home`, or `End`. Prompt modes keep fixed keys such as `Esc`, `Enter`, `Tab`, and stop-confirmation `Y`/`N`.
 
 Enter and `H` use the available Inspect plugin. On macOS with Ghostty 1.3+ (TERM_PROGRAM=ghostty), this includes the other bundled open-only plugin using Ghostty's preview AppleScript API; status and close are unavailable because no binding is written. In a child-specific inspector, type ordinary guidance and press Enter to send it through the acknowledged steer channel; `steer <message>`, `status`, and `stop` remain available as explicit controls. 
-Without a TUI, `/subagents-fleet` retains the textual `subagent({ action: "status", view: "fleet" })` fallback, and mutations use explicit commands: run `/subagents-stop` and pick from the selector, or use `/subagents-stop <run-id>` / `subagent({ action: "stop", id: "..." })` when you already know the id.
+Without a TUI, `/subagents-fleet` retains the textual `subagent_control({ action: "status", view: "fleet" })` fallback, and mutations use explicit commands: run `/subagents-stop` and pick from the selector, or use `/subagents-stop <run-id>` / `subagent_control({ action: "stop", id: "..." })` when you already know the id.
 
 Use `/subagents-detach [run-id]` only for an active foreground single-subagent run you want to leave running without terminating; the eventual result remains available through status/wait.
 
@@ -183,7 +183,7 @@ Async runs write machine-readable lifecycle artifacts for observability and work
   subagent-log-<id>.md
 ```
 
-- `status.json` powers the widget and `subagent({ action: "status" })` output.
+- `status.json` powers the widget and `subagent_control({ action: "status" })` output.
 - `events.jsonl` contains wrapper events plus child Pi JSON events annotated with run and step metadata, including correlated `subagent.steer.requested`, `scheduled`, `routed`, `queued`, `delivered`, `failed`, and `recovered` events plus failure/partial/recovery notices.
 - `output-<n>.log` is a live human-readable tail.
 

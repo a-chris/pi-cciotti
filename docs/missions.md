@@ -26,7 +26,7 @@ Behavior:
 An explicit `mission` object must have exactly one non-empty `title` or `summary`. `objective` and `labels` are optional. When supplied, `goal` must be `true` and requires `budget: { tokens: <positive integer> }`.
 
 ```ts
-const created = subagent({
+const created = subagent_control({
   action: "mission.create",
   mission: { title: "Ship auth refresh", objective: "Implement and validate token refresh" }
 })
@@ -43,7 +43,7 @@ subagent({
 Set `goal: true` with a token budget to make an open mission an active continuation driver:
 
 ```ts
-subagent({
+subagent_control({
   action: "mission.create",
   mission: {
     title: "Ship auth refresh",

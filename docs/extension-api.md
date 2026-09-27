@@ -430,22 +430,29 @@ const dispose = registerExternalJobProvider({
 
 The provider returns handles with `providerJobId`, `state`, optional `handleUrl`/`conversationUrl`, optional `failureCode`/`failureMessage`, and optional `blockingJobId` for capacity conflicts. `result` can also return `output` and/or `artifactPath`.
 
-`followUp(input)` is optional. When it is present, a completed external-job run can be continued with `subagent({ action: "resume", id: "<run>", message: "..." })`. Pi sends the completed parent provider job id plus a stable `requestId` and `requestDigest`. The provider must continue that parent conversation or fail closed. It must not open a fresh thread when the parent conversation is missing.
+`followUp(input)` is optional. When it is present, a completed external-job run can be continued with `subagent_control({ action: "resume", id: "<run>", message: "..." })`. Pi sends the completed parent provider job id plus a stable `requestId` and `requestDigest`. The provider must continue that parent conversation or fail closed. It must not open a fresh thread when the parent conversation is missing.
 
 The async runner process does not import provider internals. It writes operation requests into its async run directory. The parent Pi process services those requests against the registered provider and writes operation responses. If the provider is not registered, the bridge fails closed with an actionable error. If a run is recovered after provider job metadata exists, the runner calls `reattach` and `result`; it does not call `start` or `follow-up` again.
 
 ## Inspect integration
 
-Inspect is the portable command and action surface for an existing async run. The public actions are:
+Inspect is the portable command and surface for an existing async run. It is **not** a model
+tool action: `subagent_control` accepts only `status`, `resume`, `steer`, `stop`, `interrupt`,
+`validate`, `list`, `get`, `models`, `guide`, and `mission.create`, and an `inspector.*` action is
+rejected by that tool's schema before it reaches the executor.
 
-```ts
-subagent({ action: "inspector.command", id: "<run-id>", index: 0 })
-subagent({ action: "inspector.open", id: "<run-id>", index: 0, focus: true })
-subagent({ action: "inspector.status", id: "<run-id>", index: 0 })
-subagent({ action: "inspector.close", id: "<run-id>", index: 0 })
-```
+Hosts reach it through the surfaces that actually dispatch it:
 
-`inspector.command` returns a standalone runner command without contacting a host or writing a binding. `inspector.open` selects an available bundled inspector plugin. `status` and `close` select the plugin that owns the run binding and report clearly when that plugin does not support the requested lifecycle action. Without an available plugin, `open` fails closed with an actionable message; ordinary launches remain headless. Closing an inspector never stops the run.
+- `/subagents-fleet` opens the live fleet inspector, which drives the bundled inspector plugins.
+- `/subagents-inspect-rpc <requestId> ...` is the host integration bridge: it answers an async
+  child inspection request with a correlated widget payload and starts no model turn. The reply is
+  emitted through `ctx.ui.setWidget` prefixed with `PI_SUBAGENT_INSPECT_JSON:` and retracted in the
+  same handler, so the host correlates the payload by `requestId` without accumulating visible
+  state. Inspection replies are available only on RPC surfaces; in TUI mode use `/subagents` or
+  `subagent_control({ action: "status", view: "transcript" })`.
+
+An available inspector plugin owns the run binding; without one, open fails closed with an
+actionable message and ordinary launches stay headless. Closing an inspector never stops the run.
 
 ## Host session lifetime and completion wakes
 

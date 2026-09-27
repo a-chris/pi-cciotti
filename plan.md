@@ -328,6 +328,68 @@ is a safe checkpoint on its own.
 4. **End:** suite green; measurement recorded when applicable; plan.md status + current-milestone
    updated; committed. A milestone is never "mostly done" — it is done (done-when met) or not.
 
+### M4 execution log — U3b-2 (docs ↔ facade contract)
+
+**Live defect, not a param trim.** The guide topics are served to the model at
+runtime (`action: "guide"` → `readSubagentGuide`), and after the M1 facade cutover
+they instructed the model to call things its own tool schema rejects:
+
+| Measured | Evidence |
+|---|---|
+| 37 control examples named the wrong tool | prose said `subagent({ action: "status" })`; the delegation schema **requires `task`**, so following the docs launches a child instead of reporting status |
+| 25 examples taught verbs the enum rejects | `children.list`, `worktree.discard/cleanup`, `inspector.*`, `doctor`, `refine*`, agent CRUD — verified rejected by an enum probe on `SubagentControlParams` |
+| Parameter reference described the removed 81-param tool | 24 of 29 documented rows were not on any facade |
+| 18 of 31 internal actions are unreachable | facade enum (11) ∪ slash (7 more) ∪ RPC manage (**empty allow-list**) |
+
+Fixed in `docs/tool-reference.md`, `docs/agents.md`, `docs/configuration.md`,
+`docs/extension-api.md`, `README.md`: renamed all 37 examples to
+`subagent_control`, deleted dead-verb examples and the agent-CRUD block (D5),
+replaced the parameter reference with the real facade surface, and rewrote
+`extension-api.md`'s inspect section around the routes that actually dispatch
+(`/subagents-fleet`, `/subagents-inspect-rpc`) instead of four unreachable actions.
+
+**Regression test:** `test/unit/guide-docs-facade-contract.test.ts` parses every
+`served topic → tool-call literal` with a brace-matching, string-skipping scanner
+and asserts (1) only enum verbs, (2) control verbs ride `subagent_control`,
+(3) no control example passes a param the facade drops except the tracked list,
+(4) the parameter reference contains facade params only. All four rules
+mutation-verified (planted offender → red → restore → green).
+
+**New functional defect found while writing rule 3 — U4 must fix, docs cannot hide.**
+`normalizeControlParams` (facade.ts) forwards **only** `id`/`action`/`message`, so
+kept verbs are silently crippled at the tool boundary:
+
+| Call the model can make | Executor receives | Consequence |
+|---|---|---|
+| `{ action: "get", agent: "scout" }` | `{ action: "get" }` | cannot inspect one agent |
+| `{ action: "guide", topic: "agents" }` | `{ action: "guide" }` | always `overview`; 8 topics unreachable |
+| `{ action: "status", view: "transcript" }` | `{ action: "status" }` | transcript tail unreachable (`view`/`index`/`lines`) |
+| `{ action: "steer", mode: "follow_up" }` | `{ action: "steer" }` | delivery mode unreachable |
+| `{ action: "list", capabilities: true }` | `{ action: "list" }` | capability rows unreachable |
+
+Executor reads all of these (`params.topic` at subagent-executor.ts:5943,
+`params.view` at :2456), so only the facade is missing them. **Unit tests do not
+catch this** — they call the executor with the params directly, bypassing the
+facade. Fix in U4: add `topic`/`view`/`index`/`lines`/`mode`/`agent`/`capabilities`
+to `SubagentControlParams` + `normalizeControlParams`, then delete the matching
+entries from `trackedFacadeGaps` in the contract test.
+
+**Also found, same class, NOT yet fixed (next unit):** `skills/pi-subagents/references/*`
+and `prompts/council.md` carry identical dead-verb and wrong-tool text
+(`management-authoring-rpc.md` is built almost entirely around the removed
+create/update/delete/eject/disable/enable/reset verbs, so it needs an authoring
+pass, not a rename). Extend the contract test's file list when that sweep lands.
+
+**Deferred at owner-gate 50% (ask_jeff, below the ≥60% threshold):** deleting
+`handoffPath` + `repo` + the two dead `worktree.*` handlers +
+`worktree-cleanup-plan.ts`, and `additional` + the dead `grant-spawn-budget`
+handler. Both are on the REMOVE list, but neither has a replacement route
+recorded: removing them leaves preserved worktrees reclaimable only by
+`git worktree remove`/`git branch -D`, and spawn-budget grants unreachable. That
+is a capability decision, so it waits for the owner rather than riding a
+measured-reachability argument. `additional` is read **only** by
+`grant-spawn-budget` (subagent-executor.ts:5893), so it shares the same gate.
+
 ### M4 execution log — U1 + U2a
 
 **U1 — config layer (committed `f0928173`).** Kept + fail-closed validated the five enrichment keys

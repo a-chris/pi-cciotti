@@ -132,19 +132,19 @@ Supported override fields: `description`, `output`, `outputMode`, `defaultReads`
 
 Disable and restore:
 
-- `disabled: true` hides a builtin from runtime discovery and agent-facing `subagent({ action: "list" })` output.
+- `disabled: true` hides a builtin from runtime discovery and agent-facing `subagent_control({ action: "list" })` output.
 - `subagents.disableBuiltins: true` disables all builtins at once.
-- `subagent({ action: "disable", agent: "reviewer" })` writes the override without editing settings by hand; `subagent({ action: "enable", agent: "reviewer" })` removes it.
-- `subagent({ action: "eject", agent: "reviewer" })` copies a bundled builtin or package agent verbatim into the user or project agent dir (default `user`) as an editable custom file that shadows the original.
-- `subagent({ action: "reset", agent: "reviewer" })` deletes the scope's custom agent file and/or settings override entry, restoring the bundled default. It refuses if no bundled default exists (use `delete` for purely custom agents).
+- Edit the scope's settings file (`~/.pi/agent/settings.json`, or `.pi/settings.json`) to set that agent's `disabled: true`; remove the entry to re-enable it.
+- Copy a bundled builtin or package agent verbatim into the user or project agent dir (default `user`) as an editable custom file that shadows the original.
+- Delete the scope's custom agent file and/or its settings override entry to restore the bundled default.
 
-`eject`, `disable`, `enable`, and `reset` accept `agentScope: "user" | "project"` and operate in one scope at a time. Project overrides still win over user ones, so a project-scope disable survives a user-scope `enable` until you target the project scope.
+These edits operate in one scope at a time (`~/.pi/agent/` or `.pi/`). Project overrides still win over user ones, so a project-scope disable survives a user-scope enable until you edit the project scope.
 
 ## Parent prompt discovery
 
 Set `advertise: true` in a specialist's agent file frontmatter for parent-prompt discovery. When the `subagent` tool is active, pi-subagents adds an agent-owned catalog of names and descriptions to the parent system prompt. Disabled agents and agents excluded by the current capability ceiling are omitted. Advertisement is not supported through settings overrides or runtime registration.
 
-Advertisement is opt-in discovery, not automatic routing. The catalog is sorted by name and limited to 16 agents and 12,288 total rendered UTF-8 bytes, including XML escaping, instructions, and omission counts. Descriptions are capped at 512 UTF-8 bytes before escaping. Entries that cannot fit are omitted; canonical agent names are never truncated. The parent still calls `subagent({ action: "list", capabilities: true })` before execution to confirm that the selected agent is executable (including `runner.available === true` for external CLI agents).
+Advertisement is opt-in discovery, not automatic routing. The catalog is sorted by name and limited to 16 agents and 12,288 total rendered UTF-8 bytes, including XML escaping, instructions, and omission counts. Descriptions are capped at 512 UTF-8 bytes before escaping. Entries that cannot fit are omitted; canonical agent names are never truncated. The parent still calls `subagent_control({ action: "list", capabilities: true })` before execution to confirm that the selected agent is executable (including `runner.available === true` for external CLI agents).
 
 The file catalog snapshot refreshes at session start/reload and after extension-owned agent-management mutations. External file or settings edits require `/reload`; ordinary turns do not poll the filesystem. Tool availability and capability-ceiling filtering are checked in memory on every prompt. A failed management-triggered refresh withdraws the catalog until a successful refresh, without changing the persisted mutation's result.
 
@@ -286,12 +286,6 @@ A refinement overlay is bounded, project-local guidance layered on top of one ag
 
 ```text
 /subagents-refine reviewer
-```
-
-```ts
-subagent({ action: "refine", agent: "reviewer" })
-subagent({ action: "refine.show", agent: "reviewer" })
-subagent({ action: "refine.rollback", agent: "reviewer" })
 ```
 
 How it works:

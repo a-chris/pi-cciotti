@@ -53,7 +53,7 @@ Child results cross into the script as plain JSON data. Non-JSON host metadata i
 Validate a script without launching children:
 
 ```js
-subagent({ action: "validate", workflowScript: `
+subagent_control({ action: "validate", workflowScript: `
   const results = await runs.all([{ key: "scan", agent: "scout", task: "Scan" }]);
   return results[0].output;
 ` });
@@ -63,7 +63,7 @@ For a script stored in a file, use `workflowScriptPath` instead of `workflowScri
 
 ```js
 subagent({ workflowScriptPath: "workflows/review.js", cwd: "/path/to/project" });
-subagent({ action: "validate", workflowScriptPath: "workflows/review.js" });
+subagent_control({ action: "validate", workflowScriptPath: "workflows/review.js" });
 ```
 
 The fields are mutually exclusive. Relative paths resolve against the request `cwd`; absolute paths pass through. The host reads the file before validation or workflow sandbox execution. The sandbox still has no filesystem access. Missing, unreadable, and empty files return file input errors instead of script syntax errors.

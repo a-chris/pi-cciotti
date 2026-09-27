@@ -361,12 +361,22 @@ it documents and each rejected key throws. 2715 / 0 / 11.
 - **U2b — dead depth plumbing (next).** `maxSubagentDepth` (parse/types/docs — it gates nothing now),
   `nestedRoute`/`nestedParent` types + status plumbing, `nested-events.ts`,
   `NestedPathEntry`/`nested-path.ts`, the retained-nested-route tracker, child-side
-  `runFanoutBudget` remnants. **Deferred from U2a deliberately:** the `allowMutatingManagementActions`
-  dep and its seven `is not available from child-safe subagent fanout mode` guards in
-  `subagent-executor.ts` — verified in U2a that **no production caller passes it anymore** (deleted
-  fanout-child was the sole setter; only tests pass it), so those guards are unreachable production
-  code naming a mode that no longer exists. Delete dep + guards + their tests in U2b rather than
-  rewording a dead branch (U2a kept them so the suite stayed green and the commit stayed narrow).
+  `runFanoutBudget` remnants.
+  - **U2b-1 DONE (`52b84fce`) — removed the child-safe management boundary**: the
+    `allowMutatingManagementActions` dep, `MUTATING_MANAGEMENT_ACTIONS`, the seven
+    `child-safe subagent fanout mode` guards, and the fixture param. Verified dead first: the executor
+    is built at `index.ts:584`, *after* the child early-return at `index.ts:391`, and the deleted
+    fanout-child was the dep's only setter. `nestedResolutionScopeForExecutor` keeps its
+    `!route -> undefined` early return so non-child callers are unchanged. The 23 positional
+    `makeExecutor` call sites were rewritten with the TypeScript compiler API — a hand-rolled comma
+    splitter corrupted both integration files first (restored from git); positional args are a trap.
+  - **Correction:** `nested-events.ts` is **load-bearing, not dead** — the Fleet tree, run-id
+    resolution and the runner's own self-events read it (`buildNestedRouteIndex`,
+    `projectNestedRegistryForRoot`, `findNestedRouteForRootId`, `readNestedRegistry`). Keep the
+    nested-event surface; only the child-side route/nestedParent writes are dead.
+  - **`maxSubagentDepth` is not a pure delete:** it gates `checkSubagentDepth` on the *parent* path
+    (executor 1632/1788/4762/6358/6938). Removing it means removing that gate too — owner decision:
+    drop the depth cap entirely, or keep it for detached-runner chains.
 - **U3** trim the 68-key pool to facade/RPC-derivable keys, delete dead schemas
   (`ChainItem`, `ParallelTaskSchema`, `Dynamic*Schema`); **U4** add `topic`/script-source/`mission`
   to the control facade + `normalizeControlParams`; **U5** the REMOVE-list params end-to-end.

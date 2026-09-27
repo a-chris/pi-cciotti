@@ -185,7 +185,6 @@ import {
 import { generateContextBrief, wrapPrequelTask, wrapSummaryTask } from "../../shared/context-brief.ts";
 import { deriveChildSessionName } from "../../shared/child-session-name.ts";
 
-const MUTATING_MANAGEMENT_ACTIONS = new Set(["create", "update", "delete", "eject", "disable", "enable", "reset", "grant-spawn-budget", "mission.create", "inspector.open", "inspector.close", "project.open", "project.close", "worktree.discard", "worktree.cleanup", "refine", "refine.rollback", "dismiss"]);
 const DESTRUCTIVE_MANAGEMENT_ACTIONS = new Set(["delete", "eject", "disable", "reset", "worktree.discard", "refine.rollback", "inspector.close", "project.close", "stop", "interrupt"]);
 
 function resolveSteerDeliveryMode(mode: SubagentParamsLike["mode"]): SteerDeliveryMode | undefined {
@@ -416,7 +415,6 @@ interface ExecutorDeps {
 	expandTilde: (p: string) => string;
 	discoverAgents: (cwd: string, scope: AgentScope, preferredModelProvider?: string) => { agents: AgentConfig[]; agentDiagnostics?: AgentDiscoveryDiagnostic[]; modelScope?: ModelScopeConfig; maxThinking?: AgentConfig["maxThinking"]; cwd?: string; scope?: AgentScope; directories?: UnknownAgentDiagnosticContext["directories"] };
 	onAgentsChanged?: () => void;
-	allowMutatingManagementActions?: boolean;
 	refreshResultDelivery?: () => void;
 	trackRetainedNestedRoute?: (rootRunId: string) => void;
 	kill?: (pid: number, signal?: NodeJS.Signals | 0) => boolean;
@@ -567,9 +565,10 @@ function formatForegroundActivity(control: SubagentState["foregroundControls"] e
 }
 
 function nestedResolutionScopeForExecutor(deps: ExecutorDeps): NestedRunResolutionScope | undefined {
-	if (deps.allowMutatingManagementActions !== false) return undefined;
 	const route = inheritedNestedRoute(deps);
 	const address = route ? inheritedNestedParentAddress(deps) : undefined;
+	// A parent with no inherited nested route has no nested registry to scope against.
+	if (!route) return undefined;
 	return {
 		routes: route ? [route] : [],
 		...(address ? { descendantOf: { parentRunId: address.parentRunId, ...(address.parentStepIndex !== undefined ? { parentStepIndex: address.parentStepIndex } : {}) } } : {}),
@@ -5803,9 +5802,6 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 		}
 		if (action) {
 			if (action === "worktree.cleanup") {
-				if (deps.allowMutatingManagementActions === false) {
-					return { content: [{ type: "text", text: "Action 'worktree.cleanup' is not available from child-safe subagent fanout mode." }], isError: true, details: { mode: "management", results: [] } };
-				}
 				if (paramsWithResolvedCwd.mode !== "plan") {
 					return { content: [{ type: "text", text: "worktree.cleanup currently supports mode='plan' only; apply/removal is not available yet." }], isError: true, details: { mode: "management", results: [] } };
 				}
@@ -5829,9 +5825,6 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 				}
 			}
 			if (action === "worktree.discard") {
-				if (deps.allowMutatingManagementActions === false) {
-					return { content: [{ type: "text", text: "Action 'worktree.discard' is not available from child-safe subagent fanout mode." }], isError: true, details: { mode: "management", results: [] } };
-				}
 				if (!paramsWithResolvedCwd.handoffPath?.trim()) {
 					return { content: [{ type: "text", text: "worktree.discard requires handoffPath from parallelHandoff.path or async status." }], isError: true, details: { mode: "management", results: [] } };
 				}
@@ -5858,12 +5851,6 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			}
 			const policyAction = action === "stop" ? "stopRun" : action === "steer" ? "steerRun" : action === "inspector.open" ? "inspectorOpen" : action === "project.open" ? "projectOpen" : undefined;
 			if (policyAction) {
-				// Child-safe mode is a hard capability boundary; the policy is an operator
-				// preference. Refuse first, so the gate never prompts for an action that is
-				// going to be rejected anyway and never masks the more specific reason.
-				if (deps.allowMutatingManagementActions === false && MUTATING_MANAGEMENT_ACTIONS.has(action)) {
-					return { content: [{ type: "text", text: `Action '${action}' is not available from child-safe subagent fanout mode.` }], isError: true, details: { mode: "management", results: [] } };
-				}
 				const decision = resolveAuthorityDecision({ action: policyAction, ...(deps.config.authorityPolicy === undefined ? {} : { policy: deps.config.authorityPolicy }) });
 				if (decision === "forbid") {
 					return { content: [{ type: "text", text: `Authority policy forbids action '${action}'.` }], isError: true, details: { mode: "management", results: [] } };
@@ -5875,9 +5862,6 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 				}
 			}
 			if ((INSPECTOR_ACTIONS as readonly string[]).includes(action)) {
-				if (deps.allowMutatingManagementActions === false && MUTATING_MANAGEMENT_ACTIONS.has(action)) {
-					return { content: [{ type: "text", text: `Action '${action}' is not available from child-safe subagent fanout mode.` }], isError: true, details: { mode: "management", results: [] } };
-				}
 				deps.state.currentSessionId = resolveCurrentSessionId(ctx.sessionManager);
 				return handleInspectorAction(action as (typeof INSPECTOR_ACTIONS)[number], paramsWithResolvedCwd, {
 					state: deps.state,
@@ -5889,13 +5873,6 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 				});
 			}
 			if ((MISSION_ACTIONS as readonly string[]).includes(action)) {
-				if (deps.allowMutatingManagementActions === false && MUTATING_MANAGEMENT_ACTIONS.has(action)) {
-					return {
-						content: [{ type: "text", text: `Action '${action}' is not available from child-safe subagent fanout mode.` }],
-						isError: true,
-						details: { mode: "management", results: [] },
-					};
-				}
 				const currentSessionId = deps.state.currentSessionId ?? ctx.sessionManager.getSessionId() ?? undefined;
 				return handleMissionAction(paramsWithResolvedCwd, {
 					cwd: requestCwd,
@@ -5904,13 +5881,6 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 				});
 			}
 			if (action === "refine" || action === "refine.show" || action === "refine.rollback") {
-				if (deps.allowMutatingManagementActions === false && MUTATING_MANAGEMENT_ACTIONS.has(action)) {
-					return {
-						content: [{ type: "text", text: `Action '${action}' is not available from child-safe subagent fanout mode.` }],
-						isError: true,
-						details: { mode: "management", results: [] },
-					};
-				}
 				return handleRefinementAction(action, paramsWithResolvedCwd, {
 					cwd: requestCwd,
 					state: deps.state,
@@ -5927,7 +5897,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 				});
 			}
 			if (action === "grant-spawn-budget") {
-				if (deps.allowMutatingManagementActions === false || !ctx.hasUI) {
+				if (!ctx.hasUI) {
 					return {
 						content: [{ type: "text", text: "Action 'grant-spawn-budget' is available only from the root interactive parent session." }],
 						isError: true,
@@ -6195,13 +6165,6 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			}
 			if (action === "append-step") {
 				return appendStepToAsyncChain(omitUndefinedProperties({ params: paramsWithResolvedCwd, requestCwd, ctx, deps, parentModel: requestParentModel }));
-			}
-			if (deps.allowMutatingManagementActions === false && MUTATING_MANAGEMENT_ACTIONS.has(action)) {
-				return {
-					content: [{ type: "text", text: `Action '${action}' is not available from child-safe subagent fanout mode.` }],
-					isError: true,
-					details: { mode: "management" as const, results: [] },
-				};
 			}
 			if (action === "dismiss") {
 				const targetRunId = paramsWithResolvedCwd.runId ?? paramsWithResolvedCwd.id;

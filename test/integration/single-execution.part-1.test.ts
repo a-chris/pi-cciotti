@@ -92,7 +92,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 				options: options as { triggerTurn?: boolean } | undefined,
 			});
 		};
-		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, true, new Map(), undefined, createEventBus(), undefined, undefined, sendMessage);
+		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, new Map(), undefined, createEventBus(), undefined, undefined, sendMessage);
 		const launch = await executor.execute("workflow-child-wakes", {
 			async: true,
 			workflowScript: `return await runs.all([{ key: "a", agent: "echo", task: "Child A" }, { key: "b", agent: "echo", task: "Child B" }]);`,
@@ -493,7 +493,6 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 			getSubagentSessionRoot: () => path.join(tempDir, ".pi/subagents", "sessions"),
 			expandTilde: (value: string) => value,
 			discoverAgents: () => ({ agents: [makeAgent("echo")] }),
-			allowMutatingManagementActions: true,
 		});
 
 		const pending = executor.execute(
@@ -578,7 +577,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 
 	it("rejects a static spawn-budget mismatch before discovering or launching children", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
 		const before = fs.readdirSync(tempDir).sort();
-		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, true, new Map(), undefined, createEventBus(), () => {
+		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, new Map(), undefined, createEventBus(), () => {
 			throw new Error("spawn-budget validation must not discover or launch agents");
 		});
 		const script = [
@@ -610,7 +609,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 
 	it("validates workflow scripts without launching children or creating artifacts", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
 		const before = fs.readdirSync(tempDir).sort();
-		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, true, new Map(), undefined, createEventBus(), () => {
+		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, new Map(), undefined, createEventBus(), () => {
 			throw new Error("validate must not discover or launch agents");
 		});
 
@@ -1033,7 +1032,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 		const requestCwd = path.join(tempDir, "request-cwd");
 		fs.mkdirSync(requestCwd);
 		fs.writeFileSync(path.join(requestCwd, "workflow.js"), `return runs.run("bad key", { agent: "echo" });`);
-		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, true, new Map(), undefined, createEventBus(), () => {
+		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, new Map(), undefined, createEventBus(), () => {
 			throw new Error("validate must not discover or launch agents");
 		});
 
@@ -1055,7 +1054,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 
 	it("reports missing and empty workflowScriptPath files before validation", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
 		fs.writeFileSync(path.join(tempDir, "empty.js"), " \n");
-		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, true, new Map(), undefined, createEventBus(), () => {
+		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, new Map(), undefined, createEventBus(), () => {
 			throw new Error("file input errors must not discover or launch agents");
 		});
 
@@ -1148,7 +1147,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 	it("starts workflow scripts asynchronously with a portable internal run id", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
 		mockPi.onCall({ output: "async child done" });
 		const asyncJobs: SubagentState["asyncJobs"] = new Map();
-		const executor = makeExecutor([makeAgent("echo", { aliases: ["helper"], defaultAsync: true })], { missions: { globalIndex: false } }, false, undefined, true, asyncJobs);
+		const executor = makeExecutor([makeAgent("echo", { aliases: ["helper"], defaultAsync: true })], { missions: { globalIndex: false } }, false, undefined, asyncJobs);
 		const workflowCwd = path.join(tempDir, "workflow-cwd");
 		fs.mkdirSync(workflowCwd);
 		const toolCallId = "call_demo|fc_demo";
@@ -1277,7 +1276,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 		mockPi.onCall({ output: "child output" });
 		const asyncJobs: SubagentState["asyncJobs"] = new Map();
 		const workflowControllers = new Map<string, AbortController>();
-		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, true, asyncJobs, workflowControllers);
+		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, asyncJobs, workflowControllers);
 		const started = await executor.execute(
 			`workflow-reload-assembly-${Date.now()}`,
 			{
@@ -1679,7 +1678,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 				notifyOn: ["active_long_running", "needs_attention"],
 				notifyChannels: ["event"],
 			},
-		}, false, undefined, true, asyncJobs);
+		}, false, undefined, asyncJobs);
 
 		const result = await executor.execute(
 			"workflow-live-activity",
@@ -1759,7 +1758,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 				notifyOn: ["needs_attention"],
 				notifyChannels: ["event"],
 			},
-		}, false, undefined, true, asyncJobs, undefined, piEvents);
+		}, false, undefined, asyncJobs, undefined, piEvents);
 
 		const result = await executor.execute(
 			"workflow-child-attention-notice",
@@ -1898,7 +1897,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 		const controller = new AbortController();
 		controller.abort();
 		try {
-			const result = await makeExecutor([makeAgent("echo")], {}, false, undefined, true, new Map(), undefined, piEvents).execute(
+			const result = await makeExecutor([makeAgent("echo")], {}, false, undefined, new Map(), undefined, piEvents).execute(
 				"abort-workflow-await",
 				{ agent: "echo", task: "Do not import the seeded result", async: true, workflowAwaitAsync: true, workflowChildAsyncId: runId },
 				controller.signal,
@@ -2109,7 +2108,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 
 	it("stops a live async workflow through its controller", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
 		const controller = new AbortController();
-		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, true, new Map(), new Map([["workflow-stop", controller]]));
+		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, new Map(), new Map([["workflow-stop", controller]]));
 		const result = await executor.execute(
 			"stop-call",
 			{ action: "stop", id: "workflow-stop" },
@@ -2126,7 +2125,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 	it("persists parent-stopped workflow children as stopped instead of failed", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
 		mockPi.onCall({ delay: 5_000, output: "too late" });
 		const workflowControllers = new Map<string, AbortController>();
-		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, true, new Map(), workflowControllers);
+		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, new Map(), workflowControllers);
 		const started = await executor.execute(
 			`workflow-stop-child-${Date.now()}`,
 			{ workflowScript: `return await runs.run("review", { agent: "echo", task: "Wait" });` },
@@ -2192,7 +2191,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 		mockPi.onCall({ matchArgIncludes: "Slow child", delay: 5_000, output: "slow late" });
 		mockPi.onCall({ matchArgIncludes: "Fast child", delay: 250, output: "fast done" });
 		const asyncJobs: SubagentState["asyncJobs"] = new Map();
-		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, true, asyncJobs);
+		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, asyncJobs);
 		const started = await executor.execute(
 			`workflow-child-stop-${Date.now()}`,
 			{
@@ -2284,7 +2283,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 			startedAt: Date.now(),
 			updatedAt: Date.now(),
 		}]]);
-		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, true, asyncJobs);
+		const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, asyncJobs);
 
 		const result = await executor.execute(
 			"stop-completed-workflow",
@@ -2757,7 +2756,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 		fs.mkdirSync(appDir, { recursive: true });
 		const rootAgents = [makeAgent("echo", { output: "root-report.md" })];
 		const appAgents = [makeAgent("echo", { output: "app-report.md" })];
-		const executor = makeExecutor(rootAgents, {}, false, undefined, true, new Map(), undefined, createEventBus(), (cwd) => path.resolve(cwd) === path.resolve(appDir) ? appAgents : rootAgents);
+		const executor = makeExecutor(rootAgents, {}, false, undefined, new Map(), undefined, createEventBus(), (cwd) => path.resolve(cwd) === path.resolve(appDir) ? appAgents : rootAgents);
 
 		const result = await executor.execute(
 			"scripted-workflow-child-cwd-omitted-output-default",
@@ -2784,7 +2783,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 		fs.mkdirSync(appDir, { recursive: true });
 		const rootAgents = [makeAgent("echo", { output: "root-report.md" })];
 		const appAgents = [makeAgent("echo", { output: "app-report.md" })];
-		const executor = makeExecutor(rootAgents, {}, false, undefined, true, new Map(), undefined, createEventBus(), (cwd) => path.resolve(cwd) === path.resolve(appDir) ? appAgents : rootAgents);
+		const executor = makeExecutor(rootAgents, {}, false, undefined, new Map(), undefined, createEventBus(), (cwd) => path.resolve(cwd) === path.resolve(appDir) ? appAgents : rootAgents);
 
 		const result = await executor.execute(
 			"scripted-workflow-child-cwd-output-default",

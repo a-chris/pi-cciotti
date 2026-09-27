@@ -286,7 +286,6 @@ export function installSingleExecutionHooks() {
 		config: Record<string, unknown> = {},
 		asyncByDefault = false,
 		initialSpawnState?: NonNullable<SubagentState["subagentSpawns"]>,
-		allowMutatingManagementActions = true,
 		initialAsyncJobs: SubagentState["asyncJobs"] = new Map(),
 		workflowControllers?: Map<string, AbortController>,
 		piEvents = createEventBus(),
@@ -312,7 +311,6 @@ export function installSingleExecutionHooks() {
 			getSubagentSessionRoot: () => path.join(tempDir, ".pi/subagents", "sessions"),
 			expandTilde: (value: string) => value,
 			discoverAgents: (cwd: string) => ({ agents: discoverAgentsForCwd ? discoverAgentsForCwd(cwd) : agents }),
-			allowMutatingManagementActions,
 		});
 	}
 

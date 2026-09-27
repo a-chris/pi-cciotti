@@ -81,7 +81,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 }\n`, { mode: 0o755 });
 			const baseDir = createTempDir();
 			const bus = createEventBus();
-			const executor = makeExecutor([makeAgent("worker", { systemPrompt: "Intercom orchestration channel:" })], { worktreeBaseDir: baseDir, worktreeSetupHook: hook }, false, { sessionId: "session-123", count: 0 }, true, new Map(), undefined, bus);
+			const executor = makeExecutor([makeAgent("worker", { systemPrompt: "Intercom orchestration channel:" })], { worktreeBaseDir: baseDir, worktreeSetupHook: hook }, false, { sessionId: "session-123", count: 0 }, new Map(), undefined, bus);
 			let notified = false;
 			let notify!: () => void;
 			const notification = new Promise<void>((resolve) => { notify = resolve; });
@@ -336,7 +336,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 			getSubagentSessionRoot: () => path.join(tempDir, ".pi/subagents", "sessions"),
 			expandTilde: (value: string) => value,
 			discoverAgents: () => ({ agents: [makeAgent("echo", { toolBudget })] }),
-			allowMutatingManagementActions: true,
 		});
 		let asyncDir: string | undefined;
 		let resultPath: string | undefined;
@@ -548,6 +547,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		const second = await executor.execute("second", { agent: "echo", task: "Duplicate call" }, new AbortController().signal, undefined, ctx);
 		const firstResult = await first;
 
+		console.log("DEBUG-FIRST:", JSON.stringify(firstResult.content?.[0]?.text?.slice(0, 300)));
 		assert.equal(firstResult.isError, undefined);
 		assert.equal(second.isError, true);
 		assert.match(second.content[0]?.text ?? "", /Issue exactly ONE subagent call per turn/);
@@ -787,7 +787,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		mockPi.onCall({ output: "nested completed" });
 		const descriptor = createRunFanoutBudget("root-run", 2);
 		try {
-			const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, true, new Map(), undefined, createEventBus(), undefined, {
+			const executor = makeExecutor([makeAgent("echo")], {}, false, undefined, new Map(), undefined, createEventBus(), undefined, {
 				depth: 1,
 				waitTool: { enabled: true },
 				fast: false,
@@ -954,20 +954,11 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 			undefined,
 			makeMinimalCtx(tempDir),
 		);
-		const childSafe = makeExecutor([makeAgent("echo")], { maxSubagentSpawnsPerSession: 2 }, false, undefined, false);
-		const child = await childSafe.execute(
-			"child-grant",
-			{ action: "grant-spawn-budget", additional: 1 },
-			new AbortController().signal,
-			undefined,
-			{ ...makeMinimalCtx(tempDir), hasUI: true },
-		);
 		const asyncActive = makeExecutor(
 			[makeAgent("echo")],
 			{ maxSubagentSpawnsPerSession: 2 },
 			false,
 			undefined,
-			true,
 			new Map([["async-active", { asyncId: "async-active", asyncDir: tempDir, status: "running", sessionId: "session-123" }]]),
 		);
 		const detached = await asyncActive.execute(
@@ -995,8 +986,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 
 		assert.equal(headless.isError, true);
 		assert.match(headless.content[0]?.text ?? "", /root interactive parent session/);
-		assert.equal(child.isError, true);
-		assert.match(child.content[0]?.text ?? "", /root interactive parent session/);
 		assert.equal(detached.isError, true);
 		assert.match(detached.content[0]?.text ?? "", /rejected while current-session children are queued or running/);
 		assert.equal(active.isError, true);
@@ -1067,10 +1056,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 			const planFiles = fs.readdirSync(path.join(repo, ".pi", "subagents", "cleanup-plans"));
 			assert.equal(planFiles.length, 1);
 			const planId = planFiles[0]!.replace(/\.json$/, "");
-			const childSafe = makeExecutor([makeAgent("echo")], { worktreeBaseDir: baseDir }, false, undefined, false);
-			const childSafeResult = await childSafe.executePublic("cleanup-child-safe", { action: "worktree.cleanup", repo: "cleanup-repo", mode: "plan" }, new AbortController().signal, undefined, makeMinimalCtx(tempDir));
-			assert.equal(childSafeResult.isError, true);
-			assert.match(childSafeResult.content[0]?.text ?? "", /child-safe subagent fanout mode/i);
 			const apply = await executor.executePublic("cleanup-apply", { action: "worktree.cleanup", repo: "cleanup-repo", mode: "apply", planId }, new AbortController().signal, undefined, makeMinimalCtx(tempDir));
 			assert.equal(apply.isError, true);
 			assert.match(apply.content[0]?.text ?? "", /plan.*only|apply\/removal is not available/i);
@@ -1130,7 +1115,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 			getSubagentSessionRoot: () => path.join(tempDir, ".pi/subagents", "sessions"),
 			expandTilde: (value: string) => value,
 			discoverAgents: () => ({ agents: [makeAgent("echo")] }),
-			allowMutatingManagementActions: true,
 		});
 
 		const result = await executor.execute(
@@ -1151,7 +1135,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		mockPi.onCall({ output: "nested result" });
 		const route = createNestedRoute("root-nested-model");
 		try {
-			const executor = makeExecutor([makeAgent("echo", { model: "openai/gpt-5-mini", thinking: "high" })], {}, false, undefined, true, new Map(), undefined, createEventBus(), undefined, {
+			const executor = makeExecutor([makeAgent("echo", { model: "openai/gpt-5-mini", thinking: "high" })], {}, false, undefined, new Map(), undefined, createEventBus(), undefined, {
 				depth: 1,
 				waitTool: { enabled: true },
 				fast: false,
@@ -1523,7 +1507,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		mockPi.onCall({ stdoutRaw: structuredEvents.map((entry) => JSON.stringify(entry)).join("\n") + "\n", structuredOutputCapture: { ok: true } });
 		mockPi.onCall({ output: "disabled first", writeFiles: [{ path: agentPath, content: definition("later") }] });
 		mockPi.onCall({ output: "disabled resumed" });
-		const executor = makeExecutor([], {}, false, undefined, true, new Map(), undefined, createEventBus(), (cwd) => discoverAgents(cwd, "project").agents);
+		const executor = makeExecutor([], {}, false, undefined, new Map(), undefined, createEventBus(), (cwd) => discoverAgents(cwd, "project").agents);
 		const result = await executor.execute(
 			"workflow-inherited-resume-schema",
 			{

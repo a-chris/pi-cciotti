@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import * as os from "node:os";
-import * as path from "node:path";
 import { describe, it } from "node:test";
 import { createSubagentExecutor } from "../../src/runs/foreground/subagent-executor.ts";
 import type { AuthorityPolicyConfig, SubagentState } from "../../src/shared/types.ts";
@@ -24,12 +23,11 @@ function createState(): SubagentState {
 	};
 }
 
-function createExecutor(authorityPolicy?: AuthorityPolicyConfig, childSafe = false) {
+function createExecutor(authorityPolicy?: AuthorityPolicyConfig) {
 	return createSubagentExecutor({
 		pi: { events: { emit() {}, on() { return () => {}; } }, getSessionName() { return "parent"; } } as any,
 		state: createState(),
 		config: { maxSubagentDepth: 2, control: {}, ...(authorityPolicy ? { authorityPolicy } : {}) } as any,
-		...(childSafe ? { allowMutatingManagementActions: false } : {}),
 		asyncByDefault: false,
 		tempArtifactsDir: os.tmpdir(),
 		getSubagentSessionRoot: () => os.tmpdir(),
@@ -48,22 +46,9 @@ function ctx(ui?: { confirm: () => Promise<boolean> }) {
 	} as any;
 }
 
-async function run(action: string, policy?: AuthorityPolicyConfig, ui?: { confirm: () => Promise<boolean> }, childSafe = false): Promise<{ text: string; isError?: boolean }> {
-	const result = await createExecutor(policy, childSafe).execute(action, { action }, new AbortController().signal, undefined, ctx(ui));
+async function run(action: string, policy?: AuthorityPolicyConfig, ui?: { confirm: () => Promise<boolean> }): Promise<{ text: string; isError?: boolean }> {
+	const result = await createExecutor(policy).execute(action, { action }, new AbortController().signal, undefined, ctx(ui));
 	return { text: result.content.find((entry) => entry.type === "text")?.text ?? "", ...(result.isError === undefined ? {} : { isError: result.isError }) };
-}
-
-// `project.open` spawns the Herdr CLI, so point the client at a path that cannot
-// exist whenever the policy is expected to let the action through.
-async function withoutHerdr<T>(body: () => Promise<T>): Promise<T> {
-	const previous = process.env.HERDR_BIN;
-	process.env.HERDR_BIN = path.join(os.tmpdir(), "pi-subagents-absent-herdr-binary");
-	try {
-		return await body();
-	} finally {
-		if (previous === undefined) delete process.env.HERDR_BIN;
-		else process.env.HERDR_BIN = previous;
-	}
 }
 
 describe("inspector and project pane authority policy", () => {
@@ -88,19 +73,4 @@ describe("inspector and project pane authority policy", () => {
 		assert.match(text, /requires user confirmation for action 'inspector\.open'/);
 	});
 
-	it("refuses project.open in child-safe fanout mode without prompting for authority", async () => {
-		let asked = 0;
-		const { text, isError } = await run("project.open", undefined, { confirm: async () => { asked += 1; return true; } }, true);
-
-		assert.equal(asked, 0);
-		assert.equal(isError, true);
-		assert.match(text, /Action 'project\.open' is not available from child-safe subagent fanout mode\./);
-	});
-
-	it("reports the child-safe restriction for inspector.open rather than the policy that also forbids it", async () => {
-		const { text, isError } = await run("inspector.open", { inspectorOpen: "forbid" }, undefined, true);
-
-		assert.equal(isError, true);
-		assert.match(text, /Action 'inspector\.open' is not available from child-safe subagent fanout mode\./);
-	});
 });

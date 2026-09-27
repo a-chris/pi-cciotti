@@ -1243,22 +1243,6 @@ describe("async interrupt action", () => {
 		}
 	});
 
-	it("rejects dismiss from child-safe fanout mode", async () => {
-		const state = createState();
-		state.currentSessionId = "session";
-		const runId = `dismiss-child-safe-${Date.now().toString(36)}`;
-		const asyncDir = createRunningAsync(state, runId, { track: false, sessionId: "session", mode: "workflow" });
-		try {
-			const result = await executorWithKill(state, () => true, { allowMutatingManagementActions: false })
-				.execute("dismiss-child-safe", { action: "dismiss", id: runId }, new AbortController().signal, undefined, ctx());
-
-			assert.equal(result.isError, true);
-			assert.match(text(result), /child-safe subagent fanout mode/);
-			assert.equal(JSON.parse(fs.readFileSync(path.join(asyncDir, "status.json"), "utf-8")).displayDismissedAt, undefined);
-		} finally {
-			cleanup(runId, asyncDir);
-		}
-	});
 
 	it("rejects dismiss for live-controller, non-workflow, terminal, and other-session runs", async () => {
 		const cases = [

@@ -1,6 +1,6 @@
 # Plan: Facade rewrite of the subagent tool surface
 
-> Status: **M4 in progress — U1, U2a, U2b-1 (child-safe boundary), U2b-2 (project.* / projectOpen) committed. Next: U3 (param pool trim). Open owner decision: `maxSubagentDepth` (see M4 log).**
+> Status: **M4 in progress — U1, U2a, U2b-1, U2b-2, U3a (dead schema island) committed. Next: U3b/U5 param sweep. Open owner decision: `maxSubagentDepth` (see M4 log).**
 > VISION updated; decisions resolved.
 > Current milestone: **M4 — Enrichment + param sweep** (config keys for config-enriched params
 > before removing per-call forms; delete REMOVE params end-to-end — types, executor, preflight,
@@ -406,8 +406,22 @@ it documents and each rejected key throws. 2715 / 0 / 11.
     check, so a stale file reports the removal instead of degrading to defaults. Proven by mutation:
     neutralising the nested check turns the new regression test red, restoring it is green.
     2686 pass / 0 fail / 11 skipped, integration part-1 98/98, `tsc` clean.
-- **U3** trim the 68-key pool to facade/RPC-derivable keys, delete dead schemas
-  (`ChainItem`, `ParallelTaskSchema`, `Dynamic*Schema`); **U4** add `topic`/script-source/`mission`
+  - **U3a DONE** (`08506dde`): the dead-schema half of U3. `ChainItem`, `ParallelTaskSchema`,
+    `DynamicExpandSchema`, `DynamicParallelTemplateSchema`, `DynamicCollectSchema` had **zero importers
+    and zero references from `SubagentParamProperties`** — `chain` is not a model-facing key at all
+    (legacy top-level chain/parallel input is rejected in `public-execution`). `OutputOverride`,
+    `ReadsOverride`, `ChainGateOverride` became definition-only and went with them: 119 lines, pool
+    unchanged at 56 keys, 2686 pass / 0 fail, integration `in-process-child` 25/25.
+  - **Pool measured: 56 keys, not 68** (the plan's figure predates M1–M3). Remaining U3b/U5 work is the
+    REMOVE-list survivors still in the pool — cheapest first by `src`/`test` file count:
+    `steeringRecovery` 4/2, `additional` 6/8, `handoffPath` 5/6, `share`/`sessionDir`/`chatProgress`,
+    then `childId` 15/13, `repo` 8/42. `merge`/`supersession`/`sessionOnly`/`quiet` as *params* are
+    already gone (M3); `planId` survives only as an internal cleanup-plan field, not a param.
+  - **M3 already covered by earlier milestones** — `schedule.*`/`watchdog.*`/`lane` count zero in
+    `schemas.ts`, so U3 is only the key trim, not a second subsystem pass.
+  - **M6's byte-budget test already exists** (`schemas.test.ts:740`, < 3000 chars across the three
+    facades); U3a removed dead weight, threshold untouched.
+- **U3b** trim the 56-key pool to facade/RPC-derivable keys; **U4** add `topic`/script-source/`mission`
   to the control facade + `normalizeControlParams`; **U5** the REMOVE-list params end-to-end.
 
 **pi-lens residual (recorded, not fixed — option-a precedent, sessions 4–6).** `src/extension/index.ts`

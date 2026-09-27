@@ -93,6 +93,17 @@ describe("M4 config-enriched keys: validated and wired", () => {
 		assert.throws(() => loadConfig(), /toolDescriptionMode was removed/);
 	});
 
+	it("rejects the removed authorityPolicy.projectOpen key without losing the file", () => {
+		// The key is nested, so the generic fail-closed list cannot see it by name.
+		// Without the explicit check this file would degrade to defaults silently.
+		// No other fail-closed key present: this fixture isolates the nested-key check.
+		writeRawConfig('{"authorityPolicy": { "projectOpen": "auto" }}');
+		assert.throws(() => loadConfig(), /projectOpen was removed/);
+		// A removed action without the fail-closed guard would log and return {}.
+		writeRawConfig('{"authorityPolicy": { "steerRun": "maybe" }}');
+		assert.deepEqual(loadConfig(), {});
+	});
+
 	it("config.timeoutMs becomes the launch default, and loses to an explicit call", () => {
 		const configDefault = resolveConfigDefaultTimeoutMs(45_000);
 		assert.equal(configDefault, 45_000);

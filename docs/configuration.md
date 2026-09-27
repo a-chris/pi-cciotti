@@ -482,8 +482,7 @@ Automatic missions are enabled by default for ordinary launches with a task. Use
     "spawnBudgetGrant": "confirm",
     "stopRun": "auto",
     "steerRun": "auto",
-    "inspectorOpen": "auto",
-    "projectOpen": "confirm"
+    "inspectorOpen": "auto"
   }
 }
 ```

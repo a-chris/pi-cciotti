@@ -231,6 +231,27 @@ function validateConfig(config: Record<string, unknown>): void {
 	validateOrcaProgressTabsConfig(config.orcaProgressTabs);
 }
 
+/**
+ * Config keys whose validation failure must abort the load instead of quietly
+ * replacing the operator's file with defaults: keys that change what a run does
+ * (route/worktree identity, deadlines, budgets, control thresholds) and documented
+ * keys that were removed, so the removal error surfaces rather than being swallowed.
+ */
+const FAIL_CLOSED_CONFIG_KEYS = [
+	"worktreeProvider", "worktreeBranchPrefix",
+	"modelResponseAliases", "modelExclusions", "toolDescriptionMode",
+	"checkpointBeforeDeadlineMs", "timeoutMs", "toolTimeoutMs", "toolBudget", "control",
+] as const;
+
+function hasFailClosedConfigKey(raw: Record<string, unknown>): boolean {
+	if (FAIL_CLOSED_CONFIG_KEYS.some((key) => Object.hasOwn(raw, key))) return true;
+	// `authorityPolicy.projectOpen` went away with the project-pane actions. It is nested, so
+	// the name list above cannot see it; a file still carrying it must report the removal
+	// instead of losing the rest of the operator's config to defaults.
+	const authority = raw.authorityPolicy;
+	return !!authority && typeof authority === "object" && Object.hasOwn(authority as Record<string, unknown>, "projectOpen");
+}
+
 export function getConfigPath(): string {
 	return path.join(getAgentDir(), "extensions", "subagent", "config.json");
 }
@@ -272,8 +293,7 @@ export function loadConfig(): ExtensionConfig {
 		// discarded and replaced by the built-in defaults after validation fails.
 		try {
 			const raw = JSON.parse(fs.readFileSync(configPath, "utf-8")) as unknown;
-			if (raw && typeof raw === "object" && !Array.isArray(raw)
-				&& (Object.hasOwn(raw, "worktreeProvider") || Object.hasOwn(raw, "worktreeBranchPrefix") || Object.hasOwn(raw, "modelResponseAliases") || Object.hasOwn(raw, "modelExclusions") || Object.hasOwn(raw, "toolDescriptionMode") || Object.hasOwn(raw, "checkpointBeforeDeadlineMs") || Object.hasOwn(raw, "timeoutMs") || Object.hasOwn(raw, "toolTimeoutMs") || Object.hasOwn(raw, "toolBudget") || Object.hasOwn(raw, "control"))) throw error;
+			if (raw && typeof raw === "object" && !Array.isArray(raw) && hasFailClosedConfigKey(raw as Record<string, unknown>)) throw error;
 		} catch (readError) {
 			if (readError === error) throw error;
 		}

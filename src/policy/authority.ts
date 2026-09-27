@@ -5,7 +5,6 @@ export const AUTHORITY_ACTIONS = [
 	"stopRun",
 	"steerRun",
 	"inspectorOpen",
-	"projectOpen",
 ] as const;
 
 export type AuthorityAction = typeof AUTHORITY_ACTIONS[number];
@@ -19,7 +18,6 @@ const DEFAULT_AUTHORITY_POLICY: Record<AuthorityAction, AuthorityDecision> = {
 	stopRun: "auto",
 	steerRun: "auto",
 	inspectorOpen: "auto",
-	projectOpen: "confirm",
 };
 
 export function resolveAuthorityDecision(input: {
@@ -35,6 +33,9 @@ export function validateAuthorityPolicy(value: unknown, label = "config.authorit
 		throw new Error(`${label} must be a JSON object`);
 	}
 	const policy = value as Record<string, unknown>;
+	if ("projectOpen" in policy) {
+		throw new Error(`${label}.projectOpen was removed with the project-pane actions; delete this field`);
+	}
 	const allowedActions = new Set<string>(AUTHORITY_ACTIONS);
 	for (const [action, decision] of Object.entries(policy)) {
 		if (!allowedActions.has(action)) {

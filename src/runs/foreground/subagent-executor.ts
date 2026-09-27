@@ -5849,7 +5849,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 					return { content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }], isError: true, details: { mode: "management", results: [] } };
 				}
 			}
-			const policyAction = action === "stop" ? "stopRun" : action === "steer" ? "steerRun" : action === "inspector.open" ? "inspectorOpen" : action === "project.open" ? "projectOpen" : undefined;
+			const policyAction = action === "stop" ? "stopRun" : action === "steer" ? "steerRun" : action === "inspector.open" ? "inspectorOpen" : undefined;
 			if (policyAction) {
 				const decision = resolveAuthorityDecision({ action: policyAction, ...(deps.config.authorityPolicy === undefined ? {} : { policy: deps.config.authorityPolicy }) });
 				if (decision === "forbid") {

@@ -281,11 +281,11 @@ const SubagentParamProperties = {
 	})),
 	lines: Type.Optional(Type.Integer({ minimum: 1, maximum: 500, description: "Transcript tail lines; default 80." })),
 	topic: Type.Optional(Type.String()),
-	message: Type.Optional(Type.String({ description: "resume/steer guidance or project.open prompt." })),
+	message: Type.Optional(Type.String({ description: "resume/steer guidance or a control action prompt." })),
 	mode: Type.Optional(Type.String({ enum: ["steer", "follow_up", "auto", "plan", "apply"], description: "steer delivery mode; worktree.cleanup supports plan only, no apply/removal." })),
 	steeringRecovery: Type.Optional(Type.Boolean({ description: "steer: pause/revive after missed acknowledgment; default true in direct steer mode, forced false by extension RPC for exact ownership." })),
 	additional: Type.Optional(Type.Integer({ minimum: 1, description: "grant-spawn-budget: root interactive parent + native user confirmation only; total grants capped at original configured cap." })),
-	focus: Type.Optional(Type.Boolean({ description: "Focus inspector.open/project.open pane." })),
+	focus: Type.Optional(Type.Boolean({ description: "Focus the inspector pane." })),
 	mission: Type.Optional(Type.Unsafe({ ...MissionLaunchOverride, description: "false disables; true invalid. Object: exactly one non-empty title or summary; objective/labels optional; goal only true, requires budget.tokens." })),
 	// Agent configuration for create/update (nested to avoid conflicts with execution fields)
 	config: Type.Optional(Type.Unsafe({

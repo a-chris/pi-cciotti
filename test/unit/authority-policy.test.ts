@@ -11,12 +11,11 @@ describe("authority policy", () => {
 		assert.equal(resolveAuthorityDecision({ action: "steerRun" }), "auto");
 	});
 
-	it("confirms project panes that spawn an unchecked host and leaves plugin-gated inspectors automatic", () => {
+	it("leaves plugin-gated inspectors automatic and rejects the removed projectOpen key", () => {
 		assert.equal(resolveAuthorityDecision({ action: "inspectorOpen" }), "auto");
-		assert.equal(resolveAuthorityDecision({ action: "projectOpen" }), "confirm");
-		const policy = validateAuthorityPolicy({ inspectorOpen: "forbid", projectOpen: "auto" });
+		const policy = validateAuthorityPolicy({ inspectorOpen: "forbid" });
 		assert.equal(resolveAuthorityDecision({ action: "inspectorOpen", policy }), "forbid");
-		assert.equal(resolveAuthorityDecision({ action: "projectOpen", policy }), "auto");
+		assert.throws(() => validateAuthorityPolicy({ projectOpen: "auto" }), /projectOpen was removed/);
 	});
 
 	it("accepts only fixed actions and decisions", () => {

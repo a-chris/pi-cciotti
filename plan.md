@@ -1,6 +1,6 @@
 # Plan: Facade rewrite of the subagent tool surface
 
-> Status: **M4 in progress — U1, U2a, U2b-1, U2b-2, U3a, U2b-3 (depth cap removed), U3b-1 (chatProgress), U3b-2/U3b-3/U3b-4 (all model-read prose now matches the three facades, enforced by a 6-rule contract test) committed. Next: U5, the REMOVE-list params end-to-end. One owner-gated decision open: the three control verbs that cannot receive their inputs (see the U3b-3 log).**
+> Status: **M4 in progress — U1, U2a, U2b-1, U2b-2, U3a, U2b-3 (depth cap removed), U3b-1 (chatProgress), U3b-2…U3b-5 (all model-read prose now matches the three facades, enforced by a 7-rule contract test) committed. Next: U5, the REMOVE-list params end-to-end. One owner-gated decision open: the three control verbs that cannot receive their inputs (see the U3b-3 log).**
 > VISION updated; decisions resolved.
 > Current milestone: **M4 — Enrichment + param sweep** (config keys for config-enriched params
 > before removing per-call forms; delete REMOVE params end-to-end — types, executor, preflight,
@@ -381,6 +381,23 @@ it found 25 offenders in three files:
 those are RPC and preflight contracts, which plan.md buckets as internal-contract fields, not model
 tool calls. Orphaned validate prose in `workflows.md`/`tool-reference.md` was folded into statements
 about launch-time validation, which does run (subagent-executor.ts:4677).
+
+**U3b-5 — the vocabulary half, DONE.** Rules 1–6 only inspected tool-prefixed literals, so the
+internal param names survived in bare fences and in prose: `workflowScript`/`workflowScriptPath`
+appeared 37 times across 11 model-read files (9 bare `{ workflowScript: ... }` fences in
+`tool-reference.md`, plus prose like "Chaining is code-driven through `workflowScript`",
+"## Scripted workflows (workflowScript)", and "A top-level `{ workflowScript, worktree: true }`").
+A model following any of them passes a name the workflow facade does not accept — it merged both
+into `source`.
+
+Rule 7 now bans those two tokens outright in model-read files, with one deliberate exemption:
+`docs/extension-api.md`, whose examples are the RPC `spawn` and preflight contracts, which plan.md
+buckets as internal-contract fields (`spawn` really does require `workflowScript`). Its precedence
+sites are untouched. Rule 7 mutation-verified.
+
+Also removed the `## Session sharing` section from `tool-reference.md`: it taught `share: true`,
+which the disposition table lists under **Remove entirely**, and no facade carries it. Checked for
+dangling `#session-sharing` links — none.
 
 Rule 6 mutation-verified (a `subagent({ workflowScript })` planted in a skill reference → red →
 restore → green). `tsc` 0, ratchet clean, unit 2659 pass / 0 fail / 11 skipped, integration

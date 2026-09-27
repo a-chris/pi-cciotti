@@ -40,9 +40,9 @@ The package includes reusable prompt templates for common workflows. You do not 
 
 Add `autofix` to `/parallel-review` or `/parallel-cleanup` to apply only the synthesized fixes worth doing now after reviewers return.
 
-## Scripted workflows (workflowScript)
+## Scripted workflows (`source`)
 
-Use direct `{ agent, task }` for one bounded child. Use `workflowScript` when the parent needs a stable keyed child, sequence, fanout, steering, retry, or aggregation. For ordinary parallel fanout, use `await runs.all([{ key, agent, task }, ...])`. It resolves to an ordered array, not a key map, so use indexes, destructuring, or `.map(...)`, not `results.<key>`. Do not read `.output` from unawaited `runs.run` launches. Store a `runs.run` promise only when the script later observes it with `await`, `Promise.race`, or `Promise.all`, such as steering a live child before awaiting its result. Scripts are ordinary JavaScript statement bodies. Use an explicit `return` for a useful result:
+Use direct `{ agent, task }` for one bounded child. Use a workflow script (`source`) when the parent needs a stable keyed child, sequence, fanout, steering, retry, or aggregation. For ordinary parallel fanout, use `await runs.all([{ key, agent, task }, ...])`. It resolves to an ordered array, not a key map, so use indexes, destructuring, or `.map(...)`, not `results.<key>`. Do not read `.output` from unawaited `runs.run` launches. Store a `runs.run` promise only when the script later observes it with `await`, `Promise.race`, or `Promise.all`, such as steering a live child before awaiting its result. Scripts are ordinary JavaScript statement bodies. Use an explicit `return` for a useful result:
 
 For multi-step or parallel work, make exactly one top-level `subagent` workflow call with `async:true` and launch children only inside it. Read this guide for recipes rather than constructing a second top-level orchestration. Available sandbox helpers include `runs.run`, `runs.all`, `runs.steer`, `runs.status`, `runs.ref`/`runs.refs`, `emit`, `console`, standard JavaScript, and mission `state` when enabled. No filesystem, shell, arbitrary Pi tools, or host globals are available; named resources alone may grant `runs.host` authority.
 
@@ -81,7 +81,7 @@ subagent_workflow({ workflow: "review", args: { task: "Review the change" } });
 subagent_workflow({ workflow: "run-ci", args: { command: "npm test" } });
 ```
 
-The host resolves the name and validates bounded plain-JSON `args` before starting the workflow. Resource provenance is recorded in workflow details and receipts for downstream permission/policy checks. Resource authority is not caller-supplied: `runs.host` is available only when the resolved resource explicitly grants the requested host key and command. Inline `workflowScript` and `workflowScriptPath` remain raw, unknown-provenance inputs, so their `runs.host` calls are unavailable through the public execution boundary. Named resources cannot be combined with `agent`, `task`, `workflowScript`, or `workflowScriptPath`; this first slice ships only the package-owned `review` and `run-ci` resources, not a user/project resource registry.
+The host resolves the name and validates bounded plain-JSON `args` before starting the workflow. Resource provenance is recorded in workflow details and receipts for downstream permission/policy checks. Resource authority is not caller-supplied: `runs.host` is available only when the resolved resource explicitly grants the requested host key and command. An inline `source` script and a file-backed `source: { path }` remain raw, unknown-provenance inputs, so their `runs.host` calls are unavailable through the public execution boundary. Named resources cannot be combined with `agent`, `task`, or `source`; this first slice ships only the package-owned `review` and `run-ci` resources, not a user/project resource registry.
 
 ### Opt-in bounded workflows
 
@@ -116,7 +116,7 @@ subagent_workflow({ source: `
 ` });
 ```
 
-Keep helper functions portable across Node and Bun. Use top-level `await`, plain helper functions that return `runs.run(...)`, or explicit Promise chains. Do not define nested `async function` helpers, async arrows, or async methods inside `workflowScript`; native async helpers hide child-launch observation in Bun and are rejected.
+Keep helper functions portable across Node and Bun. Use top-level `await`, plain helper functions that return `runs.run(...)`, or explicit Promise chains. Do not define nested `async function` helpers, async arrows, or async methods inside the script; native async helpers hide child-launch observation in Bun and are rejected.
 
 ```js
 subagent_workflow({ source: `
@@ -254,7 +254,7 @@ Legacy top-level `chain`, `tasks`, `parallel`, `chainDir`, `/chain`, `/parallel`
 // { chain: [{ agent: "scout", task: "Scan" }, { agent: "worker", task: "Fix from {previous}" }] }
 
 // Current shape:
-{ workflowScript: `
+{ source: `
   const scan = await runs.run("scan", { agent: "scout", task: "Scan" });
   return runs.run("fix", { agent: "worker", task: "Fix from: " + scan.output });
 ` }
@@ -265,7 +265,7 @@ Legacy top-level `chain`, `tasks`, `parallel`, `chainDir`, `/chain`, `/parallel`
 // { tasks: [{ agent: "reviewer", task: "Review API" }, { agent: "reviewer", task: "Review UI" }] }
 
 // Current shape:
-{ workflowScript: `
+{ source: `
   return runs.all([
     { key: "api", agent: "reviewer", task: "Review API" },
     { key: "ui", agent: "reviewer", task: "Review UI" }
@@ -291,7 +291,7 @@ A plain workflow creates one enclosing mission by default. Its children do not c
 
 Use stable child keys and keep process logic in ordinary JavaScript. `runs.run` launches one child, `runs.all` launches independent children together, and later steps can use each completed child's `output`. Put long task text in arrays joined with `"\n"` so Markdown fences do not conflict with the script string.
 
-For a process you run often, save the task as a prompt template under `.pi/prompts/` or `~/.pi/agent/prompts/` and launch it with `/prompt-workflow`. The adapter compiles prompt steps into `workflowScript`, so templates describe the work instead of embedding raw `subagent` tool-call JSON. You can ask the parent agent to create or update these prompt files from a process described in natural language.
+For a process you run often, save the task as a prompt template under `.pi/prompts/` or `~/.pi/agent/prompts/` and launch it with `/prompt-workflow`. The adapter compiles prompt steps into a workflow script, so templates describe the work instead of embedding raw `subagent` tool-call JSON. You can ask the parent agent to create or update these prompt files from a process described in natural language.
 
 ```md
 ---
@@ -336,11 +336,11 @@ return { api: api.artifactPaths, ui: ui.artifactPaths };
 
 Each child uses the existing worktree lifecycle: it branches from clean HEAD, journals ownership before launch, captures a patch and handoff manifest, then removes cleanly captured temporary worktrees and branches. The handoff manifest path remains available in the child's `artifactPaths`; return or emit it when the orchestrator needs to apply or inspect the patches. `runs.ref` stays concise and intentionally omits full paths.
 
-A top-level `{ workflowScript, worktree: true }` makes isolation the default for every workflow child. An individual child can override that default with `worktree: false`. Keep one writer when parallel writes are not intentionally isolated.
+A top-level `{ source, worktree: true }` makes isolation the default for every workflow child. An individual child can override that default with `worktree: false`. Keep one writer when parallel writes are not intentionally isolated.
 
 Before a materialized `runs.run` or `runs.all` group dispatches fresh children, isolated sources must be Git repositories with clean working trees (excluding `.pi/subagents/` runtime state). A rejected group dispatches no children and spends no fan-out slots or child output claims; key-level failure traces can remain. Checks are shared only within that group, are cancellable, and run again at allocation because sources can change. Retained resumes keep their stored contracts. Select the correct cwd or arrange an operator-approved commit/stash; isolation is never dropped automatically.
 
-Use `baseRef` to branch managed worktrees from `HEAD` or a supported named ref such as `refs/heads/release`, `refs/tags/v1`, or `origin/main`. Full 40/64-character commit IDs and revision expressions such as `HEAD~1` are unsupported. For example, `{ workflowScript, worktree: true, baseRef: "refs/heads/release" }` applies the release ref to children unless a child supplies its own `baseRef`. If omitted, the default `HEAD` is resolved at worktree allocation, not when the script is validated. The source checkout must still be clean, and the ref must resolve to a commit before any worktree is allocated.
+Use `baseRef` to branch managed worktrees from `HEAD` or a supported named ref such as `refs/heads/release`, `refs/tags/v1`, or `origin/main`. Full 40/64-character commit IDs and revision expressions such as `HEAD~1` are unsupported. For example, `{ source, worktree: true, baseRef: "refs/heads/release" }` applies the release ref to children unless a child supplies its own `baseRef`. If omitted, the default `HEAD` is resolved at worktree allocation, not when the script is validated. The source checkout must still be clean, and the ref must resolve to a commit before any worktree is allocated.
 
 Configure the worktree provider, native path layout, base directory, and setup hook in [configuration.md](configuration.md).
 
@@ -370,4 +370,4 @@ Then run it through the native adapter:
 
 The adapter delegates to the named subagent, applies `model`, `skill`, `cwd`, and fork/fresh context metadata, and supports runtime overrides such as `--subagent reviewer`, `--fork`, `--fresh`, and `--bg`.
 
-Prompt templates with `chain:` frontmatter are translated into `workflowScript` and launched through `/prompt-workflow`; `/chain-prompts` is no longer registered.
+Prompt templates with `chain:` frontmatter are translated into a workflow script and launched through `/prompt-workflow`; `/chain-prompts` is no longer registered.

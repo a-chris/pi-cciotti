@@ -27,7 +27,7 @@ A workflow and its children share one mission, created automatically for the run
 
 ```js
 // The workflow and its children share the run's mission automatically.
-{ workflowScript: `return runs.run("main", { agent: "worker", task: "Implement the approved plan" })` }
+{ source: `return runs.run("main", { agent: "worker", task: "Implement the approved plan" })` }
 ```
 
 ### Goal missions

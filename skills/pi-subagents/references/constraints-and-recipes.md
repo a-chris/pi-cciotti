@@ -31,8 +31,8 @@ For durable evidence, copy only the final summary to session memory, a PR body/c
 
 ## Best Practices
 
-- Run subagents asynchronously by default; direct one-child execution is enough for one bounded task, while `workflowScript` is the composition surface for JavaScript control flow and data-dependent branching. Use `async: false` only when the parent must block. See `references/execution-controls.md` → Async/background for wait semantics.
-- For a staged workflow, use ordinary `runs.run(...)`/`runs.all(...)` inside `workflowScript`. Use raw `runs.run(...)`/`runs.all(...)` for conditional or rolling flows.
+- Run subagents asynchronously by default; direct one-child execution is enough for one bounded task, while a workflow script (`source`) is the composition surface for JavaScript control flow and data-dependent branching. Use `async: false` only when the parent must block. See `references/execution-controls.md` → Async/background for wait semantics.
+- For a staged workflow, use ordinary `runs.run(...)`/`runs.all(...)` inside the script. Use raw `runs.run(...)`/`runs.all(...)` for conditional or rolling flows.
 - Keep one writer per cwd/worktree. Parallelize reading, review, and validation; concurrent writers need isolated worktrees. Give every child a cold-start packet with its goal, target/ref, authority, context, success criteria, validation, output, and stop rules.
 - Keep tasks narrow and standalone; do not rely on issue numbers, broad globs, or mid-run messaging to supply missing context.
 - Keep authority with the parent. Escalate unapproved product, scope, architecture, merge, credential, or release decisions; checks, receipts, and review bots are evidence, not authority.
@@ -59,7 +59,7 @@ its overhead. Recipes select a shape; they do not authorize delegation:
 
 ## Error Handling
 
-- **Unknown agent:** run `subagent_control({ action: "list" })`; check scope/precedence and author new orchestration with `workflowScript`, not legacy chains.
+- **Unknown agent:** run `subagent_control({ action: "list" })`; check scope/precedence and author new orchestration with `subagent_workflow` (`source`), not legacy chains.
 - **Setup or discovery confusion:** run `/subagents-doctor`; `subagent_control({ action: "list" })` shows the discovered registry and `subagent_control({ action: "models" })` shows the models available to it.
 - **Missing session file for a fork:** persist the parent session before using `context: "fork"`.
 

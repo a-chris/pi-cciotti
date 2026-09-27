@@ -28,17 +28,17 @@ Children never spawn subagents: delegation is a parent-only capability.
 | Need | Use |
 | --- | --- |
 | One bounded task for one child | direct `{ agent, task }` |
-| JavaScript control flow or data-dependent branching; sequence, fanout, retry, rolling fanout, or aggregation | `workflowScript` with `runs.run(...)` / `runs.all(...)` |
+| JavaScript control flow or data-dependent branching; sequence, fanout, retry, rolling fanout, or aggregation | `subagent_workflow` with `source` |
 | Council of advisors | `../council-mode/SKILL.md` |
 | Management, status, steering, authoring, or inspection | `action` |
 
-`workflowScript` is code-driven: `runs.run(...)` for keyed steps,
+`subagent_workflow` is code-driven: `runs.run(...)` for keyed steps,
 `runs.all([...])` for fanout, plain JavaScript for branching and aggregation.
 Keep scripts portable: use top-level `await`, plain helpers, or explicit Promise
 chains, not nested async helpers. Legacy top-level `chain` / `tasks` inputs and
 durable `.chain.md` execution are inspection or migration material only.
 
-Use ordinary `runs.run(...)` / `runs.all(...)` inside a `workflowScript`. Keep assignments
+Use ordinary `runs.run(...)` / `runs.all(...)` inside a workflow script. Keep assignments
 bounded, but do not add stages or ceremony just to satisfy this skill.
 
 When composing `runs.run(...)` or `runs.all(...)`, always

@@ -6,13 +6,13 @@ Call `{ action: "guide", topic: "tool-reference" }` for this reference or `topic
 
 ## Execution examples
 
-Chaining is code-driven through `workflowScript`. Use `await runs.run(...)` for sequential steps and `await runs.all([{ key, agent, task }, ...])` for ordinary parallel fanout. `runs.all` resolves to an ordered array, not a key map, so use indexes, destructuring, or `.map(...)`, not `results.<key>`. Do not read `.output` from an unawaited `runs.run` launch. Stored `runs.run` promises are only for the advanced rolling fanout pattern under [Workflow steering](#workflow-steering), where every promise is later observed with direct `await`, `Promise.race`, or `Promise.all`. Legacy top-level `chain`, `tasks`, and `parallel` inputs are not supported. Helper functions must be plain functions or explicit Promise chains. Nested `async function` helpers, async arrows, and async methods are rejected so child-launch tracking stays portable across Node and Bun. For permission-sensitive host calls, use an extension-owned named resource such as `{ workflow: "run-ci", args: { command: "npm test" } }`; raw public `workflowScript`/`workflowScriptPath` inputs have unknown resource provenance and cannot call `runs.host`. A resolved resource may internally use `runs.host(key, { kind: "command", command, timeoutMs, output?, role?, provider? })` within its authority ceiling; there is no per-step `cwd`, and commands and relative output paths use the workflow `cwd`. Set `cwd` on the outer `subagent({...})` request instead, or put a trusted directory change in the command (for example, `cd /path/to/worktree && npm test`).
+Chaining is code-driven through a workflow script (`source`). Use `await runs.run(...)` for sequential steps and `await runs.all([{ key, agent, task }, ...])` for ordinary parallel fanout. `runs.all` resolves to an ordered array, not a key map, so use indexes, destructuring, or `.map(...)`, not `results.<key>`. Do not read `.output` from an unawaited `runs.run` launch. Stored `runs.run` promises are only for the advanced rolling fanout pattern under [Workflow steering](#workflow-steering), where every promise is later observed with direct `await`, `Promise.race`, or `Promise.all`. Legacy top-level `chain`, `tasks`, and `parallel` inputs are not supported. Helper functions must be plain functions or explicit Promise chains. Nested `async function` helpers, async arrows, and async methods are rejected so child-launch tracking stays portable across Node and Bun. For permission-sensitive host calls, use an extension-owned named resource such as `{ workflow: "run-ci", args: { command: "npm test" } }`; a raw public `source` script has unknown resource provenance and cannot call `runs.host`. A resolved resource may internally use `runs.host(key, { kind: "command", command, timeoutMs, output?, role?, provider? })` within its authority ceiling; there is no per-step `cwd`, and commands and relative output paths use the workflow `cwd`. Set `cwd` on the outer `subagent({...})` request instead, or put a trusted directory change in the command (for example, `cd /path/to/worktree && npm test`).
 
-Use `{ action: "validate", workflowScript }` to check statically decidable syntax and structure without launching children. It returns `{ ok, errors }` and fails the tool call when `ok` is false. Literal child `baseRef` values are checked against the runtime ref policy. Dynamic keys and values remain subject to runtime checks; static validation does not guess them.
+Every script is checked for statically decidable syntax and structure before any child starts. The result is `{ ok, errors }`, and a script that fails the check fails the tool call. Literal child `baseRef` values are checked against the runtime ref policy. Dynamic keys and values remain subject to runtime checks; static validation does not guess them.
 
-Use `workflowScriptPath` instead of `workflowScript` to load the same JavaScript statement body from a file. The two fields are mutually exclusive. Relative paths resolve against the request `cwd`, and absolute paths pass through. The host reads the file before validation or sandbox execution. The workflow sandbox still has no filesystem access. Missing, unreadable, and empty files fail as file input errors.
+Pass `source: { path }` instead of an inline `source` string to load the same JavaScript statement body from a file. The two shapes are mutually exclusive. Relative paths resolve against the request `cwd`, and absolute paths pass through. The host reads the file before validation or sandbox execution. The workflow sandbox still has no filesystem access. Missing, unreadable, and empty files fail as file input errors.
 
-Raw inline and file-backed scripts accept bounded plain-JSON `args`, including during `validate`. Omitted raw args become `{}`; supplied args are deeply frozen in the sandbox. Normalized args persist in run evidence for diagnosis and exact replay, so never include secrets. Args are data only and do not grant `runs.host` authority.
+Raw inline and file-backed scripts accept bounded plain-JSON `args`. Omitted raw args become `{}`; supplied args are deeply frozen in the sandbox. Normalized args persist in run evidence for diagnosis and exact replay, so never include secrets. Args are data only and do not grant `runs.host` authority.
 
 For permission-extension interoperability, use one of the package-owned named resources with bounded `args` instead of caller-supplied workflow text:
 
@@ -21,25 +21,24 @@ For permission-extension interoperability, use one of the package-owned named re
 { workflow: "run-ci", args: { command: "npm test" } }
 ```
 
-The host resolves the script and authority internally and records bounded provenance in workflow details and receipts. Named resources cannot be combined with `agent`, `task`, `workflowScript`, or `workflowScriptPath`; user/project resource registries are not part of this first slice.
+The host resolves the script and authority internally and records bounded provenance in workflow details and receipts. Named resources cannot be combined with `agent`, `task`, or `source`; user/project resource registries are not part of this first slice.
 
 ```js
-{ workflowScriptPath: "workflows/review.js", args: { target: "src/workflows" }, cwd: "/path/to/project" }
-{ action: "validate", workflowScriptPath: "workflows/review.js", args: { target: "src/workflows" } }
+{ source: { path: "workflows/review.js" }, args: { target: "src/workflows" }, cwd: "/path/to/project" }
 ```
 
 ```js
 // One child; return the child promise explicitly
-{ workflowScript: `return runs.run("main", { agent: "scout", task: "Analyze the auth flow" })` }
+{ source: `return runs.run("main", { agent: "scout", task: "Analyze the auth flow" })` }
 
 // Sequential workflow
-{ workflowScript: `
+{ source: `
   const scan = await runs.run("scan", { agent: "scout", task: "Analyze auth" });
   return (await runs.run("implement", { agent: "worker", task: "Implement from: " + scan.output })).output;
 ` }
 
 // Parallel workflow
-{ workflowScript: `
+{ source: `
   const results = await runs.all([
     { key: "backend", agent: "reviewer", task: "Review backend" },
     { key: "frontend", agent: "reviewer", task: "Review frontend" }
@@ -97,7 +96,7 @@ The workflow trace records the attempt and receipt. Always await, return, or inc
 For advanced rolling fanout, keep the launched `runs.run` promises in ordinary JavaScript data only when every promise is later observed with direct `await`, `Promise.race`, or `Promise.all`. `Promise.race` gives the next completed child, `runs.steer` can challenge a still-running keyed sibling, and `Promise.all` collects the rest. No separate `runs.start`, `runs.next`, or `runs.collect` API is exposed.
 
 ```js
-{ workflowScript: `
+{ source: `
   let pending = [
     { key: "writer", promise: runs.run("writer", { agent: "worker", task: "Draft the fix" }).then((result) => ({ key: "writer", result })) },
     { key: "reviewer", promise: runs.run("reviewer", { agent: "reviewer", task: "Review likely risks" }).then((result) => ({ key: "reviewer", result })) }
@@ -115,7 +114,7 @@ For advanced rolling fanout, keep the launched `runs.run` promises in ordinary J
 
 Use `outputMode: "file-only"` when a saved output may be large and the parent only needs a pointer. The returned text is a compact reference like `Output saved to: /abs/report.md (48.2 KB, 2847 lines). Read this file if needed.` Failed runs and save errors still return normal inline output for debugging.
 
-In workflowScript, give each child an explicit output path when later script steps need a durable file reference. A child with only read-only tools does not need direct filesystem access for `output`: it returns the complete artifact in its final response and the runtime persists it. Children with mutation-capable tools retain the direct-write instruction.
+In a workflow script, give each child an explicit output path when later script steps need a durable file reference. A child with only read-only tools does not need direct filesystem access for `output`: it returns the complete artifact in its final response and the runtime persists it. Children with mutation-capable tools retain the direct-write instruction.
 
 The `output` field is the API binding; a filename mentioned in task text (for example, `Write your findings to exactly this path: report.md`) is only instruction and does not override runtime routing. When a later workflow step or parent needs a durable file, set `output` on `runs.run`/`runs.all` and return the child’s `outputReference`, `outputPathMapping`, or `artifactPaths`; arbitrary literal strings returned by workflow JavaScript are not rewritten. Omitted child output may use a managed aggregate-derived sibling path.
 
@@ -126,7 +125,7 @@ Workflows get `await state.get(key)` and `await state.set(key, value)` through t
 Completed workflow children from the current parent session stay addressable as retained children. Address them by the `runId` each `runs.run` result returned. Resume only rows reported `resumable`; if no row is resumable, start a same-role fallback challenge and label it as fallback. A later workflow continues a resumable child by passing `resume` instead of `agent`:
 
 ```js
-{ workflowScript: `
+{ source: `
   let writer = await runs.run("implement", { agent: "worker", task: "Implement the accepted contract" });
   for (const pass of [1, 2]) {
     if (!writer.runId) throw new Error("writer did not return a retained run id");
@@ -138,7 +137,7 @@ Completed workflow children from the current parent session stay addressable as 
 
 Each workflow key identifies one workflow child. Use a new stable workflow key for every distinct retained resume pass; same-key calls are reused only when launch parameters are identical, and incompatible parameters are rejected.
 
-Inside `workflowScript`, `await runs.run(key, { resume, task })` waits for the revived child to finish and returns its completed output and new `runId`. Each resume can return a new retained run id, so loops must continue from the latest returned `runId`. Top-level `{ action: "resume" }` remains detached and returns a background-run receipt.
+Inside the script, `await runs.run(key, { resume, task })` waits for the revived child to finish and returns its completed output and new `runId`. Each resume can return a new retained run id, so loops must continue from the latest returned `runId`. Top-level `{ action: "resume" }` remains detached and returns a background-run receipt.
 
 For a simple implementation challenge outside a workflow script, send the challenge through `subagent_control({ action: "resume", id: "<retained-writer-run>", message: "Reconsider the implementation and make any better current-scope change." })` only when that writer's `runs.run` result reported a resumable `runId`. If no retained writer is resumable, start a same-role fallback challenge and record why it is a fallback. Use workflow `runs.run({ resume })` only when the script must await the revived writer output before the next step. Do not use `steer` as the sole challenge action for a completed retained child; `steer` with `mode: "follow_up"` only queues text for the next `resume`.
 
@@ -259,7 +258,7 @@ Prefer an inline JSON object. JSON-encoded object strings are tolerated only dur
 When one host-run command is the entire verification contract, use the `gate` shorthand instead of a full `acceptance` object:
 
 ```js
-{ workflowScript: `return runs.run("impl", { agent: "worker", task: "Implement the fix", gate: "npm test" })` }
+{ source: `return runs.run("impl", { agent: "worker", task: "Implement the fix", gate: "npm test" })` }
 ```
 
 `gate` normalizes to verified acceptance with that single command, so the runtime executes it on the host and records the result as evidence. Verification results are memoized per tracked workspace state and effective environment, so an unchanged tree does not rerun the same command. Use explicit `acceptance.verify` when you need multiple commands, timeouts, or custom criteria. `gate` rejects `acceptance` except `false` (treated as omitted), and rejects retained `resume` items. With `worktree: true`, the gate runs inside the child's managed worktree.
@@ -334,13 +333,3 @@ async: true
 Supported: status artifacts, stdout/stderr logs, timeout, and stop. Full stdout and stderr are written to log files, while the in-memory final stdout response and stderr error are limited to their last 64 KiB.
 
 Intentionally unsupported: native Pi child options such as model override, structured output, acceptance/agent contract, tool budgets, fast mode, fork context, skills, or native Pi tools unless the runner explicitly implements them. Foreground/clarify, steer/resume/interrupt-as-pause, and nested subagents are also unsupported.
-
-## Session sharing
-
-Pass `share: true` to export a full session to HTML, upload it to a secret GitHub Gist through your `gh` credentials, and return a `https://shittycodingagent.ai/session/?<gistId>` URL.
-
-```ts
-{ workflowScript: `return runs.run("main", { agent: "scout", task: "..." })`, share: true }
-```
-
-This is disabled by default. Session data may contain source code, paths, environment variables, credentials, or other sensitive output. You need `gh` installed and authenticated.

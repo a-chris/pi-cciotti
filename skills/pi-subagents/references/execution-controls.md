@@ -10,7 +10,7 @@ Agent files can live in:
 - `.pi/agents/**/*.md` — canonical project scope
 - legacy `.agents/**/*.md` — still read for compatibility, but `.pi/agents/` wins on conflicts
 
-Saved chain files may still be discovered for management and existing durable run state, but they are not a public execution surface. Author new orchestration with `workflowScript`.
+Saved chain files may still be discovered for management and existing durable run state, but they are not a public execution surface. Author new orchestration with `subagent_workflow` (`source`).
 
 Precedence is by parsed runtime name:
 
@@ -47,7 +47,7 @@ subagent({
 
 Use direct single-agent execution for one bounded task when no stable key,
 branching, retained-child lookup, or aggregate workflow result is needed. Use a
-`workflowScript` when the parent needs JavaScript control flow or data-dependent
+workflow script (`source` on `subagent_workflow`) when the parent needs JavaScript control flow or data-dependent
 branching, or when the run is part of a larger coordinated wave or a later step
 must resume it by key.
 
@@ -70,7 +70,7 @@ its resolved launch context as `[fresh]` or `[fork]`. Aggregate headers show
 
 ### Scripted workflows
 
-`workflowScript` is the public composition surface when the parent needs
+`source` is the public composition surface when the parent needs
 JavaScript control flow or data-dependent branching. Use
 `runs.run(key, { agent, task, ... })` for keyed children, `runs.all([...])` for
 parallel children, and ordinary JavaScript for sequence, filtering, retries,
@@ -103,7 +103,7 @@ For one host-run verification command, pass `gate: "npm test"` on a `runs.run`/`
 
 If omitted, acceptance is inferred from role, mode, and risk. Use `level: "checked"` for ordinary writer evidence and `level: "verified"` when the runtime should run explicit validation commands. Independent review is orthogonal: use `review: { required: true, agent: "reviewer" }`; reviewer/read-only calls omit `acceptance`. `review-required` means evidence passed but review is pending; `reviewed` means an independent review found no blockers. Never request `level: "reviewed"`; it is recognized only so preflight can return an actionable correction. Disable gates with `{ level: "none", reason: "..." }`; bare `"none"` is rejected and `false` is only a deprecated shorthand. Child-reported command success is evidence, not runtime verification.
 
-Completed workflow children from this parent session stay addressable as retained children. Each `runs.run`/`runs.all` result carries the child's `runId`, which is the handle for a later resume; there is no listing verb on the model surface. A child is resumable only while its persisted session file still exists, so treat an `unavailable` or `not resumable` resume failure as the signal to start a same-role fallback challenge. For a retained-child challenge, use `resume` instead of `steer` when the child is complete. If no retained child is resumable, launch a same-role fallback challenge and label it as fallback. A later workflow continues a resumable child with `runs.run(key, { resume: "<run-id>", task: "follow-up" })`. Inside `workflowScript`, awaiting that call waits for the revived child to finish and returns its completed output and new `runId`; top-level `{ action: "resume" }` remains detached. Pass explicit follow-up task text. Assign each returned child result back to the loop variable because every resume can return a new retained `runId`; always resume the latest returned id. `resume` and `agent` are mutually exclusive, the revived child keeps its stored agent/model/tool contract, and `gate` is rejected on retained resume items.
+Completed workflow children from this parent session stay addressable as retained children. Each `runs.run`/`runs.all` result carries the child's `runId`, which is the handle for a later resume; there is no listing verb on the model surface. A child is resumable only while its persisted session file still exists, so treat an `unavailable` or `not resumable` resume failure as the signal to start a same-role fallback challenge. For a retained-child challenge, use `resume` instead of `steer` when the child is complete. If no retained child is resumable, launch a same-role fallback challenge and label it as fallback. A later workflow continues a resumable child with `runs.run(key, { resume: "<run-id>", task: "follow-up" })`. Inside the script, awaiting that call waits for the revived child to finish and returns its completed output and new `runId`; top-level `{ action: "resume" }` remains detached. Pass explicit follow-up task text. Assign each returned child result back to the loop variable because every resume can return a new retained `runId`; always resume the latest returned id. `resume` and `agent` are mutually exclusive, the revived child keeps its stored agent/model/tool contract, and `gate` is rejected on retained resume items.
 
 Each workflow key identifies one workflow child: use a new stable workflow key for every distinct retained resume pass; same-key calls are reused only when launch parameters are identical, and incompatible parameters are rejected.
 

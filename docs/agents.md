@@ -365,9 +365,9 @@ Discovery uses project-first precedence:
 Use agent defaults, override them at runtime, or disable them:
 
 ```ts
-{ workflowScript: `return runs.run("main", { agent: "scout", task: "..." })` }
-{ workflowScript: `return runs.run("main", { agent: "scout", task: "...", skill: "tmux, safe-bash" })` }
-{ workflowScript: `return runs.run("main", { agent: "scout", task: "...", skill: false })` }
+{ source: `return runs.run("main", { agent: "scout", task: "..." })` }
+{ source: `return runs.run("main", { agent: "scout", task: "...", skill: "tmux, safe-bash" })` }
+{ source: `return runs.run("main", { agent: "scout", task: "...", skill: false })` }
 ```
 
 For chains, `skill` at the top level is additive. A step-level `skill` overrides that step; `false` disables skills for that step.

@@ -199,6 +199,26 @@ describe("served docs match the facade contract", () => {
 		);
 	});
 
+	it("never names the internal script params in model-read prose", () => {
+		// The workflow facade merged `workflowScript` + `workflowScriptPath` into
+		// `source`. Those two names survive only in the RPC/preflight contract, so a
+		// model-read file must not use them as a param or as a feature word — the
+		// model would pass a name the tool does not accept.
+		const exempt = new Set(["docs/extension-api.md"]);
+		const offenders: string[] = [];
+		for (const file of servedFiles) {
+			if (exempt.has(file)) continue;
+			read(file)
+				.split(/\r?\n/)
+				.forEach((text, index) => {
+					for (const match of text.matchAll(/workflowScriptPath|workflowScript/g)) {
+						offenders.push(`${file}:${index + 1} ${match[0]}`);
+					}
+				});
+		}
+		assert.deepEqual(offenders, [], "model-read files must say `source` for the workflow script param");
+	});
+
 	it("keeps the parameter reference to model-facing params", () => {
 		const [table = ""] = read("docs/tool-reference.md").split("### Budget guidance for writers");
 		const documented = [...table.matchAll(/^\| `([a-zA-Z]+)` \|/gm)].map((match) => match[1]!);

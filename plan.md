@@ -1,6 +1,6 @@
 # Plan: Facade rewrite of the subagent tool surface
 
-> Status: **M4 in progress — U1, U2a, U2b-1, U2b-2, U3a (dead schema island) committed. Next: U3b/U5 param sweep. Open owner decision: `maxSubagentDepth` (see M4 log).**
+> Status: **M4 in progress — U1, U2a, U2b-1, U2b-2, U3a, U2b-3 (depth cap removed) committed. Next: U3b/U5 param sweep. No open owner decisions.**
 > VISION updated; decisions resolved.
 > Current milestone: **M4 — Enrichment + param sweep** (config keys for config-enriched params
 > before removing per-call forms; delete REMOVE params end-to-end — types, executor, preflight,
@@ -358,10 +358,10 @@ it documents and each rejected key throws. 2715 / 0 / 11.
   the skill's stale "children spawn subagents when delegated" claim rewritten. 2688 / 0 / 11
   (−27 fanout tests, +1 enforcement test); `in-process-child` 25/25 and `single-execution.part-2`
   164/164 green.
-- **U2b — dead depth plumbing (next).** `maxSubagentDepth` (parse/types/docs — it gates nothing now),
-  `nestedRoute`/`nestedParent` types + status plumbing, `nested-events.ts`,
-  `NestedPathEntry`/`nested-path.ts`, the retained-nested-route tracker, child-side
-  `runFanoutBudget` remnants.
+- **U2b — dead depth plumbing.** Three units, all committed: U2b-1 (child-safe management boundary),
+  U2b-2 (dead `project.*` actions + `projectOpen`), U2b-3 (depth cap). Remaining candidates from the
+  original list: `ExecutorDeps.childRuntime` wholesale removal and child-side `runFanoutBudget`
+  remnants — see the U3b notes; `nested-events.ts` and `nested-path.ts` are **load-bearing** (below).
   - **U2b-1 DONE (`52b84fce`) — removed the child-safe management boundary**: the
     `allowMutatingManagementActions` dep, `MUTATING_MANAGEMENT_ACTIONS`, the seven
     `child-safe subagent fanout mode` guards, and the fixture param. Verified dead first: the executor
@@ -374,21 +374,23 @@ it documents and each rejected key throws. 2715 / 0 / 11.
     resolution and the runner's own self-events read it (`buildNestedRouteIndex`,
     `projectNestedRegistryForRoot`, `findNestedRouteForRootId`, `readNestedRegistry`). Keep the
     nested-event surface; only the child-side route/nestedParent writes are dead.
-  - **`maxSubagentDepth` — OPEN DECISION for the owner, do not delete unilaterally.** Measured after
-    U2a: (a) it is **not** in the plan's Config-enriched or Remove buckets; (b) `config.ts` has **no
-    loader/validator** for it — it reaches `deps.config` only as a JSON passthrough, while
-    `docs/configuration.md:377` documents it as a settings key; (c) the *gate* it feeds
-    (`checkSubagentDepth`, executor 1632/1788/4762/6358/6938) can never fire in production, because
-    `depth` is 0 for any real executor — `childRuntime` is never passed (`index.ts:391` returns for
-    child sessions; index never sets the dep), and the detached runner's `depth` stays 0 as well; so
-    `blocked = depth >= max` is only reachable via `PI_SUBAGENT_MAX_DEPTH=0` or `{"maxSubagentDepth":
-    0}`, i.e. the one live behaviour is an undocumented **total kill switch**. Options: (1) keep the
-    depth cap and give it a validated config key (M4 done-when demands this if it stays
-    config-enriched); (2) remove the cap entirely (frontmatter field + config key + `checkSubagentDepth`
-    + `depth`/`maxDepth` bookkeeping) as dead-but-documented complexity; (3) keep as-is and document
-    depth-0 as the intentional kill switch. **Default: option 2** (VISION: removal over compatibility;
-    a capability with no reachable non-zero depth is not a capability), but it is a user-facing removal
-    of a documented key, so it needs the owner's yes.
+  - **U2b-3 DONE** (`24e16687`) — **`maxSubagentDepth` removed** (owner: "clean up maxSubagentDepth
+    too"; option 2 of the three previously recorded here — remove the cap entirely rather than give it a
+    validator or document depth-0 as an intentional kill switch). Executed the measured mapping, `tsc`-driven: deleted
+    the Recursion Depth Guard section of `types.ts` (all six resolve/check helpers,
+    `DEFAULT_SUBAGENT_MAX_DEPTH`, `SubagentDepthContext`, `SUBAGENT_MAX_DEPTH_ENV`), the three executor
+    depth gates, the `SteeringRecoveryDescriptor` / `RunSyncOptions` / `Async*Params` / chain-step /
+    launch-contract fields, the recovery-descriptor field + its allow-list entry, the
+    `ChildRuntimeConfig.depth`/`maxDepth` fields and their inheritance, and the `depth` parameter of
+    `applyForceTopLevelAsyncOverride` (`depth === 0 && force` ≡ `force`). Hard cutover in the U1/U2a
+    shape: config still setting the key throws by name and is in `FAIL_CLOSED_CONFIG_KEYS`; agent
+    frontmatter fails discovery by name. Kept `depth` on nested-parent addresses and the unrelated
+    render/preflight caps. `recursion-guard.test.ts` deleted (it tested the removed contract); the
+    frontmatter tests now assert the removal error; child-runtime depth assertions deleted, not
+    neutered; both new guards mutation-verified. 2665 / 0 / 11, integration 915 / 0 / 1, `tsc` clean.
+    **Lesson: an integration test declared the helper's old signature in its own local `interface`, so
+    `tsc` could not catch the arity change — signature changes to exported helpers need the test files
+    read, not just typechecked.**
   - **U2b-2 candidate found (measured):** the Herdr-panes removal left `project.open`/`project.status`/
     `project.close` in `SUBAGENT_ACTIONS` (types.ts:2552) with **no handler** in the executor — they
     fall through to "Unknown action", and the enum is built from that list. `authorityPolicy.projectOpen`
@@ -423,6 +425,19 @@ it documents and each rejected key throws. 2715 / 0 / 11.
     facades); U3a removed dead weight, threshold untouched.
 - **U3b** trim the 56-key pool to facade/RPC-derivable keys; **U4** add `topic`/script-source/`mission`
   to the control facade + `normalizeControlParams`; **U5** the REMOVE-list params end-to-end.
+  - **Do not blind-remove `steeringRecovery`.** It is absent from all three facades (delegation 8 keys,
+    workflow 6, control 3) so the model cannot pass it, but the two internal callers (`rpc.ts:526`,
+    `slash-commands.ts:1091`) pass `false` to *suppress* a `recover` callback the executor builds
+    (`params.steeringRecovery === false ? {} : { recover: ... }`). That makes it an internal contract
+    field, which the M4 done-when rule allows. Removing it means hard-wiring the RPC/slash steer
+    ownership semantics — a behaviour change, not a trim. Decide with the owner or leave it as internal.
+  - **`ExecutorDeps.childRuntime` wholesale removal is a separate unit.** After U2b-3 the dep still
+    carries `nestedRoute`/`nestedParent`/`requiredExtensions`/`runFanoutBudget`, and it has **zero
+    assignment sites** in `src` (`index.ts:562` omits it; `index.ts:391` returns before the executor is
+    built for child sessions; no test passes it). Every `inheritedNestedRoute(deps)` read is therefore
+    always `undefined` in production — the same dead-plumbing shape U2a/U2b-1 removed. It is a large
+    blast radius (status tree, run-id resolution, runner self-events), so scope it deliberately rather
+    than folding it into a key trim.
 
 **pi-lens residual (recorded, not fixed — option-a precedent, sessions 4–6).** `src/extension/index.ts`
 reports 26 findings (17 errors: `no-runtime-typeof`, `require-exact-type`,

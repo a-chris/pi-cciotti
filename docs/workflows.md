@@ -10,7 +10,7 @@ Use orchestration as parent-agent guidance, not as a runtime workflow mode. For 
 clarify → scout → worker → fresh reviewers → worker
 ```
 
-Packaged `worker`, `oracle`, and `advisor` declare forked context in their agent definitions. If the parent has no persisted session file or current leaf yet, that implicit default falls back to `fresh`. Pass `context: "fresh"` when you intentionally want a fresh child run, or `context: "fork"` when fork must remain strict.
+Packaged `worker`, `oracle`, and `advisor` declare forked context in their agent definitions. If the parent has no persisted session file or current leaf yet, that implicit default falls back to `fresh`. A call cannot choose the mode; pick an agent whose `defaultContext` matches what you want, and note that `reviewer` resolves to a summary brief.
 
 Child-safety boundaries are enforced at runtime:
 
@@ -285,7 +285,7 @@ const task = [
 return runs.run("test", { agent: "worker", task });
 ````
 
-A plain workflow creates one enclosing mission by default. Its children do not create separate missions. The result exposes the id as `details.missionId`, and human-readable output ends with `Mission: <id> (<status>)`. Pass `mission:false` for an ephemeral workflow with no mission or durable `state` global.
+A plain workflow creates one enclosing mission by default. Its children do not create separate missions. The result exposes the id as `details.missionId`, and human-readable output ends with `Mission: <id> (<status>)`. An ephemeral workflow — no mission for it or its children and no durable `state` global — is set up through the extension API, not from a call param.
 
 ### Repeatable workflows
 

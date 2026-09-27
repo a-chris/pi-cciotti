@@ -58,7 +58,7 @@ const UNREACHABLE_VERBS = new Set(["get", "validate", "mission.create"]);
  * capability the model does not have.
  */
 const NEVER_MODEL_PARAMS = new Set([
-	"topic", "view", "lines", "mode", "index", "childId", "handoffPath", "repo",
+	"view", "lines", "mode", "index", "childId", "handoffPath", "repo",
 	"additional", "share", "sessionDir", "steeringRecovery", "agentScope", "capabilities", "mission",
 ]);
 
@@ -87,15 +87,24 @@ interface CallExample {
 	keys: string[];
 }
 
-/** Parse `subagent*({...})` literals with brace matching that ignores string bodies. */
+/**
+ * Parse every `{...}` argument literal — tool-prefixed (`subagent_control({...})`)
+ * and bare (`{ action: "guide", topic: "..." }`, which the model copies just as
+ * readily) — with brace matching that skips string bodies. Bare literals carry no
+ * tool, so only the rules that do not depend on a tool name apply to them; that
+ * hole is exactly how `{ action: "guide", topic: ... }` and
+ * `{ action: "list", capabilities: true }` survived earlier sweeps.
+ */
 function toolCallExamples(): CallExample[] {
 	const found: CallExample[] = [];
 	for (const file of servedFiles) {
 		const text = read(file);
-		for (const match of text.matchAll(/\b(subagent|subagent_control|subagent_workflow)\(\{/g)) {
-			let i = match.index + match[0].length - 1;
+		let consumedTo = -1;
+		for (const match of text.matchAll(/\{/g)) {
+			if (match.index < consumedTo) continue;
+			const toolMatch = /(subagent_control|subagent_workflow|subagent)\(\s*$/.exec(text.slice(Math.max(0, match.index - 32), match.index));
+			let i = match.index;
 			let depth = 0;
-			let openDepth = 0;
 			let end = -1;
 			const keys: string[] = [];
 			for (; i < text.length; i++) {
@@ -111,16 +120,14 @@ function toolCallExamples(): CallExample[] {
 				}
 				if (char === "{") {
 					depth++;
-					openDepth++;
 				} else if (char === "}") {
 					depth--;
-					openDepth--;
 					if (depth === 0) {
 						end = i;
 						break;
 					}
 				}
-				if (openDepth === 1) {
+				if (depth === 1) {
 					const key = /^([a-zA-Z]+)\s*:/.exec(text.slice(i));
 					if (key) {
 						keys.push(key[1]!);
@@ -131,7 +138,15 @@ function toolCallExamples(): CallExample[] {
 			if (end < 0) continue;
 			const body = text.slice(match.index, end + 1);
 			const verb = /action:\s*\\?"([a-zA-Z][a-zA-Z.0-9-]*)\\?"/.exec(body)?.[1];
-			found.push({ file, line: text.slice(0, match.index).split("\n").length, tool: match[1]!, verb, keys: [...new Set(keys)] });
+			if (!verb) continue;
+			found.push({
+				file,
+				line: text.slice(0, match.index).split("\n").length,
+				tool: toolMatch ? toolMatch[1]! : "(bare)",
+				verb,
+				keys: [...new Set(keys)],
+			});
+			consumedTo = end + 1;
 		}
 	}
 	return found;
@@ -151,7 +166,7 @@ describe("served docs match the facade contract", () => {
 	});
 
 	it("routes control verbs to the subagent_control tool", () => {
-		const offenders = controlExamples().filter((example) => example.tool !== "subagent_control");
+		const offenders = controlExamples().filter((example) => example.tool !== "(bare)" && example.tool !== "subagent_control");
 		assert.deepEqual(
 			offenders.map((e) => `${e.file}:${e.line} ${e.tool}({ action: "${e.verb}" })`),
 			[],

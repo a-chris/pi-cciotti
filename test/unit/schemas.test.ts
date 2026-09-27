@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { SUBAGENT_GUIDE_TOPICS } from "../../src/extension/subagent-guide.ts";
 
 type JsonSchemaNode = Record<string, unknown>;
 
@@ -692,7 +693,7 @@ describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available
 		const control = schemas.SubagentControlParams as JsonSchemaNode;
 		assert.ok(control, "SubagentControlParams schema should exist");
 		const props = properties(control);
-		assert.deepEqual(Object.keys(props).sort(), ["action", "id", "message"].sort());
+		assert.deepEqual(Object.keys(props).sort(), ["action", "id", "message", "topic"].sort());
 		assert.equal(props.id?.type, "string");
 		assert.equal(props.message?.type, "string");
 		assert.equal(props.action?.type, "string");
@@ -700,6 +701,9 @@ describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available
 			"status", "resume", "steer", "stop", "interrupt", "validate",
 			"list", "get", "models", "guide", "mission.create",
 		]);
+		assert.equal(props.topic?.type, "string");
+		assert.deepEqual(props.topic?.enum, [...SUBAGENT_GUIDE_TOPICS]);
+		assert.ok(Boolean(props.topic?.description), "topic should carry a description");
 	});
 
 	it("keeps exactly the declared cross-cutting params shared and all others one-per-tool", () => {
@@ -741,7 +745,7 @@ describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available
 		const sharedByFacade: string[][] = [
 			["task", "agent", "cwd", "async", "worktree", "output"],
 			["async", "worktree", "baseRef"],
-			["id", "message"],
+			["id", "message", "topic"],
 		];
 		const facades = [delegationProps, workflowProps, controlProps];
 		const stripDescription = (node: JsonSchemaNode | undefined): JsonSchemaNode | undefined => {

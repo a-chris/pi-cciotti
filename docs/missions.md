@@ -17,10 +17,10 @@ Records created under the old default `<project>/.pi/subagents/missions` stay on
 
 Behavior:
 
-- Automatic persistence failures do not block the run and are reported as `details.missionWarning`. Explicit `mission` requests remain strict before launch.
+- Automatic persistence failures do not block the run and are reported as `details.missionWarning`. A mission supplied by the extension API is validated strictly before launch.
 - Human receipts end with `Mission: <id> (<status>)`, while JSON/structured output text stays unchanged and `details.missionId` is authoritative.
-- Pass `mission: false` for an intentionally ephemeral workflow. It creates no mission for the workflow or its children and has no `state` global.
-- Set `missions.enabled: false` to disable automatic mission creation; explicit mission fields still work.
+- An intentionally ephemeral workflow creates no mission for itself or its children and has no `state` global; it is set up through the extension API, not from a call param.
+- Set `missions.enabled: false` to disable automatic mission creation.
 - A workflow with a mission can use `await state.get(key)` and `await state.set(key, value)` for durable JSON state. Missing keys return `undefined`. Keys use the same format as `runs.run` keys. Each set takes the state-file lock, reads the latest file, merges the key, and atomically writes `<mission-directory>/<mission-id>/state.json`. The complete file cannot exceed 256 KiB. Each workflow caches the file on its first `get`. A `mission:false` workflow has no `state` global.
 
 A workflow and its children share one mission, created automatically for the run. The explicit `mission` object and the `mission.create` verb are not on the model surface: `subagent_control` carries only `id`, `action`, and `message`, so a mission that needs an authored title, objective, or budget is set up by the operator (or through the extension API) before the work runs.

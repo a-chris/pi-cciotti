@@ -108,7 +108,7 @@ For bounded orchestration, `maxSubagentSpawnsPerRun` limits cumulative logical c
 
 or ask: "Check whether subagents are set up correctly."
 
-For installed-version help, use `/subagents-guide [topic]` to read a packaged topic, or `subagent_control({ action: "guide" })` for the packaged overview. The available topics are `overview`, `workflows`, `agents`, `missions`, `observability`, `tool-reference`, `configuration`, `models`, and `extension-api`.
+For installed-version help, use `subagent_control({ action: "guide", topic: "workflows" })` to read a packaged topic, or `subagent_control({ action: "guide" })` for the packaged overview; `/subagents-guide [topic]` is the slash equivalent. The available topics are `overview`, `workflows`, `agents`, `missions`, `observability`, `tool-reference`, `configuration`, `models`, and `extension-api`.
 
 ## Documentation
 

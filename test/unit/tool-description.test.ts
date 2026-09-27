@@ -127,6 +127,6 @@ describe("registered facade tools", { timeout: 120000 }, () => {
 		assert.equal(byName.subagent_control.description, SUBAGENT_CONTROL_DESCRIPTION);
 		assert.deepEqual(byName.subagent.properties.sort(), ["agent", "async", "cwd", "output", "prequel", "reads", "task", "worktree"].sort());
 		assert.deepEqual(byName.subagent_workflow.properties.sort(), ["args", "async", "baseRef", "source", "workflow", "worktree"].sort());
-		assert.deepEqual(byName.subagent_control.properties.sort(), ["action", "id", "message"].sort());
+		assert.deepEqual(byName.subagent_control.properties.sort(), ["action", "id", "message", "topic"].sort());
 	});
 });

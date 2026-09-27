@@ -39,6 +39,7 @@ export interface SubagentControlFacadeParams {
 	id?: string;
 	action?: SubagentControlAction;
 	message?: string;
+	topic?: string;
 }
 
 /**
@@ -96,12 +97,13 @@ export function normalizeWorkflowParams(params: SubagentWorkflowFacadeParams): S
 }
 
 export function normalizeControlParams(params: SubagentControlFacadeParams): SubagentParamsLike {
-	// SAFETY: id/action/message are the only control params the facade owns and
+	// SAFETY: id/action/message/topic are the only control params the facade owns and
 	// action is constrained to the closed enum by the control schema.
 	return {
 		id: params.id,
 		action: params.action,
 		message: params.message,
+		topic: params.topic,
 	} as SubagentParamsLike;
 }
 

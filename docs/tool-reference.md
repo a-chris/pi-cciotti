@@ -2,7 +2,7 @@
 
 Parameters and actions for the three model-facing tools: `subagent` (one child), `subagent_workflow` (a script or named resource), and `subagent_control` (run and registry verbs). These are what the LLM passes when it calls them; most users ask naturally or use slash commands instead.
 
-Call `{ action: "guide", topic: "tool-reference" }` for this reference or `topic: "workflows"` for [workflow recipes](workflows.md). Use `topic: "agents"` for authoring and `topic: "missions"` for missions. Guide reads do not change the schema or grant authority.
+`{ action: "guide" }` reads the packaged overview (this file is `tool-reference`); `subagent_control({ action: "guide", topic: "workflows" })` reads a specific topic — e.g. `workflows` for [workflow recipes](workflows.md), `agents` for authoring, or `missions` for missions. `/subagents-guide [topic]` is the slash equivalent. Guide reads do not change the schema or grant authority.
 
 ## Execution examples
 
@@ -66,6 +66,7 @@ The host resolves the script and authority internally and records bounded proven
 | `action` | string | `status` | `subagent_control` | One of `status`, `resume`, `steer`, `stop`, `interrupt`, `validate`, `list`, `get`, `models`, `guide`, `mission.create`. Anything else is rejected by the tool schema. |
 | `id` | string | - | `subagent_control`, `bg_wait` | Run id or id prefix for run-targeting actions. |
 | `message` | string | - | `subagent_control` | Guidance for `steer`, follow-up text for `resume`, or the objective for `mission.create`. |
+| `topic` | string | `overview` | `subagent_control` | Guide topic for `action: "guide"`. Omit to read the overview. |
 
 Options that shape a child's runtime (tool budgets, deadlines, attention
 thresholds, output truncation, model and context policy) are **not** per-call
@@ -147,23 +148,16 @@ For a simple implementation challenge outside a workflow script, send the challe
 
 ### Guide
 
-`{ action: "guide" }` reads the packaged `README.md` from the installed version. Pass `topic` to read its packaged `docs/<topic>.md` file instead. Valid topics are `overview`, `workflows`, `agents`, `missions`, `observability`, `tool-reference`, `configuration`, `models`, and `extension-api`. Unknown topics list the valid values and do not change files. Use `/subagents-guide [topic]` for the slash equivalent.
+`{ action: "guide" }` reads the packaged `README.md` from the installed version; `subagent_control({ action: "guide", topic: "workflows" })` reads one specific topic at a time — the packaged `docs/<topic>.md`. Valid topics are `overview`, `workflows`, `agents`, `missions`, `observability`, `tool-reference`, `configuration`, `models`, and `extension-api`. Unknown topics list the valid values and do not change files. `/subagents-guide [topic]` is the slash equivalent.
 
 Agent definitions are not loaded into context by default. The read verbs let the LLM discover and inspect the agent registry at runtime; agent files and overrides are edited in `~/.pi/agent/` or `.pi/`, not by the model. An unknown action returns safe next steps (`status` and `list`) and may suggest a close read-only action.
 
 ```ts
 { action: "list" }
-{ action: "list", agentScope: "project" }
-{ action: "list", capabilities: true }
-{ action: "get", agent: "scout" }
 { action: "models" }
-{ action: "models", agent: "reviewer" }
-{ action: "get", agent: "code-analysis.scout" }
 ```
 
-Rules:
-
-- `capabilities: true` changes `action: "list"` to compact one-line rows and adds `details.agentCapabilities: { agents, restrictedCount, capabilityCeilingSources? }`. Each agent row includes source, aliases, runner type/capabilities, tools, MCP direct tools, mutation tools, model/thinking, default async/timeout, declared acceptance policy/role, output path/mode, skills/extensions, and whether the current capability ceiling allows execution. External CLI rows include `runner.command`, `runner.available`, and a bounded `runner.unavailableReason` when passive PATH/PATHEXT/X_OK lookup cannot find the command. It never includes an agent's system prompt. Rows show declared/default capabilities and command discoverability, not authentication, version compatibility, or successful launch; launch preflight remains authoritative.
+`list` prints one line per discovered agent. `models` prints the provider/model ids and which agents resolve to them. Neither narrows to a single agent: the agent-registry read verbs that need an agent name (`get`, and `models` for one agent) cannot receive it on this tool, so read the agent file for one agent's full field set. Scope selection and the capability rows (`runner.available`, ceiling sources, and the rest) belong to the `/subagents` admin surface, not to a call param.
 
 ### Refinement overlays
 

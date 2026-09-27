@@ -3,6 +3,7 @@
  */
 
 import { Type, type TSchema } from "typebox";
+import { SUBAGENT_GUIDE_TOPICS } from "./subagent-guide.ts";
 
 function keepTopLevelParameterDescriptions<T>(schema: T): T {
 	return pruneNestedDescriptions(schema, []) as T;
@@ -161,7 +162,7 @@ const SubagentParamProperties = {
 		description: "status view: fleet overview or transcript tail with id/dir and optional index.",
 	})),
 	lines: Type.Optional(Type.Integer({ minimum: 1, maximum: 500, description: "Transcript tail lines; default 80." })),
-	topic: Type.Optional(Type.String()),
+	topic: Type.Optional(Type.String({ enum: [...SUBAGENT_GUIDE_TOPICS], description: "Guide topic served by the guide action. Omit to read the overview." })),
 	message: Type.Optional(Type.String({ description: "resume/steer guidance or a control action prompt." })),
 	mode: Type.Optional(Type.String({ enum: ["steer", "follow_up", "auto", "plan", "apply"], description: "steer delivery mode; worktree.cleanup supports plan only, no apply/removal." })),
 	steeringRecovery: Type.Optional(Type.Boolean({ description: "steer: pause/revive after missed acknowledgment; default true in direct steer mode, forced false by extension RPC for exact ownership." })),
@@ -326,11 +327,13 @@ const controlDescriptions = {
 	id: "Run id/prefix; required for run-targeting actions.",
 	action: "What to do; omitted = status.",
 	message: "Guidance for steer/resume.",
+	topic: "Guide topic served by the guide action. Omit to read the overview.",
 };
 const controlProperties = {
 	id: withFacadeDescription(poolField("id"), controlDescriptions.id),
 	action: Type.Optional(Type.String({ enum: [...SUBAGENT_CONTROL_ACTIONS], description: controlDescriptions.action })),
 	message: withFacadeDescription(poolField("message"), controlDescriptions.message),
+	topic: withFacadeDescription(poolField("topic"), controlDescriptions.topic),
 };
 export const SubagentControlParams = keepTopLevelParameterDescriptions(Type.Object(controlProperties));
 

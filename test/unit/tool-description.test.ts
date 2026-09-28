@@ -14,6 +14,7 @@ import {
 	SUBAGENT_WORKFLOW_DESCRIPTION,
 } from "../../src/extension/tool-description.ts";
 import { SUBAGENT_CHILD_ENV } from "../../src/runs/shared/child-runtime-config.ts";
+import * as schemas from "../../src/extension/schemas.ts";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -41,17 +42,85 @@ describe("subagent facade tool descriptions", () => {
 
 	it("points each description at guide topics for depth", () => {
 		assert.match(SUBAGENT_DELEGATION_DESCRIPTION, /guide topics tool-reference, agents/);
-		assert.match(SUBAGENT_DELEGATION_DESCRIPTION, /subagent_control action:list/);
 		assert.match(SUBAGENT_WORKFLOW_DESCRIPTION, /guide topic workflows/);
 		assert.match(SUBAGENT_CONTROL_DESCRIPTION, /guide topic tool-reference/);
 	});
 
 	it("keeps delegation authorization guidance on the delegation tool", () => {
 		assert.match(SUBAGENT_DELEGATION_DESCRIPTION, /Delegate only when authorized/i);
-		// agent is required, so the description names it as part of the core pair.
-		assert.match(SUBAGENT_DELEGATION_DESCRIPTION, /agent \(installed name via subagent_control action:list\) plus task/);
-		assert.match(SUBAGENT_DELEGATION_DESCRIPTION, /Optional: reads \(files\), cwd, async \(background\)/);
-		assert.match(SUBAGENT_DELEGATION_DESCRIPTION, /prequel states current work and what led here/);
+	});
+
+	/**
+	 * A description that glosses its own parameters pays for the same sentence
+	 * twice on every call, because the schema rides in the same payload. Measured
+	 * before this rule: `subagent` listed "Optional: reads (files), cwd, async
+	 * (background), output (durable path), worktree (isolate)" while all five
+	 * params described themselves, and `subagent_control` enumerated verbs that
+	 * `action.enum` already sends.
+	 *
+	 * The previous assertions pinned that gloss (they required "Optional: reads
+	 * (files), cwd, async (background)" and "agent (installed name via ...) plus
+	 * task"), which made the duplication load-bearing exactly as the old bg_wait
+	 * assertions did: keeping the duplicate was mandatory and saying it once in the
+	 * param failed. The facts are unchanged - each now appears once, in the param
+	 * that owns it - and `required: ["task", "agent"]` is machine-enforced.
+	 */
+	it("does not restate its own parameter names or schema enums", () => {
+		const offenders: string[] = [];
+		const tools: Array<[string, string, { properties?: unknown }]> = [
+			["subagent", SUBAGENT_DELEGATION_DESCRIPTION, schemas.SubagentDelegationParams],
+			["subagent_workflow", SUBAGENT_WORKFLOW_DESCRIPTION, schemas.SubagentWorkflowParams],
+			["subagent_control", SUBAGENT_CONTROL_DESCRIPTION, schemas.SubagentControlParams],
+		];
+		for (const [name, description, schema] of tools) {
+			// The gloss form this repo used: a parenthetical attached to a param, or
+			// naming one. `reads (files)`, `async (background)`, `steer (with message)`,
+			// `resource (workflow)`, `get (agent)` — each re-says what that param's own
+			// description says, in the same payload, so it is paid for twice per call.
+			const props = Object.keys((schema.properties ?? {}) as Record<string, unknown>);
+			const verbs = ((schema.properties as { action?: { enum?: string[] } } | undefined)?.action?.enum ?? []).flatMap((verb) => verb.split("."));
+			const vocabulary = new Set([...props, ...verbs]);
+			for (const match of description.matchAll(/\b([a-z][a-zA-Z]{2,})\s*\(([^)]{1,44})\)/g)) {
+				const [, attached, inside] = match;
+				const namesVocabulary = [...(inside as string).matchAll(/[a-zA-Z][a-zA-Z.]{2,}/g)].some((word) => vocabulary.has(word[0]!.toLowerCase()));
+				if (vocabulary.has(attached!.toLowerCase()) || namesVocabulary) {
+					offenders.push(`${name}: "${match[0]}" glosses a param inline; that param's description already says it`);
+				}
+			}
+			// Verbs are discoverable through action.enum; a hand-copied list drifts and
+			// is a second copy of the schema.
+			const quoted = verbs.filter((verb) => new RegExp(`\\b${verb.replace(".", "\\.")}\\b`).test(description));
+			if (verbs.length && quoted.length === verbs.length) {
+				offenders.push(`${name} description enumerates the entire action.enum (${verbs.length} verbs) that the schema already sends`);
+			}
+		}
+		assert.deepEqual(offenders, []);
+	});
+
+	/**
+	 * Two guards, because they catch different regressions.
+	 *
+	 * The description cap is what stops prose inflation: the three descriptions were
+	 * 368 + 288 + 234 = 890 characters, and de-glossed they are 408. The shape cap is
+	 * the backstop for anything the per-form rules above do not recognize, e.g. a new
+	 * bloated parameter. Measured at 7c582f92 the three serialized tools totalled
+	 * 3,457; after this change 3,077, of which ~140 is the async correctness fix.
+	 * Verified: reverting only the descriptions trips the gloss rule and the 500 cap
+	 * (890 chars); reverting descriptions and schemas together also trips this cap.
+	 * Raising either number is a reviewable edit with a measured before/after, which
+	 * is the point. Verified by mutation: reverting the descriptions trips the gloss
+	 * rule and the 500 cap; a 447-char parameter description trips the 3,400 cap.
+	 */
+	it("keeps the whole model-facing tool surface inside its budget", () => {
+		const tools: Array<[string, unknown]> = [
+			[SUBAGENT_DELEGATION_DESCRIPTION, schemas.SubagentDelegationParams],
+			[SUBAGENT_WORKFLOW_DESCRIPTION, schemas.SubagentWorkflowParams],
+			[SUBAGENT_CONTROL_DESCRIPTION, schemas.SubagentControlParams],
+		];
+		const total = tools.reduce((sum, [description, schema]) => sum + description.length + JSON.stringify(schema).length, 0);
+		const descriptions = tools.reduce((sum, [description]) => sum + description.length, 0);
+		assert.ok(descriptions < 500, `three facade descriptions should stay under 500 chars combined, got ${descriptions} (408 after de-glossing, 890 before)`);
+		assert.ok(total < 3_400, `three facade tools (description + schema) should stay under 3400 chars, got ${total} (3077 measured, 3457 pre-fix)`);
 	});
 
 	it("ships no stale text from removed subsystems in any description", () => {

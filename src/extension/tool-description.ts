@@ -21,8 +21,14 @@ export function buildSubagentToolPromptMetadata(): SubagentToolPromptMetadata {
 	};
 }
 
-export const SUBAGENT_DELEGATION_DESCRIPTION = "Delegate one child agent for a focused task: agent (installed name via subagent_control action:list) plus task. prequel states current work and what led here (consumed only for fork/summary contexts). Optional: reads (files), cwd, async (background), output (durable path), worktree (isolate). Delegate only when authorized. Depth: guide topics tool-reference, agents.";
+// A description states what the tool is for plus the policy the schema cannot
+// carry. It must not gloss parameters: the schema ships in the same payload, so
+// `async (background)` says the same thing twice per call, and anything already
+// in `required` or an `enum` is a third copy. `subagent_control` used to
+// enumerate its verbs verbatim; what stays is the read/mutate split, which an
+// enum cannot express.
+export const SUBAGENT_DELEGATION_DESCRIPTION = "Delegate one child agent for a focused task. Delegate only when authorized. Depth: guide topics tool-reference, agents.";
 
-export const SUBAGENT_WORKFLOW_DESCRIPTION = "Run a multi-child workflow by named resource (workflow) or an inline script (source string) / script file (source { path }), with bounded JSON args. async backgrounds it; worktree isolates in a managed git worktree; baseRef sets the worktree base branch/ref. Depth: guide topic workflows.";
+export const SUBAGENT_WORKFLOW_DESCRIPTION = "Run a multi-child workflow from a named resource or a script body, with bounded JSON args. Depth: guide topic workflows.";
 
-export const SUBAGENT_CONTROL_DESCRIPTION = "Manage runs by id: status, resume, steer (with message), stop, interrupt. Read with list, get (agent), models (agent), guide (topic). mission.create (mission) opens a mission. Omit action for status. Depth: guide topic tool-reference.";
+export const SUBAGENT_CONTROL_DESCRIPTION = "Run and registry control. Omit action for status. resume, steer, stop, interrupt, and mission.create mutate; the remaining verbs read. Depth: guide topic tool-reference.";

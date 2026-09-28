@@ -233,7 +233,7 @@ export function createSubagentParamsSchema(): typeof SubagentParams {
 }
 
 // ---------------------------------------------------------------------------
-// Model-facing facade schemas (M1): three small tools replace the single flat
+// Model-facing facade schemas: three small tools replace the single flat
 // 81-param surface. Shared fields are DERIVED projections OF `SubagentParamProperties`
 // BY REFERENCE so their types/shapes are single-sourced with the internal contract
 // and can never drift. Description overrides are the facade layer and sit in one
@@ -329,7 +329,7 @@ const workflowProperties = {
 };
 export const SubagentWorkflowParams = keepTopLevelParameterDescriptions(Type.Object(workflowProperties));
 
-// D10: `validate` left this enum. Its only input is a script body, which lives
+// `validate` left this enum. Its only input is a script body, which lives
 // on subagent_workflow (`source`), so on this tool the verb could never receive
 // what it needs; the static lint stays on the internal contract (RPC/preflight).
 export const SUBAGENT_CONTROL_ACTIONS = [
@@ -351,7 +351,8 @@ const controlProperties = {
 	action: Type.Optional(Type.String({ enum: [...SUBAGENT_CONTROL_ACTIONS], description: controlDescriptions.action })),
 	message: withFacadeDescription(poolField("message"), controlDescriptions.message),
 	topic: withFacadeDescription(poolField("topic"), controlDescriptions.topic),
-	// D10 drivable verbs: get/models read `agent`; mission.create reads `mission`.
+	// Verbs that take an input need a place to carry it: get/models read `agent`,
+	// mission.create reads `mission`.
 	agent: withFacadeDescription(poolField("agent"), controlDescriptions.agent),
 	mission: withFacadeDescription(poolField("mission"), controlDescriptions.mission),
 };

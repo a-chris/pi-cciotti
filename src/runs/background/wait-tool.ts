@@ -15,7 +15,7 @@ export function registerWaitTool(
 ): void {
 	// One short description per tool; the wait-mode depth lives in the
 	// `tool-reference` guide topic (docs/tool-reference.md) and the waitTool
-	// configuration. The #1729 anti-overuse guardrail states ONCE, parent-only (a
+	// configuration. The anti-overuse guardrail states ONCE, parent-only (a
 	// child runtime has no native notifier, so telling a child to "return control"
 	// would suppress the blocking wait it needs to collect its own descendants), and
 	// `test/unit/schemas.test.ts` pins it as an exactly-once invariant across the

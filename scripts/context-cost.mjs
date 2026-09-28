@@ -19,8 +19,9 @@
  *
  * Historical comparison (one-off): git worktree add /tmp/x <ref>, symlink this
  * repo's node_modules into it, and import its src/extension/schemas.ts the same
- * way. Pre-M1 (before 95073427) the single 81-param subagent tool declaration
- * measured 17,416 chars (~4.4-6k tok) — A is now a third of that.
+ * way. Before the surface was split into three tools (commit 95073427), the
+ * single 81-param subagent tool declaration measured 17,416 chars (~4.4-6k tok)
+ * — section A is now less than a third of that.
  */
 
 import {
@@ -134,4 +135,4 @@ console.log("SUM");
 console.log(`  parent turn (A+B)          ${pad(parent, 8)}~${pad(Math.ceil(parent / 4), 7)}~${pad(Math.ceil(parent / DENSE_CHARS_PER_TOKEN), 7)}paid on EVERY model call`);
 console.log(`  child launch, cheapest     ${pad(childLow, 8)}~${pad(Math.ceil(childLow / 4), 7)}~${pad(Math.ceil(childLow / DENSE_CHARS_PER_TOKEN), 7)}${cheapest.label} + boundary, per launch`);
 console.log(`  child launch, priciest     ${pad(childHigh, 8)}~${pad(Math.ceil(childHigh / 4), 7)}~${pad(Math.ceil(childHigh / DENSE_CHARS_PER_TOKEN), 7)}${priciest.label} + boundary, per launch`);
-console.log(`\n(baseline: pre-M1 monolithic tool alone was 17,416 chars; see header comment)`);
+console.log(`\n(baseline: the old single 81-param tool declaration alone was 17,416 chars)`);

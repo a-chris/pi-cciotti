@@ -400,7 +400,7 @@ describe("SubagentParams schema", { skip: !schemasAvailable ? "typebox not avail
 	});
 
 	/**
-	 * The #1729 anti-overuse guardrail is product, not prose: it is what stops the
+	 * The bg_wait anti-overuse guardrail is product, not prose: it is what stops the
 	 * model from holding a blocking tool call open on children that already notify
 	 * the session natively. It was added in commit 1353c734 by repeating one
 	 * sentence in the tool description AND in all five parameter descriptions, so
@@ -441,8 +441,8 @@ describe("SubagentParams schema", { skip: !schemasAvailable ? "typebox not avail
 		assert.equal(countGuardrails(child.description), 0, "child runtime must not inherit the parent's notify-natively guardrail");
 		assert.match(child.description, /no native completion notifier/);
 
-		// One short description per tool (M1 policy: at most 60 words), and the
-		// whole tool must stay well under the weight of a single redundant wait call.
+		// One description per tool, at most 60 words, and the whole tool must stay
+		// well under the weight of a single redundant wait call.
 		for (const tool of [parent, child]) {
 			assert.ok(tool.description.split(/\s+/).filter(Boolean).length <= 60, `bg_wait description exceeds 60 words: ${tool.description}`);
 		}
@@ -718,7 +718,7 @@ describe("SubagentParams schema", { skip: !schemasAvailable ? "typebox not avail
 	});
 });
 
-describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available" : undefined }, () => {
+describe("facade schemas", { skip: !schemasAvailable ? "typebox not available" : undefined }, () => {
 	function properties(schema: unknown): Record<string, JsonSchemaNode> {
 		const props = (schema as JsonSchemaNode | undefined)?.properties;
 		return (props && typeof props === "object" ? props : {}) as Record<string, JsonSchemaNode>;
@@ -788,7 +788,7 @@ describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available
 		assert.equal(props.topic?.type, "string");
 		assert.deepEqual(props.topic?.enum, [...SUBAGENT_GUIDE_TOPICS]);
 		assert.ok(Boolean(props.topic?.description), "topic should carry a description");
-		// D10: the verbs must be drivable — get/models read agent, mission.create reads mission.
+		// The verbs must be drivable: get/models read agent, mission.create reads mission.
 		assert.equal(props.agent?.type, "string");
 		assert.match(String(props.agent?.description ?? ""), /get/);
 		assert.equal(hasAnyOfType(props.mission, "object"), true);
@@ -823,9 +823,10 @@ describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available
 	});
 
 	it("keeps exactly the declared cross-cutting params shared and all others one-per-tool", () => {
-		// D10 relaxed the M1 invariant from a fixed exempt set to this declared share
-		// list (plan.md §3): growing it is a reviewable one-line change with a
-		// "same meaning on each tool" rationale, not a forbidden step.
+		// Params may appear on more than one facade only when they mean the same
+		// thing on each. This list is the reviewable record of that judgement:
+		// growing it is a one-line edit that has to carry a rationale, not a
+		// forbidden step.
 		const sharedRationale: Record<string, string> = {
 			async: "background run, background unless resolved false — identical switch on delegation and workflow",
 			worktree: "isolate in a managed git worktree — identical switch on delegation and workflow",

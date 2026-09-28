@@ -1,5 +1,5 @@
 /**
- * Model-facing tool descriptions (M1): one short description per facade tool,
+ * Model-facing tool descriptions: one short description per facade tool,
  * each at most 60 words. Depth lives in guide topics, reachable via the
  * subagent_control action:guide (e.g. tool-reference, workflows, agents).
  */

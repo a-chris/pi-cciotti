@@ -24,15 +24,6 @@ import { resolveWatchPath } from "../../shared/utils.ts";
 
 export type ControlChannelFs = Pick<typeof fs, "mkdirSync" | "existsSync" | "rmSync" | "watch" | "readdirSync" | "readFileSync" | "realpathSync">;
 
-function writeJsonToExistingDir(filePath: string, payload: object): void {
-	const tempPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${process.pid}.${Date.now()}.${randomUUID()}.tmp`);
-	try {
-		fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), { encoding: "utf-8", flag: "wx" });
-		fs.renameSync(tempPath, filePath);
-	} finally {
-		fs.rmSync(tempPath, { force: true });
-	}
-}
 export type ControlChannelTimers = { setInterval: typeof setInterval; clearInterval: typeof clearInterval };
 const CONTROL_SAFETY_POLL_INTERVAL_MS = 5000;
 type KillFn = (pid: number, signal?: NodeJS.Signals | 0) => unknown;
@@ -167,13 +158,6 @@ export function writeSteerRequestToDir(dir: string, request: SteerRequest): stri
 	if (!validSteerRequest(request)) throw new Error("steer request is malformed or exceeds transport limits.");
 	const requestPath = path.join(dir, steerRequestFileName(request));
 	writeAtomicJson(requestPath, request);
-	return requestPath;
-}
-
-export function writeSteerRequestToExistingDir(dir: string, request: SteerRequest): string {
-	if (!validSteerRequest(request)) throw new Error("steer request is malformed or exceeds transport limits.");
-	const requestPath = path.join(dir, steerRequestFileName(request));
-	writeJsonToExistingDir(requestPath, request);
 	return requestPath;
 }
 

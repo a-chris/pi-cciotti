@@ -7,7 +7,6 @@ export const MISSION_ACTIONS = [
 	"mission.create",
 ] as const;
 
-export type MissionAction = typeof MISSION_ACTIONS[number];
 
 export interface MissionLaunchInput {
 	title: string;

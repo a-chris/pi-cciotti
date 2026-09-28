@@ -829,7 +829,7 @@ describe("facade schemas", { skip: !schemasAvailable ? "typebox not available" :
 		// growing it is a one-line edit that has to carry a rationale, not a
 		// forbidden step.
 		const sharedRationale: Record<string, string> = {
-			async: "background run, background unless resolved false — identical switch on delegation and workflow",
+			async: "background run, default-on — identical switch on delegation and workflow",
 			worktree: "isolate in a managed git worktree — identical switch on delegation and workflow",
 			agent: "name the agent to delegate to / the agent to inspect — same name, same registry",
 		};

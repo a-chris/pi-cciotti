@@ -50,7 +50,7 @@ describe("subagent action recovery", () => {
 		const message = unknownSubagentActionMessage("statsu");
 
 		assert.match(message, /Unknown action: statsu\. Did you mean status\?/);
-		assert.match(message, /Use subagent\(\{ action: "status" \}\)/);
+		assert.match(message, /Use subagent_control\(\{ action: "status" \}\)/);
 		assert.match(message, /Valid: .*status/);
 	});
 

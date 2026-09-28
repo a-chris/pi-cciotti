@@ -138,14 +138,6 @@ export function resolveMcpDirectToolResolution(
 	};
 }
 
-export function resolveMcpDirectToolSelections(
-	mcpDirectTools: string[] | undefined,
-	cwd = process.cwd(),
-	runtimeSnapshotHost?: McpRuntimeSnapshotHost,
-): ResolvedMcpDirectToolSelection[] {
-	return resolveMcpDirectToolResolution(mcpDirectTools, cwd, runtimeSnapshotHost).selections;
-}
-
 function loadMetadataCache(): MetadataCache | null {
 	const cachePath = path.join(getAgentDir(), "mcp-cache.json");
 	let parsed: unknown;
@@ -362,9 +354,6 @@ function extractServers(config: unknown, kind: ImportKind): Record<string, Serve
 	return parseServerEntries(servers);
 }
 
-export function resolveMcpDirectToolNames(mcpDirectTools: string[] | undefined, cwd = process.cwd()): string[] {
-	return resolveMcpDirectToolSelections(mcpDirectTools, cwd).map((selection) => selection.name);
-}
 
 function validateSelectedServerDefinitions(config: McpConfig, selectors: string[]): void {
 	const { servers, tools } = parseMcpDirectToolSelectors(selectors);

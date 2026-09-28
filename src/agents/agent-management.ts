@@ -217,7 +217,7 @@ function modelWarning(ctx: ManagementContext, model: string | undefined): string
 	if (!model) return undefined;
 	const found = ctx.modelRegistry.getAvailable().some((m) => `${m.provider}/${m.id}` === model || m.id === model);
 	if (found) return undefined;
-	return `Warning: model '${model}' is not in the current model registry. Run subagent({ action: "models" }) to list valid provider/id selectors, then use the exact provider/id form (bare ids resolve only when unique).`;
+	return `Warning: model '${model}' is not in the current model registry. Run subagent_control({ action: "models" }) to list valid provider/id selectors, then use the exact provider/id form (bare ids resolve only when unique).`;
 }
 
 function skillsWarning(cwd: string, agent: Pick<AgentConfig, "skills" | "skillPath" | "filePath">): string | undefined {
@@ -1322,7 +1322,7 @@ function handleDisable(params: ManagementParams, ctx: ManagementContext): AgentT
 	const after = resolveEffectiveAgent(discoverAgentsAll(ctx.cwd), raw).agent;
 	if (after?.disabled === true) {
 		ctx.onAgentsChanged?.();
-		return result(`Disabled agent '${runtimeName}' via ${scope} settings override at ${settingsPath}. It is now hidden from runtime discovery and { action: "list" }.`);
+		return result(`Disabled agent '${runtimeName}' via ${scope} settings override at ${settingsPath}. It is now hidden from runtime discovery and subagent_control({ action: "list" }).`);
 	}
 	return result(`Wrote a disabled override for '${runtimeName}' at ${settingsPath}, but the agent is still enabled. A higher-precedence ${after?.override?.scope ?? "project"} override is likely winning. Try agentScope: '${after?.override?.scope ?? "project"}'.`, true);
 }

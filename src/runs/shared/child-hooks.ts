@@ -35,12 +35,6 @@ export function withChildSessionErrorReporting(session: Omit<ChildSessionLaunch,
 	return launch;
 }
 
-export function isReadonlyChildSessionReporting(launch: ChildSessionLaunch): boolean {
-	const proof = ownedProof(launch.hooks);
-	const descriptor = Object.getOwnPropertyDescriptor(launch, "onExtensionError");
-	if (descriptor && (!descriptor.enumerable || !("value" in descriptor))) return false;
-	return proof?.reporting ? proof.reporting.launch === launch && proof.reporting.callback === descriptor?.value : !descriptor && !("onExtensionError" in launch);
-}
 
 /** Admit only own enumerable data: inspecting descriptors must not invoke getters. */
 function dataKeys(value: unknown): string[] | undefined {
@@ -91,14 +85,6 @@ function noBackgroundProviders(): boolean {
 	} catch { return false; }
 }
 
-/** Internal proof of the captured closure/config, not its caller-controlled display name. */
-export function isReadonlyChildHookProfile(hooks: ChildHookExtension[], config: ChildRuntimeConfig): boolean {
-	const proof = ownedProof(hooks);
-	if (!proof) return false;
-	const valid = proof.config === config && readonlyConfig(config, proof.capture) === proof.snapshot && noBackgroundProviders();
-	if (!valid) proof.observation?.deny();
-	return valid && (proof.observation?.check() ?? true);
-}
 
 /** Arm just the next installation; ordinary installations retain the original API/handlers. */
 export function observeReadonlyChildHookDrain(hooks: ChildHookExtension[], enabled: boolean, sessionFile: string): void {

@@ -7,7 +7,7 @@ description: Run a bounded supervisor-mediated advisor council. Use when the use
 
 Council mode is parent-supervised advice for a material decision with real tradeoffs. It is not free-form agent chat, implementation work, a transcript dump, mutation authority, or a council UI.
 
-The parent selects the roster, relays only curated claims, decides validity, and writes the memo. Advisors stay read-only and do not see peer transcripts by default.
+The parent selects the roster, relays only curated claims, decides validity, and writes the memo. Advisors stay read-only and do not see peer transcripts by default. Do not add a chair advisor or let advisors talk to each other.
 
 Before launch, read:
 
@@ -22,18 +22,18 @@ If fewer than two council profiles are available, fill with `oracle`, then `revi
 
 `council-*` profiles live in user or project agent directories, not this package. A profile defines model, tools, context, output defaults, and persistent stance. Keep advisors read-only, disable inherited skills unless needed, and put stance in the profile body instead of inventing per-run role labels.
 
-External-job/package advisors may join only when their provider is registered. Treat them as ordinary advisor names in `runs.all`, but honor their runner limits: they may lack repo tools, structured output, or resumability. Include evidence they cannot read, request JSON text instead of `outputSchema`, and use a fresh-context fallback when they cannot resume for cross-exam.
+External-job/package advisors may join only when their provider is registered — for Surf, the `surf-cli` Pi extension has loaded and `surf-oracle` is listed. Treat them as ordinary advisor names in `runs.all`, but honor their runner limits: they may lack repo tools, structured output, or resumability. Omit child `async` for normal attached council results, include evidence they cannot read themselves, request JSON text instead of `outputSchema`, and use a fresh-context fallback when they cannot resume for cross-exam.
 
 ## Passes
 
-Pass 1 is independent reports. Pass 2 is one cross-exam. Run Pass 3 only when `--max-passes 3` was requested and a material dispute can still be settled by evidence. Never run an unbounded loop.
+Pass 1 is independent reports. Pass 2 is one cross-exam. Run Pass 3 only when `--max-passes 3` was requested and a material dispute can still be settled by evidence. Default the cap to 2 and never exceed 3, whatever the invocation asks for. Never run an unbounded loop.
 
 ## Protocol
 
 1. Write the council brief: question, scope, non-goals, evidence targets, roster, known advisor context modes, and pass cap.
 2. Tell the user the roster, context modes, and pass cap.
 3. Launch one async workflow script with `runs.all` for Pass 1. Use stable keys, `phase: "Council pass 1"`, concise labels, and `output: false` unless separate artifacts are useful. Set `context` only when the profile context is known or a fallback rule requires it.
-4. Return one aggregate Pass 1 receipt. On completion, tell the user completion count, agreement count, dispute count, and whether Pass 2 is needed.
+4. Return one aggregate Pass 1 receipt, then yield instead of polling for completion. On completion, tell the user completion count, agreement count, dispute count, and whether Pass 2 is needed.
 5. Synthesize the claim matrix in the parent: agreements, disputed claims, missing proof, owner decisions, and at most five material relay claims per advisor.
 6. For Pass 2, tell the user which claims are relayed and why they matter. Resume each advisor with a curated challenge packet. A resume needs a retained run id and task; it excludes `agent` and rejects `gate`. Record each new run id; Pass 3 resumes those latest ids with new stable keys.
 7. Stop at convergence, pass cap, failed fallback, or user interruption. The parent writes the final memo.

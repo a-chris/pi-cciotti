@@ -681,10 +681,6 @@ export function findNestedRunMatchesById(id: string, options: { prefix?: boolean
 	return matches;
 }
 
-export function findNestedRunById(id: string): { rootRunId: string; run: NestedRunSummary } | undefined {
-	const match = findNestedRunMatchesById(id)[0];
-	return match ? { rootRunId: match.rootRunId, run: match.run } : undefined;
-}
 
 export function readNestedRegistry(route: NestedRoute): NestedRegistry {
 	validateRouteShape(route);
@@ -861,44 +857,7 @@ export function writeNestedControlRequest(route: NestedRoute, request: Omit<Nest
 	return writeRouteRecord(route.controlInbox, sanitized.ts, sanitized);
 }
 
-export function readNestedControlRequests(route: NestedRoute): Array<NestedControlRequestRecord & { filePath: string }> {
-	validateRouteShape(route);
-	let entries: string[] = [];
-	try {
-		entries = fs.readdirSync(route.controlInbox).filter((entry) => entry.endsWith(".json")).sort();
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-	}
-	const requests: Array<NestedControlRequestRecord & { filePath: string }> = [];
-	for (const entry of entries) {
-		const filePath = path.join(route.controlInbox, entry);
-		if (!containedPath(route.controlInbox, filePath)) continue;
-		try {
-			const stat = fs.statSync(filePath);
-			if (!stat.isFile() || stat.size > MAX_EVENT_BYTES) continue;
-			const request = parseControlRequest(fs.readFileSync(filePath, "utf-8"), route);
-			if (request) requests.push({ ...request, filePath });
-		} catch {
-			continue;
-		}
-	}
-	return requests;
-}
 
-export function writeNestedControlResult(route: NestedRoute, result: Omit<NestedControlResultRecord, "type" | "rootRunId" | "capabilityToken">): void {
-	validateRouteShape(route);
-	assertSafeId("requestId", result.requestId);
-	assertSafeId("targetRunId", result.targetRunId);
-	const record: NestedControlResultRecord = {
-		type: "subagent.nested.control-result",
-		...result,
-		rootRunId: route.rootRunId,
-		capabilityToken: route.capabilityToken,
-	};
-	const sanitized = parseControlResult(JSON.stringify(record), route);
-	if (!sanitized) throw new Error("Nested control result failed validation.");
-	writeRouteRecord(route.eventSink, sanitized.ts, sanitized);
-}
 
 function readControlResultsFromFile(route: NestedRoute, eventPath: string): NestedControlResultRecord[] {
 	if (!containedPath(route.eventSink, eventPath)) return [];
@@ -940,11 +899,6 @@ export function findNestedControlResult(route: NestedRoute, requestId: string, t
 	return undefined;
 }
 
-export function readNestedControlResults(route: NestedRoute): NestedControlResultRecord[] {
-	return listNestedEventFiles(route)
-		.sort()
-		.flatMap((entry) => readControlResultsFromFile(route, path.join(route.eventSink, entry)));
-}
 
 export function attachRootChildrenToSteps<T extends { children?: NestedRunSummary[]; index?: number }>(rootRunId: string, steps: T[] | undefined, children: NestedRunSummary[] | undefined): void {
 	if (!steps?.length) return;
@@ -1057,10 +1011,6 @@ export function nestedSummaryFromAsyncStatus(status: AsyncStatus, asyncDir: stri
 	};
 }
 
-export function isTopLevelAsyncDir(asyncDir: string): boolean {
-	const resolved = path.resolve(asyncDir);
-	return containedPath(DIRS.async, resolved) && !containedPath(path.join(TEMP_ROOT_DIR, "nested-subagent-runs"), resolved);
-}
 
 export function nestedRunScope(rootRunId: string) {
 	assertSafeId("rootRunId", rootRunId);

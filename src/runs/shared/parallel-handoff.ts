@@ -90,26 +90,6 @@ export function readParallelHandoffManifest(manifestPath: string): ParallelHando
 	return validateManifestIdentity(parsed, manifestPath);
 }
 
-export function resolveParallelHandoffChild(input: {
-	manifestPath: string;
-	runId: string;
-	workflowKey?: string;
-	childRunId?: string;
-}): { group: ParallelHandoffGroup; child: ParallelHandoffGroup["children"][number] } | undefined {
-	const manifest = readParallelHandoffManifest(input.manifestPath);
-	if (!manifest) return undefined;
-	if (manifest.runId !== input.runId) throw new Error(`Managed worktree handoff belongs to run '${manifest.runId}', not '${input.runId}'.`);
-	const workflowKey = input.workflowKey?.trim() || undefined;
-	const childRunId = input.childRunId?.trim() || undefined;
-	if (!workflowKey && !childRunId) throw new Error("Parallel handoff child resolution requires workflowKey or childRunId.");
-	const matches = manifest.groups.flatMap((group) => group.children.map((child) => ({ group, child }))).filter(({ child }) => {
-		if (workflowKey && child.workflowKey !== workflowKey) return false;
-		if (childRunId && child.runId !== childRunId) return false;
-		return true;
-	});
-	if (matches.length > 1) throw new Error(`Parallel handoff has multiple children matching workflow identity${workflowKey ? ` '${workflowKey}'` : ` '${childRunId}'`}.`);
-	return matches[0];
-}
 
 function resolveExistingPath(candidate: string): string {
 	try {

@@ -228,9 +228,6 @@ const SubagentParamsSchema = Type.Object(SubagentParamProperties);
 
 export const SubagentParams = keepTopLevelParameterDescriptions(SubagentParamsSchema);
 
-export function createSubagentParamsSchema(): typeof SubagentParams {
-	return SubagentParams;
-}
 
 // ---------------------------------------------------------------------------
 // Model-facing facade schemas: three small tools replace the single flat

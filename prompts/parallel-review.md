@@ -2,7 +2,7 @@
 description: Parallel subagents review
 ---
 
-Launch parallel reviewers for an adversarial review of the current work.
+Launch parallel `reviewer` agents for an adversarial review of the current work.
 
 Use fresh context, not forked context, unless I explicitly ask for forked context. Reviewers should inspect the repository, relevant instructions, and current diff directly from files and commands. Do not rely on the main conversation history.
 
@@ -28,9 +28,7 @@ Choose or adapt angles when the work calls for it:
 
 Prefer three strong reviewers over many vague reviewers.
 
-Give every reviewer a specific task prompt naming its angle. Ask reviewers to return concise, evidence-backed findings with file/line references and suggested fixes. Filter on evidence, not severity: a finding must be concrete and current within the named review target, and supported by source proof, a test or repro, or a contract contradiction. For a diff review, require that the issue is caused or made reachable by that diff. Label findings P0/P1/P2. P0 blocks merge. P1 should be fixed before release. P2 is report-only. End each review with `Merge verdict: BLOCK`, `Merge verdict: OK`, or `Merge verdict: OK with notes`. If nothing qualifies, ask the reviewer to say exactly `No issues found.` The response should be review feedback, not a context summary. Reviewers must not edit files unless I explicitly ask for a writer pass.
-
-Do not default first-pass reviews to `blockers only`. That phrase is valid only for final pre-merge re-checks after P1/P2 findings are already inventoried, or for explicit emergency hotfix lanes where non-blocking findings are intentionally deferred.
+Give every reviewer a specific task prompt naming its angle. Name the `reviewer` agent so each child carries its own contract — evidence bar, P0/P1/P2 labels, merge verdict wording, `No issues found.`, and the blockers-only rule — and put only the review target and angle in the task; do not restate that contract. Do not ask a first-pass review for `blockers only`; that mode is for a final pre-merge re-check or an emergency hotfix.
 
 For a targeted follow-up review, ask only whether the named finding was resolved, whether the fix introduced a new defect in the fix blast radius, and whether prior P1/P2 notes still stand. For bot or PR-comment triage, classify each comment as VALID, STALE, INVALID, or OUT-OF-POLICY against current HEAD, then assign P0/P1/P2 only to VALID comments.
 
@@ -41,9 +39,9 @@ While reviewers run, do your own narrow inspection if useful. After they return,
 
 Do not blindly apply every reviewer suggestion.
 
-Autofix mode: if the invocation contains the exact word `autofix`, treat it as workflow control, not review scope. Remove it before deciding the review target. After synthesis, apply only fixes worth doing now, validate, and summarize. Do not apply optional improvements unless explicitly requested. If there are no fixes worth doing now, do not edit.
+Autofix mode: if the invocation contains the exact word `autofix`, remove it before deciding the review target — it changes what you do with findings, not what counts as one. In autofix mode, after synthesis apply only the fixes worth doing now, validate, and summarize; do not apply optional improvements unless I ask, and do not edit at all if there are no fixes worth doing now.
 
-Without autofix mode, ask before applying fixes unless I already told you to address review feedback. When you ask, end with a compact numbered menu so I can respond with a number. Use wording suited to the findings, but include these choices when applicable:
+Without autofix mode, ask before applying fixes unless I already told you to address review feedback. When you ask, end with this numbered menu so I can reply with a number, adapting wording to the findings:
 
 ```text
 Reply with [1], [2], or further instructions:

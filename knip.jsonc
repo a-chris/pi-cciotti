@@ -1,0 +1,60 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+
+  // Entry points that a static import graph cannot discover. index.ts and install.mjs are
+  // omitted because knip already infers them from package.json "exports" and "bin".
+  // The runner and inspector are spawned as separate processes; the runner-peer shims are
+  // resolved at runtime; the test suites are executed directly by `node --test`.
+  "entry": [
+    "inspector-runner.mjs",
+    "async-retention-discovery-worker.mjs",
+    "runner-peer-loader.mjs",
+    "runner-peer-preload.mjs",
+    "scripts/*.mjs",
+    "src/api/*.ts",
+    "src/inspectors/inspector-runner.ts",
+    "src/runs/background/binary-bootstrap.ts",
+    "src/runs/background/subagent-runner.ts",
+    "test/smoke/*.mjs",
+    "test/smoke/*.ts",
+    "test/unit/*.test.ts",
+    "test/integration/*.test.ts"
+  ],
+  "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.mjs", "*.mjs"],
+
+  // Only report a symbol when nothing imports it AND nothing in its own file uses it, i.e.
+  // genuinely deletable rather than merely over-exported.
+  "ignoreExportsUsedInFile": true,
+
+  // acorn is require()'d through a runtime-resolved path in scripted-workflow.ts, so there is
+  // no static import to follow. oxlint and its plugin pack are driven by .oxlintrc.json rather
+  // than a package script. pi-coding-agent resolves to test/fixtures/...-shim, which is the
+  // host API surface the tests type against.
+  "ignoreDependencies": ["acorn", "oxlint", "@oxlint/plugins", "@earendil-works/pi-coding-agent"],
+
+  // Every entry here is a false positive with a real consumer that knip cannot see.
+  //
+  // settings.ts: createChainDir, resolveChainTemplates and resolveParallelBehaviors are read
+  // as `settings?.<name>` off `await tryImport<any>(...)` in
+  // test/integration/template-resolution.test.ts, which loads the module dynamically and
+  // property-accesses it through `any`. knip 5's ignoreIssues has no per-symbol form, so this
+  // exempts the whole file: a NEW dead export in settings.ts would not be reported. Cost is
+  // measured, not assumed — with entry-exemption off, these three are the only settings.ts
+  // findings, so nothing else is hidden.
+  //
+  // runner-aliases.ts: findHostPeerPackageDir is consumed by test/smoke/clean-install.mjs
+  // through a jiti-loaded copy of the compiled module.
+  //
+  // tool-timeout.ts / external-runs.ts: each keeps one older name as an alias of its
+  // canonical export.
+  //
+  // the vendored pi-coding-agent shim references an optional image library that is not a
+  // dependency of this package.
+  "ignoreIssues": {
+    "src/shared/settings.ts": ["exports"],
+    "src/runs/background/runner-aliases.ts": ["exports"],
+    "src/runs/shared/tool-timeout.ts": ["duplicates"],
+    "src/api/external-runs.ts": ["duplicates"],
+    "test/fixtures/pi-coding-agent-shim/**": ["unlisted"]
+  }
+}

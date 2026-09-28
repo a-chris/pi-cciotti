@@ -7,6 +7,21 @@ on:
     branches: [main]
 
 jobs:
+  dead-code:
+    # knip resolves the module graph statically, so the result is host-independent and
+    # does not need the test matrix. Gating here keeps `npm ci --ignore-scripts` sufficient
+    # (no native Pi SDK build step is needed to read the graph).
+    name: Dead code (knip)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - run: npm run check:dead-code
+
   test:
     strategy:
       matrix:

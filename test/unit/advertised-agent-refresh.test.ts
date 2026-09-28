@@ -77,7 +77,7 @@ it("emits bounded file-only snapshots, refreshes through management, and perform
 			let prompt = noIo(() => emit());
 			assert.match(prompt, /<name>specialist<\/name>/);
 			assert.doesNotMatch(prompt, /hidden-/);
-			assert.match(prompt, /Before execution.*action: "list", capabilities: true/);
+			assert.match(prompt, /Before execution.*subagent_control.*action: "list"/);
 			assert.equal(noIo(() => emit(prompt, ["read"])), "base");
 			activeTools = ["read"];
 			assert.equal(noIo(() => emit(prompt, null)), "base");

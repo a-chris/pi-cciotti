@@ -237,6 +237,28 @@ The persisted `steering` ledger retains 20 requests and replaces the old `steerC
 
 The `/subagents-steer <run-id> [--child <child-id>] <message>` slash command is the host bridge for non-TUI sessions and RPC hosts. `--child` accepts the stable child identity shown in status output and inspect replies (workflow key, child run id, or `step:<index>`) and resolves it to the child index before steering; unknown or ambiguous child ids fail closed. Flags are parsed only between the run id and the message tail — once the message starts, `--` tokens are message text. The bridge always disables pause-and-revive recovery (`steeringRecovery: false`), matching the extension RPC `nonRecoveringSteer` guarantee so the caller keeps authority over the exact child it addressed.
 
+## `bg_wait`
+
+`bg_wait` waits for background work that has no native completion notification and returns its result in the same turn. The tool description carries only the purpose and the policy; the wait modes are here, reached by `subagent_control({ action: "guide", topic: "tool-reference" })`. Configuration semantics for `waitTool.enabled` and `waitTool.defaultTimeoutMs` are in [`waitTool`](configuration.md#waittool).
+
+**When not to call it.** Ordinary async subagent runs notify this session natively when they complete or need attention, so a child being active is not a reason to wait on it — return control and let the notification wake you. Call `bg_wait` for provider jobs, remembered detached foreground runs, and other background work with no native notification path, or when this turn genuinely cannot finish without the result. Headless runs auto-drain current-session subagent work at `agent_end`, so detached children are not abandoned even with no wait call.
+
+```ts
+bg_wait({})                                  // return when the first initially active async run or registered provider item finishes, or when a subagent needs attention
+bg_wait({ all: true })                       // wait for every async run, provider item, and remembered detached foreground descendant active when the call began
+bg_wait({ id: "run-prefix" })                // wait for one run by id or prefix; an already-finished named run returns its stored terminal result references
+bg_wait({ id: "run-prefix", nonBlocking: true }) // subscribe once and return immediately
+bg_wait({ stopOnAttention: false })          // keep waiting through idle or long-thinking attention
+bg_wait({ timeoutMs: 600000 })               // stop waiting after N ms; the work keeps running
+```
+
+- **Blocking window.** `timeoutMs` falls back to `waitTool.defaultTimeoutMs`, then 30 minutes. Window expiry is not an error: the call returns a non-error `window_elapsed` result naming the work still active, and that work keeps running. Wait again or inspect status rather than treating expiry as failure.
+- **Attention.** A blocking wait stops when a run needs attention (`activityState: "needs_attention"` on the run or one of its steps). `stopOnAttention: false` keeps waiting through idle or long-thinking attention, which is what a run-to-completion flow wants.
+- **Non-blocking subscriptions.** `nonBlocking: true` resolves the id to one exact run, persists a wake subscription, and returns a token immediately. The originating session is woken on completion, failure, attention, reconciliation failure, or timeout. It requires `id`, cannot combine with `all`, and needs a long-lived interactive runtime — a blocking-only runtime returns an error instead of subscribing. Armed subscriptions appear in `subagent_control({ action: "status" })` output and are not counted as active child work.
+- **A subscription is not `enabled: false`.** `waitTool.enabled=false` makes direct calls return immediately without registering any future wake; a non-blocking subscription is a durable wake contract.
+- **Provider items.** They are session-scoped and identified exactly, so replacing one job with another cannot hide a completion. Provider extensions must be explicitly loaded in this process — `bg_wait` never loads providers or grants tools. In a child agent, keep `bg_wait` in the child's tool allowlist and load each provider through the agent's `extensions` or `subagentOnlyExtensions`.
+- **Inside a child runtime.** A child does not install the root session's native completion notifier, so a child with `bg_wait` allowlisted uses a blocking wait to collect its own descendants during its turn, then reads the returned result references before synthesizing. Automatic draining at `agent_end` keeps owned work alive but does not synthesize its results.
+
 ## Acceptance gates
 
 Every run resolves an effective acceptance policy. Callers may omit `acceptance` for the inferred default, or set it on single runs, top-level parallel task items, chain steps, static parallel tasks, and dynamic fanout templates.

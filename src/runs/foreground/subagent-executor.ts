@@ -221,7 +221,7 @@ export function unknownSubagentActionMessage(action: string): string {
 		if (DESTRUCTIVE_MANAGEMENT_ACTIONS.has(candidate)) return distance === 1 && requested.length >= candidate.length - 1;
 		return closeMatch;
 	});
-	const nextStep = 'Use subagent({ action: "status" }) to inspect runs or subagent({ action: "list" }) to inspect agents.';
+	const nextStep = 'Use subagent_control({ action: "status" }) to inspect runs or subagent_control({ action: "list" }) to inspect agents.';
 	const validActions = `Valid: ${SUBAGENT_ACTIONS.join(", ")}.`;
 	return suggestion
 		? `Unknown action: ${action}. Did you mean ${suggestion}? ${nextStep} ${validActions}`

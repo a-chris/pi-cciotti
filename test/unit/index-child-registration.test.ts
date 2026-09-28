@@ -227,11 +227,7 @@ describe("subagent extension child mode", () => {
 			registerSubagentExtension(fakePi);
 			if (!registeredTool) throw new Error("tool not registered");
 			let invalidations = 0;
-			let legacyTicks = 0;
-			const context = {
-				state: { subagentResultAnimationTimer: setInterval(() => { legacyTicks += 1; }, 10) },
-				invalidate() { invalidations += 1; },
-			};
+			const context = { invalidate() { invalidations += 1; } };
 			registeredTool.renderResult({
 				content: [{ type: "text", text: "running" }],
 				details: {
@@ -244,9 +240,6 @@ describe("subagent extension child mode", () => {
 				},
 			}, { expanded: false }, { fg(_name, text) { return text; }, bold(text) { return text; } }, context);
 			await new Promise((resolve) => setTimeout(resolve, 120));
-			if (context.state.subagentResultAnimationTimer) clearInterval(context.state.subagentResultAnimationTimer);
-			if (context.state.subagentResultAnimationTimer !== undefined) throw new Error("legacy timer was not cleared");
-			if (legacyTicks !== 0) throw new Error("legacy timer ticked " + legacyTicks + " times");
 			if (invalidations !== 0) throw new Error("foreground result invalidated " + invalidations + " times");
 		`;
 

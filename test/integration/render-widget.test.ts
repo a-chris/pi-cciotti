@@ -3,9 +3,8 @@ import { describe, it } from "node:test";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { extractToolArgsPreview } from "../../src/shared/utils.ts";
 
-const { buildWidgetLines, clearLegacyResultAnimationTimer, compactTaskText, projectAsyncLane, renderWidget, widgetRenderKey } = await import("../../src/tui/render.ts") as {
+const { buildWidgetLines, compactTaskText, projectAsyncLane, renderWidget, widgetRenderKey } = await import("../../src/tui/render.ts") as {
 	buildWidgetLines: (jobs: Array<Record<string, unknown>>, theme: { fg(name: string, text: string): string; bold(text: string): string }, width?: number, expanded?: boolean, frame?: number) => string[];
-	clearLegacyResultAnimationTimer: (context: { state: { subagentResultAnimationTimer?: ReturnType<typeof setInterval> } }) => void;
 	compactTaskText: (task: string | undefined, label?: string) => string | undefined;
 	projectAsyncLane: (job: Record<string, unknown>) => { label?: string; role: string; phase?: string; state: string; gate?: string; next?: string; output?: string; workspace?: string; ref: string; chips: string[] } | undefined;
 	renderWidget: (ctx: Record<string, unknown>, jobs: Array<Record<string, unknown>>) => void;
@@ -2259,21 +2258,6 @@ describe("subagent async widget rendering", () => {
 		} finally {
 			Date.now = originalNow;
 			renderWidget(createUiContext().ctx as never, []);
-		}
-	});
-
-	it("clears legacy result row animation timers", async () => {
-		let ticks = 0;
-		const context = {
-			state: { subagentResultAnimationTimer: setInterval(() => { ticks += 1; }, 10) },
-		};
-		try {
-			clearLegacyResultAnimationTimer(context);
-			await new Promise((resolve) => setTimeout(resolve, 50));
-			assert.equal(context.state.subagentResultAnimationTimer, undefined);
-			assert.equal(ticks, 0, "legacy timer should be cleared before it can tick");
-		} finally {
-			if (context.state.subagentResultAnimationTimer) clearInterval(context.state.subagentResultAnimationTimer);
 		}
 	});
 

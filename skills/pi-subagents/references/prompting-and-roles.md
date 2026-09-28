@@ -14,7 +14,7 @@ workflow fit, and potential quality gains help choose a shape after that gate;
 they do not authorize a launch.
 
 - **Complex work orchestration**: after delegation is authorized, keep the parent on its ordinary strong default model and launch only when a bounded child materially improves evidence, independent review, specialization, useful parallelism, or isolated execution. For hard orchestration or root-cause questions, use a top-reasoning model only as a bounded read-only critic/oracle escalation, never as an autonomous root. Lightweight one-off delegation can stay lightweight.
-- **Advisory review**: use fresh-context `reviewer` agents for adversarial code review; fork to `oracle` only for rare escalation where inherited decisions, drift, model routing, root cause, or hard tradeoffs matter
+- **Advisory review**: use fresh-context `reviewer` agents for adversarial code review; `oracle` reads a summary brief of the parent's decisions, so escalate to it when inherited decisions, drift, model routing, root cause, or hard tradeoffs matter
 - **Implementation handoff**: have `oracle` advise, then `worker` implement only after an approved direction
 - **Recon and planning**: use `scout`, then write a plan when needed
 - **Parallel exploration**: run multiple non-conflicting tasks concurrently

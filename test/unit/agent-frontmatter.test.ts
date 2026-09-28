@@ -667,7 +667,8 @@ Do work
 		assert.equal(worker?.defaultContext, "summary", "worker should default to a summary brief");
 		assert.ok(worker?.contextBrief, "worker should shape its own summary brief");
 		const oracle = agents.find((candidate) => candidate.name === "oracle");
-		assert.equal(oracle?.defaultContext, "fork", "oracle should default to fork context");
+		assert.equal(oracle?.defaultContext, "summary", "oracle should default to a summary brief");
+		assert.ok(oracle?.contextBrief, "oracle should shape its own summary brief");
 		assert.deepEqual(oracle?.aliases, ["advisor"]);
 		assert.doesNotMatch(oracle?.tools?.join(",") ?? "", /contact_supervisor/);
 		for (const name of ["scout", "researcher", "oracle", "reviewer"]) {

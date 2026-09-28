@@ -65,8 +65,8 @@ history down to only the relevant parts. Use it when you want a separate review
 or execution thread that can still reference the parent session history.
 
 Foreground results, async status, fleet, and widget surfaces label each child with
-its resolved launch context as `[fresh]` or `[fork]`. Aggregate headers show
-`[mixed]` when a run uses both modes.
+its resolved launch context as `[fresh]`, `[fork]`, or `[summary]`. Aggregate headers
+show `[mixed]` when a run uses more than one mode.
 
 ### Scripted workflows
 

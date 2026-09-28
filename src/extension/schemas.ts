@@ -230,7 +230,7 @@ export const SubagentParams = keepTopLevelParameterDescriptions(SubagentParamsSc
 
 
 // ---------------------------------------------------------------------------
-// Model-facing facade schemas (M1): three small tools replace the single flat
+// Model-facing facade schemas: three small tools replace the single flat
 // 81-param surface. Shared fields are DERIVED projections OF `SubagentParamProperties`
 // BY REFERENCE so their types/shapes are single-sourced with the internal contract
 // and can never drift. Description overrides are the facade layer and sit in one
@@ -277,7 +277,11 @@ const delegationDescriptions = {
 	task: "The action to do or problem to solve.",
 	agent: "One of the installed agent names (via subagent_control action:list). Required: no default agent exists.",
 	cwd: "Working directory; default: session directory.",
-	async: "Background run; omit for background (default), set false to block the parent.",
+	// Was "default false", which is wrong: an omitted `async` resolves through
+	// agent.defaultAsync then asyncByDefault, and resolveAsyncByDefault({}) === true,
+	// so it runs in the BACKGROUND (docs/tool-reference.md says "default-on").
+	// The full resolution chain lives in that table; keep this a one-liner.
+	async: "Run in the background. When omitted the run is background by default; set false to block the parent.",
 	output: "Durable result path, or false.",
 	worktree: "Isolate in a managed git worktree; default false.",
 };
@@ -299,7 +303,15 @@ const workflowDescriptions = {
 	workflow: "Named workflow resource, e.g. \"review\" or \"run-ci\".",
 	source: "Inline script body, or { path } to a script file.",
 	args: "Bounded JSON inputs for the workflow.",
-	async: "Background run; omit for background (default), set false to block the parent.",
+	// Workflows are background UNLESS async:false (`asyncWorkflow = async !== false`,
+	// subagent-executor.ts:4732) - unlike delegation, asyncByDefault does not gate
+	// them. Was "default false", which was wrong on both counts.
+	// Shared verbatim with SubagentWorkflowParams (declared share list, schemas.test).
+	// One text is true for both routes: delegation resolves an omitted async through
+	// agent.defaultAsync then asyncByDefault (resolveAsyncByDefault({}) === true), and
+	// workflows use `async !== false`. Both background unless resolved false. Was
+	// "default false", which inverted the default on both routes.
+	async: "Run in the background. When omitted the run is background by default; set false to block the parent.",
 	worktree: "Isolate in a managed git worktree; default false.",
 	baseRef: "Branch/ref for worktree isolation.",
 };
@@ -314,7 +326,7 @@ const workflowProperties = {
 };
 export const SubagentWorkflowParams = keepTopLevelParameterDescriptions(Type.Object(workflowProperties));
 
-// D10: `validate` left this enum. Its only input is a script body, which lives
+// `validate` left this enum. Its only input is a script body, which lives
 // on subagent_workflow (`source`), so on this tool the verb could never receive
 // what it needs; the static lint stays on the internal contract (RPC/preflight).
 export const SUBAGENT_CONTROL_ACTIONS = [
@@ -336,7 +348,8 @@ const controlProperties = {
 	action: Type.Optional(Type.String({ enum: [...SUBAGENT_CONTROL_ACTIONS], description: controlDescriptions.action })),
 	message: withFacadeDescription(poolField("message"), controlDescriptions.message),
 	topic: withFacadeDescription(poolField("topic"), controlDescriptions.topic),
-	// D10 drivable verbs: get/models read `agent`; mission.create reads `mission`.
+	// Verbs that take an input need a place to carry it: get/models read `agent`,
+	// mission.create reads `mission`.
 	agent: withFacadeDescription(poolField("agent"), controlDescriptions.agent),
 	mission: withFacadeDescription(poolField("mission"), controlDescriptions.mission),
 };
@@ -344,20 +357,20 @@ export const SubagentControlParams = keepTopLevelParameterDescriptions(Type.Obje
 
 const SubagentWaitParamsSchema = Type.Object({
 	id: Type.Optional(Type.String({
-		description: "Async run or remembered detached foreground run id/prefix to wait for one specific run. Ordinary async subagent runs already notify this session natively; use bg_wait for provider, detached, or other background work without native notification, or when same-turn blocking results are truly needed. Omit to wait across every active async run started in this session only when a same-turn wait is truly needed.",
+		description: "Async run or remembered detached foreground run id/prefix to wait for one specific run. A named run that already finished returns its stored terminal result references. Omit to wait across every active async run started in this session.",
 	})),
 	nonBlocking: Type.Optional(Type.Boolean({
-		description: "When true, resolve id to one exact run, persist a wake subscription, and return immediately. Use this only for provider, detached, or other background work without a native completion notification; ordinary async subagent runs already notify this session natively and do not need a subscription. The originating session is woken on completion, failure, attention, reconciliation failure, or timeout. Requires id and cannot be combined with all.",
+		description: "With id, resolve that run once, persist a wake subscription, and return immediately. The originating session is woken on completion, failure, attention, reconciliation failure, or timeout. Requires id, cannot be combined with all, and needs a long-lived interactive runtime - a blocking-only runtime errors instead. Armed subscriptions appear in status output and differ from waitTool.enabled=false, which returns immediately without registering any future wake.",
 	})),
 	all: Type.Optional(Type.Boolean({
-		description: "Wait for ALL active runs to finish. Ordinary async subagent runs already notify this session natively; use all only when a same-turn result from tracked background work is truly needed. Default false: return when the first tracked run or provider item finishes or needs attention. Ignored when id targets a single run.",
+		description: "Wait for every async run, provider item, and remembered detached foreground descendant that was active when the call began. Default false: return as soon as the first one finishes or needs attention. Ignored when id targets a single run.",
 	})),
 	timeoutMs: Type.Optional(Type.Integer({
 		minimum: 1,
-		description: "Give up waiting after this many milliseconds (the runs keep going regardless). Ordinary async subagent runs already notify this session natively; use a wait timeout only when same-turn results are truly needed for provider, detached, or other background work without native notification. Defaults to config waitTool.defaultTimeoutMs, then 1800000 (30 minutes). Window expiry is a non-error active-work result.",
+		description: "Give up waiting after this many milliseconds (the runs keep going regardless). Defaults to config waitTool.defaultTimeoutMs, then 1800000 (30 minutes). Window expiry is a non-error window_elapsed result naming the work still active.",
 	})),
 	stopOnAttention: Type.Optional(Type.Boolean({
-		description: "For a blocking wait that is truly needed, stop when a run needs attention by default. Set false to keep waiting through idle or long-thinking attention. Attention from a long-running or stuck child is surfaced rather than silently waited through.",
+		description: "Blocking waits stop when a run needs attention by default. Set false to keep waiting through idle or long-thinking attention.",
 	})),
 });
 

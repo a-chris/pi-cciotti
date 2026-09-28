@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import { SUBAGENT_GUIDE_TOPICS } from "../../src/extension/subagent-guide.ts";
+import { resolveAsyncByDefault } from "../../src/extension/config.ts";
 
 type JsonSchemaNode = Record<string, unknown>;
 
@@ -380,19 +383,93 @@ describe("SubagentParams schema", { skip: !schemasAvailable ? "typebox not avail
 		const stopOnAttention = properties?.stopOnAttention;
 		const timeoutMs = properties?.timeoutMs;
 		assert.ok(id, "id schema should exist");
-		assert.match(String(id.description ?? ""), /ordinary async subagent runs already notify this session natively/i);
-		assert.match(String(id.description ?? ""), /same-turn blocking results are truly needed/);
+		assert.match(String(id.description ?? ""), /id\/prefix to wait for one specific run/);
+		assert.match(String(id.description ?? ""), /already finished returns its stored terminal result references/);
 		assert.ok(nonBlocking, "nonBlocking schema should exist");
-		assert.match(String(nonBlocking.description ?? ""), /provider, detached, or other background work without a native completion notification/i);
-		assert.match(String(nonBlocking.description ?? ""), /do not need a subscription/);
+		assert.match(String(nonBlocking.description ?? ""), /persist a wake subscription, and return immediately/);
+		assert.match(String(nonBlocking.description ?? ""), /woken on completion, failure, attention, reconciliation failure, or timeout/);
+		assert.match(String(nonBlocking.description ?? ""), /cannot be combined with all/);
 		assert.ok(all, "all schema should exist");
-		assert.match(String(all.description ?? ""), /same-turn result.*truly needed/);
+		assert.match(String(all.description ?? ""), /every async run, provider item, and remembered detached foreground descendant/);
 		assert.doesNotMatch(String(all.description ?? ""), /spawn a replacement/);
 		assert.ok(stopOnAttention, "stopOnAttention schema should exist");
 		assert.equal(stopOnAttention.type, "boolean");
 		assert.match(String(stopOnAttention.description ?? ""), /idle or long-thinking attention/);
 		assert.match(String(timeoutMs?.description ?? ""), /waitTool\.defaultTimeoutMs/);
-		assert.match(String(timeoutMs?.description ?? ""), /non-error active-work result/);
+		assert.match(String(timeoutMs?.description ?? ""), /non-error window_elapsed result/);
+	});
+
+	/**
+	 * The bg_wait anti-overuse guardrail is product, not prose: it is what stops the
+	 * model from holding a blocking tool call open on children that already notify
+	 * the session natively. It was added in commit 1353c734 by repeating one
+	 * sentence in the tool description AND in four of the five parameter descriptions, so
+	 * `bg_wait` reached 4,395 chars — 55% of the parent tool surface, paid on every
+	 * model call — while saying nothing a single copy plus the guide did not.
+	 *
+	 * The old assertion required that sentence inside the `id` parameter
+	 * description, which made the duplication load-bearing in both directions:
+	 * deleting it failed the test, and adding more copies anywhere else passed.
+	 * These assert the opposite invariant — the
+	 * guardrail survives, and it appears exactly once across the whole surface.
+	 * The behavioral depth it was protecting stays taught at the decision point,
+	 * where the launch result already says it (`formatAsyncStartedMessage`) and in
+	 * the `tool-reference` guide topic.
+	 */
+	it("states the bg_wait anti-overuse guardrail exactly once, not once per param", async () => {
+		const { registerWaitTool } = await import("../../src/runs/background/wait-tool.ts");
+		const grab = (child?: { nestedRootRunId?: string }): { description: string } => {
+			const registered: Array<{ name: string; description: string }> = [];
+			// registerWaitTool only reads `registerTool` when it declares the tool, so
+			// the rest of the API surface is irrelevant here (same stub shape as
+			// wait-subscriptions.test.ts).
+			registerWaitTool({ registerTool: (value: unknown) => registered.push(value as { name: string; description: string }) } as never, {} as never, true, undefined, undefined, child);
+			assert.deepEqual(registered.map((entry) => entry.name), ["bg_wait"], "bg_wait must always be registered");
+			return registered[0]!;
+		};
+		const countGuardrails = (text: string): number => (text.match(/already notify this session natively/gi) ?? []).length;
+		const parent = grab();
+		const serializedTool = JSON.stringify({ description: parent.description, parameters: SubagentWaitParams });
+
+		// The guardrail is present, and stated once for the entire tool.
+		assert.equal(countGuardrails(parent.description), 1, "guardrail belongs in the description exactly once");
+		assert.equal(countGuardrails(serializedTool), 1, `guardrail must not be restated per-parameter; found ${countGuardrails(serializedTool)} copies`);
+		assert.match(parent.description, /do not call this merely to wait on a child/);
+
+		// A child runtime has no native notifier, so the parent guardrail must not
+		// leak into it — it would suppress the blocking wait a child needs.
+		const child = grab({ nestedRootRunId: "root-run" });
+		assert.equal(countGuardrails(child.description), 0, "child runtime must not inherit the parent's notify-natively guardrail");
+		assert.match(child.description, /no native completion notifier/);
+
+		// One description per tool, at most 60 words, and the whole tool must stay
+		// well under the weight of a single redundant wait call.
+		for (const tool of [parent, child]) {
+			assert.ok(tool.description.split(/\s+/).filter(Boolean).length <= 60, `bg_wait description exceeds 60 words: ${tool.description}`);
+		}
+		const total = parent.description.length + JSON.stringify(SubagentWaitParams).length;
+		assert.ok(total < 2_200, `expected the whole bg_wait tool under 2200 chars, got ${total}`);
+	});
+
+	it("documents the relocated bg_wait wait modes in a served guide topic", () => {
+		// Cutting the description must not lose information: the six call shapes the
+		// description used to enumerate have to be readable by a model that follows
+		// the description's "Depth: guide topic tool-reference." pointer.
+		const doc = readFileSync(join(process.cwd(), "docs", "tool-reference.md"), "utf-8");
+		assert.ok(SUBAGENT_GUIDE_TOPICS.includes("tool-reference"), "tool-reference must stay a loadable guide topic");
+		const section = doc.slice(doc.indexOf("\n## `bg_wait`"));
+		assert.ok(section.length > 200, "tool-reference must carry a bg_wait section");
+		for (const fact of [
+			/first initially active async run|first .* finishes/s,
+			/all: true/,
+			/nonBlocking: true/,
+			/stopOnAttention: false/,
+			/timeoutMs/,
+			/window_elapsed/,
+			/enabled=false/,
+		]) {
+			assert.match(section, fact, `bg_wait guide section lost a wait mode: ${fact}`);
+		}
 	});
 
 	it("does not emit description-only schema nodes", () => {
@@ -642,7 +719,7 @@ describe("SubagentParams schema", { skip: !schemasAvailable ? "typebox not avail
 	});
 });
 
-describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available" : undefined }, () => {
+describe("facade schemas", { skip: !schemasAvailable ? "typebox not available" : undefined }, () => {
 	function properties(schema: unknown): Record<string, JsonSchemaNode> {
 		const props = (schema as JsonSchemaNode | undefined)?.properties;
 		return (props && typeof props === "object" ? props : {}) as Record<string, JsonSchemaNode>;
@@ -712,7 +789,7 @@ describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available
 		assert.equal(props.topic?.type, "string");
 		assert.deepEqual(props.topic?.enum, [...SUBAGENT_GUIDE_TOPICS]);
 		assert.ok(Boolean(props.topic?.description), "topic should carry a description");
-		// D10: the verbs must be drivable — get/models read agent, mission.create reads mission.
+		// The verbs must be drivable: get/models read agent, mission.create reads mission.
 		assert.equal(props.agent?.type, "string");
 		assert.match(String(props.agent?.description ?? ""), /get/);
 		assert.equal(hasAnyOfType(props.mission, "object"), true);
@@ -721,10 +798,36 @@ describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available
 		assert.ok(!(props.action?.enum as readonly string[]).includes("validate"), "validate left the model surface together with its script input");
 	});
 
+	/**
+	 * The facade advertised `async` as "Background run; default false." for its whole
+	 * life while the executor read `async ?? asyncByDefault` and
+	 * resolveAsyncByDefault({}) returned true. A model that believed the schema would
+	 * omit `async` expecting a blocking call, get a background run, and then wait on a
+	 * run it never asked for. docs/tool-reference.md said "default-on" the entire
+	 * time; only the model-facing schema was wrong. Derived from the resolver rather
+	 * than asserted as a literal, so the prose cannot drift from the code again.
+	 */
+	it("states the real async default instead of inverting it", () => {
+		const backgroundByDefault = resolveAsyncByDefault({});
+		assert.equal(backgroundByDefault, true, "baseline: an omitted asyncByDefault means background");
+		for (const [name, schema] of [
+			["subagent", schemas.SubagentDelegationParams],
+			["subagent_workflow", schemas.SubagentWorkflowParams],
+		] as const) {
+			const description = String(properties(schema).async?.description ?? "");
+			assert.ok(description.length > 0, `${name} should describe async`);
+			if (backgroundByDefault) {
+				assert.doesNotMatch(description, /default (false|off)/i, `${name} claims a non-background default the resolver contradicts: ${description}`);
+				assert.match(description, /background by default|Run in the background/i, `${name} should say the run backgrounds when async is omitted`);
+			}
+		}
+	});
+
 	it("keeps exactly the declared cross-cutting params shared and all others one-per-tool", () => {
-		// D10 relaxed the M1 invariant from a fixed exempt set to this declared share
-		// list (plan.md §3): growing it is a reviewable one-line change with a
-		// "same meaning on each tool" rationale, not a forbidden step.
+		// Params may appear on more than one facade only when they mean the same
+		// thing on each. This list is the reviewable record of that judgement:
+		// growing it is a one-line edit that has to carry a rationale, not a
+		// forbidden step.
 		const sharedRationale: Record<string, string> = {
 			async: "background run, default-on — identical switch on delegation and workflow",
 			worktree: "isolate in a managed git worktree — identical switch on delegation and workflow",

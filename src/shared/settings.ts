@@ -150,14 +150,6 @@ export function createChainDir(runId: string, baseDir?: string): string {
 	return chainDir;
 }
 
-export function removeChainDir(chainDir: string): void {
-	try {
-		fs.rmSync(chainDir, { recursive: true });
-	} catch {
-		// Chain cleanup is best-effort. Runs can already have cleaned their temp dir.
-	}
-}
-
 export function cleanupOldChainDirs(): void {
 	if (!fs.existsSync(CHAIN_RUNS_DIR)) return;
 	const now = Date.now();
@@ -388,21 +380,6 @@ export function resolveParallelBehaviors(
 		const model = task.model ?? config.model;
 		return { output, outputMode, reads, progress, skills, model };
 	});
-}
-
-/**
- * Create subdirectories for parallel step outputs
- */
-export function createParallelDirs(
-	chainDir: string,
-	stepIndex: number,
-	taskCount: number,
-	agentNames: string[],
-): void {
-	for (let i = 0; i < taskCount; i++) {
-		const subdir = path.join(chainDir, `parallel-${stepIndex}`, `${i}-${agentNames[i]}`);
-		fs.mkdirSync(subdir, { recursive: true });
-	}
 }
 
 export type { ParallelTaskResult } from "../runs/shared/parallel-utils.ts";

@@ -466,9 +466,6 @@ export function resultCandidateFilesForToolCall(resultsDir: string, toolCallId: 
 	return resultFilesFromIndexDir(resultsDir, toolCallIndexDir(resultsDir, toolCallId), true);
 }
 
-export function missionObserverResultFiles(resultsDir: string): string[] {
-	return resultFilesFromIndexDir(resultsDir, observerIndexDir(resultsDir, MISSION_OBSERVER));
-}
 
 export function missionObserverResultCandidateFiles(resultsDir: string): string[] {
 	return resultFilesFromIndexDir(resultsDir, observerIndexDir(resultsDir, MISSION_OBSERVER), true);

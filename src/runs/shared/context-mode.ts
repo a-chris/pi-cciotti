@@ -5,9 +5,6 @@ export function isContextMode(value: ContextMode | undefined): value is ContextM
 	return value === "fresh" || value === "fork" || value === "summary";
 }
 
-export function isContextSummary(value: ContextSummary | undefined): value is ContextSummary {
-	return value === "fresh" || value === "fork" || value === "summary" || value === "mixed";
-}
 
 export function summarizeContextModes(modes: Array<ContextMode | undefined>): ContextSummary | undefined {
 	const resolved = modes.filter(isContextMode);

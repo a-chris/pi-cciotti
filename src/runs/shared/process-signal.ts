@@ -1,6 +1,3 @@
-export function formatProcessSignalError(signal: string): string {
-	return `Subagent process terminated by signal ${signal}.`;
-}
 
 export function formatMidToolExitError(input: {
 	toolName: string;

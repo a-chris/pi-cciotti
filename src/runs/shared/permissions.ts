@@ -1,6 +1,3 @@
-import * as fs from "node:fs";
-import * as path from "node:path";
-
 export type PermissionDecision = "allow" | "ask" | "deny";
 export type PermissionRules = Record<string, PermissionDecision>;
 export interface PermissionConfig { rules?: PermissionRules }
@@ -79,8 +76,3 @@ export function permissionArgsPreview(input: unknown): string {
 	return `${preview}…`;
 }
 
-export function appendPermissionAudit(filePath: string | undefined, record: Record<string, unknown>): void {
-	if (!filePath) return;
-	fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });
-	fs.appendFileSync(filePath, `${JSON.stringify(record)}\n`, { encoding: "utf-8", mode: 0o600 });
-}

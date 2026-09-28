@@ -18,16 +18,25 @@ it("context-cost script reports a positive parent-turn total from live sources",
 	assert.ok(titles.some((title) => title.startsWith("A.")), "tool declaration section present");
 	assert.ok(titles.some((title) => title.startsWith("B.")), "system prompt section present");
 	assert.ok(titles.some((title) => title.startsWith("C.")), "child launch section present");
+	const declarations = report.sections.find((section) => section.title.startsWith("A."))!;
+	// Bound the tool declarations, not the whole parent turn. The parent turn also
+	// counts <advertised_subagents>, which grows with however many agents happen to
+	// be installed locally (720 chars on the machine that set this bound), so an
+	// upper limit on it is a false positive waiting for a contributor with a fuller
+	// agent directory - and the 9,853/7,431 pair this assertion used to quote came
+	// from a different local set than any later measurement reproduced.
+	//
+	// Measured tool declarations: 17,416 when one 81-parameter tool did everything,
+	// then 8,025 before the bg_wait de-duplication, 5,603 after it, and 5,261 after
+	// the same changes to the three facade tools. The bound sits above the current
+	// value and below both regressions, so either one fails here rather than
+	// spending chars per call unnoticed; the per-tool ceilings in schemas.test.ts
+	// (bg_wait) and tool-description.test.ts (the three facades) say which tool moved.
+	assert.ok(
+		declarations.subtotalChars < 5_500,
+		`tool declarations regressed toward the pre-fix surface (17,416 with one monolithic tool, 8,025 before the bg_wait de-duplication, 5,603 before the facade de-glossing): ${declarations.subtotalChars}`,
+	);
 	assert.ok(report.parentTurnChars > 5_000, `parent turn total should be substantial, got ${report.parentTurnChars}`);
-	// Pre-M1, the tool declarations alone were 17,416 chars; reverting the facade
-	// split would land near 19k. Anything above 9.5k is a regression to catch.
-	// Measured: 9,853 before the bg_wait description/schema de-duplication, 7,431
-	// after (bg_wait alone was 4,395 chars — 55% of the tool surface — because the
-	// #1729 guardrail was restated in the description and in all five parameter
-	// descriptions). The bound sits BELOW that 9,853 pre-fix total, so re-inflating
-	// that tool fails here instead of quietly spending 2.4k chars per call again;
-	// the exact per-tool ceiling lives in schemas.test.ts.
-	assert.ok(report.parentTurnChars < 9_500, `parent turn total regressed toward the pre-M1 monolith (was 17,416 chars for the tool alone, 9,853 before the bg_wait de-duplication): ${report.parentTurnChars}`);
 	const labels = report.sections.flatMap((section) => section.rows.map((row) => row.label));
 	for (const required of ["subagent", "subagent_workflow", "subagent_control", "<advertised_subagents>", "worker", "scout", "<child boundary block>"]) {
 		assert.ok(labels.includes(required), `missing row: ${required}`);

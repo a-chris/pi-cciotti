@@ -726,7 +726,7 @@ describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available
 		// list (plan.md §3): growing it is a reviewable one-line change with a
 		// "same meaning on each tool" rationale, not a forbidden step.
 		const sharedRationale: Record<string, string> = {
-			async: "background run, default false — identical switch on delegation and workflow",
+			async: "background run, default-on — identical switch on delegation and workflow",
 			worktree: "isolate in a managed git worktree — identical switch on delegation and workflow",
 			agent: "name the agent to delegate to / the agent to inspect — same name, same registry",
 		};

@@ -280,7 +280,7 @@ const delegationDescriptions = {
 	task: "The action to do or problem to solve.",
 	agent: "One of the installed agent names (via subagent_control action:list). Required: no default agent exists.",
 	cwd: "Working directory; default: session directory.",
-	async: "Background run; default false.",
+	async: "Background run; omit for background (default), set false to block the parent.",
 	output: "Durable result path, or false.",
 	worktree: "Isolate in a managed git worktree; default false.",
 };
@@ -302,7 +302,7 @@ const workflowDescriptions = {
 	workflow: "Named workflow resource, e.g. \"review\" or \"run-ci\".",
 	source: "Inline script body, or { path } to a script file.",
 	args: "Bounded JSON inputs for the workflow.",
-	async: "Background run; default false.",
+	async: "Background run; omit for background (default), set false to block the parent.",
 	worktree: "Isolate in a managed git worktree; default false.",
 	baseRef: "Branch/ref for worktree isolation.",
 };

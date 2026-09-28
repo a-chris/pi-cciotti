@@ -19,9 +19,9 @@ export function registerWaitTool(
 	// child runtime has no native notifier, so telling a child to "return control"
 	// would suppress the blocking wait it needs to collect its own descendants), and
 	// `test/unit/schemas.test.ts` pins it as an exactly-once invariant across the
-	// whole serialized tool surface. Parameter descriptions used to each repeat it,
-	// which silently grew this one tool to 4,395 chars — 55% of the parent tool
-	// surface — on every model call.
+	// whole serialized tool surface. Four of the five parameter descriptions used to
+	// repeat it too, which silently grew this one tool to 4,395 chars — 55% of the
+	// parent tool surface — on every model call.
 	const purpose = "Wait for background work that has no native completion notification: provider jobs, remembered detached foreground runs.";
 	const policy = child
 		? "This child runtime has no native completion notifier, so use a blocking bg_wait to collect owned descendants during this turn and read the result references before synthesizing. Draining at agent_end keeps owned work alive but does not synthesize results."

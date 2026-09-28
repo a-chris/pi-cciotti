@@ -100,16 +100,16 @@ describe("subagent facade tool descriptions", () => {
 	/**
 	 * Two guards, because they catch different regressions.
 	 *
-	 * The description cap is what stops prose inflation: the three descriptions were
-	 * 368 + 288 + 234 = 890 characters, and de-glossed they are 408. The shape cap is
-	 * the backstop for anything the per-form rules above do not recognize, e.g. a new
-	 * bloated parameter. Measured at 7c582f92 the three serialized tools totalled
-	 * 3,457; after this change 3,077, of which ~140 is the async correctness fix.
-	 * Verified: reverting only the descriptions trips the gloss rule and the 500 cap
-	 * (890 chars); reverting descriptions and schemas together also trips this cap.
-	 * Raising either number is a reviewable edit with a measured before/after, which
-	 * is the point. Verified by mutation: reverting the descriptions trips the gloss
-	 * rule and the 500 cap; a 447-char parameter description trips the 3,400 cap.
+	 * The description cap stops prose inflation: the three descriptions were
+	 * 368 + 288 + 234 = 890 characters and are now 408. The shape cap is the backstop
+	 * for anything the per-form rules above do not recognize, such as a new bloated
+	 * parameter: the three serialized tools totalled 3,457 before de-glossing and
+	 * 3,077 now, of which ~140 is the corrected `async` wording.
+	 *
+	 * Both bounds sit above today's value and below the regressions they exist to
+	 * catch, verified by mutation: reverting the descriptions trips the gloss rule and
+	 * the 500 cap, and a 447-character parameter description trips the 3,400 cap.
+	 * Raising either number should come with a measured before/after.
 	 */
 	it("keeps the whole model-facing tool surface inside its budget", () => {
 		const tools: Array<[string, unknown]> = [
@@ -119,8 +119,8 @@ describe("subagent facade tool descriptions", () => {
 		];
 		const total = tools.reduce((sum, [description, schema]) => sum + description.length + JSON.stringify(schema).length, 0);
 		const descriptions = tools.reduce((sum, [description]) => sum + description.length, 0);
-		assert.ok(descriptions < 500, `three facade descriptions should stay under 500 chars combined, got ${descriptions} (408 after de-glossing, 890 before)`);
-		assert.ok(total < 3_400, `three facade tools (description + schema) should stay under 3400 chars, got ${total} (3077 measured, 3457 pre-fix)`);
+		assert.ok(descriptions < 500, `three facade descriptions should stay under 500 chars combined, got ${descriptions} (408 today, 890 before de-glossing)`);
+		assert.ok(total < 3_400, `three facade tools (description + schema) should stay under 3400 chars, got ${total} (3077 today, 3457 before de-glossing)`);
 	});
 
 	it("ships no stale text from removed subsystems in any description", () => {

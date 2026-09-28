@@ -403,13 +403,14 @@ describe("SubagentParams schema", { skip: !schemasAvailable ? "typebox not avail
 	 * The bg_wait anti-overuse guardrail is product, not prose: it is what stops the
 	 * model from holding a blocking tool call open on children that already notify
 	 * the session natively. It was added in commit 1353c734 by repeating one
-	 * sentence in the tool description AND in all five parameter descriptions, so
+	 * sentence in the tool description AND in four of the five parameter descriptions, so
 	 * `bg_wait` reached 4,395 chars — 55% of the parent tool surface, paid on every
 	 * model call — while saying nothing a single copy plus the guide did not.
 	 *
-	 * The old assertions pinned that sentence into four different param
-	 * descriptions, which made the duplication load-bearing: adding a sixth copy
-	 * passed, and removing one failed. These assert the opposite invariant — the
+	 * The old assertion required that sentence inside the `id` parameter
+	 * description, which made the duplication load-bearing in both directions:
+	 * deleting it failed the test, and adding more copies anywhere else passed.
+	 * These assert the opposite invariant — the
 	 * guardrail survives, and it appears exactly once across the whole surface.
 	 * The behavioral depth it was protecting stays taught at the decision point,
 	 * where the launch result already says it (`formatAsyncStartedMessage`) and in

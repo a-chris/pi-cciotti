@@ -4,7 +4,7 @@ description: Parallel cleanup review
 
 Run a fresh-context parallel cleanup review of the current work.
 
-Use the `subagent` tool. First inspect available agents/skills if needed, then launch two reviewer subagents in parallel with `context: "fresh"`. Do not use forked context unless I explicitly ask for it. Reviewers must inspect the repository, relevant instructions, and current diff directly from files and commands. They must not rely on the main conversation history.
+Use the `subagent` tool. First inspect available agents/skills if needed, then launch two `reviewer` subagents in parallel with `context: "fresh"`. Do not use forked context unless I explicitly ask for it. Reviewers must inspect the repository, relevant instructions, and current diff directly from files and commands. They must not rely on the main conversation history.
 
 Do not write reviewer output files into the repository unless I explicitly ask for artifacts. Prefer `output: false` for each reviewer task.
 
@@ -35,7 +35,7 @@ If the `verbosity-cleaner` skill is available, pass it to this reviewer. If not,
 
 Tell this reviewer that shorter is only better when it is clearer and preserves behavior, error signals, cleanup semantics, useful invariants, and local style.
 
-Both reviewers are review-only. They must not edit files unless I explicitly ask for a writer pass. Their response should be review feedback, not a context summary. Ask them to return concise, evidence-backed findings with file/line references and suggested fixes.
+Both reviewers are review-only. They must not edit files unless I explicitly ask for a writer pass. Name the `reviewer` agent so each child carries its own contract — evidence bar, severity labels, file/line citations, the smallest safe fix, and the merge verdict — and put only the target, the scope and the pass in each task; do not restate that contract.
 
 While reviewers run, do your own narrow inspection if useful. After they return, synthesize the feedback into:
 - fixes worth doing now;
@@ -44,9 +44,9 @@ While reviewers run, do your own narrow inspection if useful. After they return,
 
 Do not blindly apply every reviewer suggestion.
 
-Autofix mode: if the invocation contains the exact word `autofix`, treat it as workflow control, not cleanup scope. Remove it before deciding the cleanup target. After synthesis, apply only fixes worth doing now, validate, and summarize. Do not apply optional improvements unless explicitly requested. If there are no fixes worth doing now, do not edit.
+Autofix mode: if the invocation contains the exact word `autofix`, remove it before deciding the cleanup target — it changes what you do with findings, not what counts as one. In autofix mode, after synthesis apply only the fixes worth doing now, validate, and summarize; do not apply optional improvements unless I ask, and do not edit at all if there are no fixes worth doing now.
 
-Without autofix mode, ask before applying fixes unless I already told you to address review feedback. When you ask, end with a compact numbered menu so I can respond with a number. Use wording suited to the findings, but include these choices when applicable:
+Without autofix mode, ask before applying fixes unless I already told you to address review feedback. When you ask, end with this numbered menu so I can reply with a number, adapting wording to the findings:
 
 ```text
 Reply with [1], [2], or further instructions:

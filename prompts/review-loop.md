@@ -14,7 +14,7 @@ As a conservative orchestration policy, do not set a hard `toolBudget` on implem
 
 For each review round, launch fresh-context `reviewer` agents in parallel. Reviewers must inspect the repository, relevant instructions, and current diff directly from files and commands. They must not rely on the main conversation history and must not edit files.
 
-Tell reviewers to filter on evidence, not severity. They should report only concrete current issues caused or made reachable by the target diff, with source proof, a test or repro, or a contract contradiction. Ask them to label findings P0/P1/P2 and end with `Merge verdict: BLOCK`, `Merge verdict: OK`, or `Merge verdict: OK with notes`. P0 blocks merge. P1 should be fixed before release. P2 is report-only. Use `blockers only` only for final pre-merge re-checks after P1/P2 findings are already captured, or for explicit emergency hotfix lanes.
+Name the `reviewer` agent so each child carries its own contract — evidence bar, P0/P1/P2 labels, merge verdict wording, `No issues found.`, and the blockers-only rule — and put only the target, the diff and the angle in each task; do not restate that contract. Ask for `blockers only` only on a final pre-merge re-check after P1/P2 findings are already captured, or on an explicit emergency hotfix lane.
 
 Choose review angles from the actual change. Common angles are correctness/regressions, tests/validation, and simplicity/maintainability. Add security, performance, docs/API contracts, or user-flow validation when the work calls for it. Prefer three strong reviewers over many vague reviewers.
 

@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import { SUBAGENT_GUIDE_TOPICS } from "../../src/extension/subagent-guide.ts";
 
@@ -380,19 +382,92 @@ describe("SubagentParams schema", { skip: !schemasAvailable ? "typebox not avail
 		const stopOnAttention = properties?.stopOnAttention;
 		const timeoutMs = properties?.timeoutMs;
 		assert.ok(id, "id schema should exist");
-		assert.match(String(id.description ?? ""), /ordinary async subagent runs already notify this session natively/i);
-		assert.match(String(id.description ?? ""), /same-turn blocking results are truly needed/);
+		assert.match(String(id.description ?? ""), /id\/prefix to wait for one specific run/);
+		assert.match(String(id.description ?? ""), /already finished returns its stored terminal result references/);
 		assert.ok(nonBlocking, "nonBlocking schema should exist");
-		assert.match(String(nonBlocking.description ?? ""), /provider, detached, or other background work without a native completion notification/i);
-		assert.match(String(nonBlocking.description ?? ""), /do not need a subscription/);
+		assert.match(String(nonBlocking.description ?? ""), /persist a wake subscription, and return immediately/);
+		assert.match(String(nonBlocking.description ?? ""), /woken on completion, failure, attention, reconciliation failure, or timeout/);
+		assert.match(String(nonBlocking.description ?? ""), /cannot be combined with all/);
 		assert.ok(all, "all schema should exist");
-		assert.match(String(all.description ?? ""), /same-turn result.*truly needed/);
+		assert.match(String(all.description ?? ""), /every async run, provider item, and remembered detached foreground descendant/);
 		assert.doesNotMatch(String(all.description ?? ""), /spawn a replacement/);
 		assert.ok(stopOnAttention, "stopOnAttention schema should exist");
 		assert.equal(stopOnAttention.type, "boolean");
 		assert.match(String(stopOnAttention.description ?? ""), /idle or long-thinking attention/);
 		assert.match(String(timeoutMs?.description ?? ""), /waitTool\.defaultTimeoutMs/);
-		assert.match(String(timeoutMs?.description ?? ""), /non-error active-work result/);
+		assert.match(String(timeoutMs?.description ?? ""), /non-error window_elapsed result/);
+	});
+
+	/**
+	 * The #1729 anti-overuse guardrail is product, not prose: it is what stops the
+	 * model from holding a blocking tool call open on children that already notify
+	 * the session natively. It was added in commit 1353c734 by repeating one
+	 * sentence in the tool description AND in all five parameter descriptions, so
+	 * `bg_wait` reached 4,395 chars — 55% of the parent tool surface, paid on every
+	 * model call — while saying nothing a single copy plus the guide did not.
+	 *
+	 * The old assertions pinned that sentence into four different param
+	 * descriptions, which made the duplication load-bearing: adding a sixth copy
+	 * passed, and removing one failed. These assert the opposite invariant — the
+	 * guardrail survives, and it appears exactly once across the whole surface.
+	 * The behavioral depth it was protecting stays taught at the decision point,
+	 * where the launch result already says it (`formatAsyncStartedMessage`) and in
+	 * the `tool-reference` guide topic.
+	 */
+	it("states the bg_wait anti-overuse guardrail exactly once, not once per param", async () => {
+		const { registerWaitTool } = await import("../../src/runs/background/wait-tool.ts");
+		const grab = (child?: { nestedRootRunId?: string }): { description: string } => {
+			const registered: Array<{ name: string; description: string }> = [];
+			// registerWaitTool only reads `registerTool` when it declares the tool, so
+			// the rest of the API surface is irrelevant here (same stub shape as
+			// wait-subscriptions.test.ts).
+			registerWaitTool({ registerTool: (value: unknown) => registered.push(value as { name: string; description: string }) } as never, {} as never, true, undefined, undefined, child);
+			assert.deepEqual(registered.map((entry) => entry.name), ["bg_wait"], "bg_wait must always be registered");
+			return registered[0]!;
+		};
+		const countGuardrails = (text: string): number => (text.match(/already notify this session natively/gi) ?? []).length;
+		const parent = grab();
+		const serializedTool = JSON.stringify({ description: parent.description, parameters: SubagentWaitParams });
+
+		// The guardrail is present, and stated once for the entire tool.
+		assert.equal(countGuardrails(parent.description), 1, "guardrail belongs in the description exactly once");
+		assert.equal(countGuardrails(serializedTool), 1, `guardrail must not be restated per-parameter; found ${countGuardrails(serializedTool)} copies`);
+		assert.match(parent.description, /do not call this merely to wait on a child/);
+
+		// A child runtime has no native notifier, so the parent guardrail must not
+		// leak into it — it would suppress the blocking wait a child needs.
+		const child = grab({ nestedRootRunId: "root-run" });
+		assert.equal(countGuardrails(child.description), 0, "child runtime must not inherit the parent's notify-natively guardrail");
+		assert.match(child.description, /no native completion notifier/);
+
+		// One short description per tool (M1 policy: at most 60 words), and the
+		// whole tool must stay well under the weight of a single redundant wait call.
+		for (const tool of [parent, child]) {
+			assert.ok(tool.description.split(/\s+/).filter(Boolean).length <= 60, `bg_wait description exceeds 60 words: ${tool.description}`);
+		}
+		const total = parent.description.length + JSON.stringify(SubagentWaitParams).length;
+		assert.ok(total < 2_200, `expected the whole bg_wait tool under 2200 chars, got ${total}`);
+	});
+
+	it("documents the relocated bg_wait wait modes in a served guide topic", () => {
+		// Cutting the description must not lose information: the six call shapes the
+		// description used to enumerate have to be readable by a model that follows
+		// the description's "Depth: guide topic tool-reference." pointer.
+		const doc = readFileSync(join(process.cwd(), "docs", "tool-reference.md"), "utf-8");
+		assert.ok(SUBAGENT_GUIDE_TOPICS.includes("tool-reference"), "tool-reference must stay a loadable guide topic");
+		const section = doc.slice(doc.indexOf("\n## `bg_wait`"));
+		assert.ok(section.length > 200, "tool-reference must carry a bg_wait section");
+		for (const fact of [
+			/first initially active async run|first .* finishes/s,
+			/all: true/,
+			/nonBlocking: true/,
+			/stopOnAttention: false/,
+			/timeoutMs/,
+			/window_elapsed/,
+			/enabled=false/,
+		]) {
+			assert.match(section, fact, `bg_wait guide section lost a wait mode: ${fact}`);
+		}
 	});
 
 	it("does not emit description-only schema nodes", () => {

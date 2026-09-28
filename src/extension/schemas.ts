@@ -347,20 +347,20 @@ export const SubagentControlParams = keepTopLevelParameterDescriptions(Type.Obje
 
 const SubagentWaitParamsSchema = Type.Object({
 	id: Type.Optional(Type.String({
-		description: "Async run or remembered detached foreground run id/prefix to wait for one specific run. Ordinary async subagent runs already notify this session natively; use bg_wait for provider, detached, or other background work without native notification, or when same-turn blocking results are truly needed. Omit to wait across every active async run started in this session only when a same-turn wait is truly needed.",
+		description: "Async run or remembered detached foreground run id/prefix to wait for one specific run. A named run that already finished returns its stored terminal result references. Omit to wait across every active async run started in this session.",
 	})),
 	nonBlocking: Type.Optional(Type.Boolean({
-		description: "When true, resolve id to one exact run, persist a wake subscription, and return immediately. Use this only for provider, detached, or other background work without a native completion notification; ordinary async subagent runs already notify this session natively and do not need a subscription. The originating session is woken on completion, failure, attention, reconciliation failure, or timeout. Requires id and cannot be combined with all.",
+		description: "With id, resolve that run once, persist a wake subscription, and return immediately. The originating session is woken on completion, failure, attention, reconciliation failure, or timeout. Requires id, cannot be combined with all, and needs a long-lived interactive runtime - a blocking-only runtime errors instead. Armed subscriptions appear in status output and differ from waitTool.enabled=false, which returns immediately without registering any future wake.",
 	})),
 	all: Type.Optional(Type.Boolean({
-		description: "Wait for ALL active runs to finish. Ordinary async subagent runs already notify this session natively; use all only when a same-turn result from tracked background work is truly needed. Default false: return when the first tracked run or provider item finishes or needs attention. Ignored when id targets a single run.",
+		description: "Wait for every async run, provider item, and remembered detached foreground descendant that was active when the call began. Default false: return as soon as the first one finishes or needs attention. Ignored when id targets a single run.",
 	})),
 	timeoutMs: Type.Optional(Type.Integer({
 		minimum: 1,
-		description: "Give up waiting after this many milliseconds (the runs keep going regardless). Ordinary async subagent runs already notify this session natively; use a wait timeout only when same-turn results are truly needed for provider, detached, or other background work without native notification. Defaults to config waitTool.defaultTimeoutMs, then 1800000 (30 minutes). Window expiry is a non-error active-work result.",
+		description: "Give up waiting after this many milliseconds (the runs keep going regardless). Defaults to config waitTool.defaultTimeoutMs, then 1800000 (30 minutes). Window expiry is a non-error window_elapsed result naming the work still active.",
 	})),
 	stopOnAttention: Type.Optional(Type.Boolean({
-		description: "For a blocking wait that is truly needed, stop when a run needs attention by default. Set false to keep waiting through idle or long-thinking attention. Attention from a long-running or stuck child is surfaced rather than silently waited through.",
+		description: "Blocking waits stop when a run needs attention by default. Set false to keep waiting through idle or long-thinking attention.",
 	})),
 });
 

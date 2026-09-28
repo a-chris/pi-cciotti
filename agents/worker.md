@@ -8,7 +8,8 @@ systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: false
 tools: read, grep, find, ls, bash, edit, write
-defaultContext: fork
+defaultContext: summary
+contextBrief: Implement the approved direction in this task; the brief carries the parent's decisions, plan, and prior diffs. Read the actual code before trusting it, and report gaps as BLOCKED.
 defaultReads: context.md, plan.md
 defaultProgress: true
 ---

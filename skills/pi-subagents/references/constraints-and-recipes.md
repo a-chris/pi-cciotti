@@ -6,9 +6,10 @@ This file is a detailed reference loaded from `skills/pi-subagents/SKILL.md`.
 
 - **Explicit forking requires a persisted parent session.** If the current session
   does not have a persisted session file or current leaf, explicit `context: "fork"`
-  fails. An agent-level `defaultContext: fork` is a preference: packaged `worker`,
-  `oracle`, and `advisor` fall back to `fresh` when those fork preconditions are not
-  met yet. Use `context: "fresh"` when you do not want a fork even after the parent
+  fails. An agent-level `defaultContext` is a preference: packaged `oracle` and its
+  `advisor` alias declare `fork`, while `worker` and `reviewer` declare `summary`, and
+  all of them fall back to `fresh` when those preconditions are not met yet. Use
+  `context: "fresh"` when you do not want a fork or a brief even after the parent
   session exists.
 - **Forked runs inherit parent history.** They are branched threads, not fresh
   filtered contexts. Use fresh context for adversarial reviewers unless the user explicitly asks for forked context.

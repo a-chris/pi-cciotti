@@ -10,7 +10,7 @@ Use orchestration as parent-agent guidance, not as a runtime workflow mode. For 
 clarify → scout → worker → fresh reviewers → worker
 ```
 
-Packaged `worker`, `oracle`, and `advisor` declare forked context in their agent definitions. If the parent has no persisted session file or current leaf yet, that implicit default falls back to `fresh`. A call cannot choose the mode; pick an agent whose `defaultContext` matches what you want, and note that `reviewer` resolves to a summary brief.
+Packaged `oracle` (and its `advisor` alias) declares forked context in its agent definition, while `worker` and `reviewer` declare a summary brief. If the parent has no persisted session file or current leaf yet, that implicit default falls back to `fresh`. A call cannot choose the mode; pick an agent whose `defaultContext` matches what you want.
 
 Child-safety boundaries are enforced at runtime:
 

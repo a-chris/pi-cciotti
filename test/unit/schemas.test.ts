@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { SUBAGENT_GUIDE_TOPICS } from "../../src/extension/subagent-guide.ts";
+import { resolveAsyncByDefault } from "../../src/extension/config.ts";
 
 type JsonSchemaNode = Record<string, unknown>;
 
@@ -796,12 +797,37 @@ describe("M1 facade schemas", { skip: !schemasAvailable ? "typebox not available
 		assert.ok(!(props.action?.enum as readonly string[]).includes("validate"), "validate left the model surface together with its script input");
 	});
 
+	/**
+	 * The facade advertised `async` as "Background run; default false." for its whole
+	 * life while the executor read `async ?? asyncByDefault` and
+	 * resolveAsyncByDefault({}) returned true. A model that believed the schema would
+	 * omit `async` expecting a blocking call, get a background run, and then wait on a
+	 * run it never asked for. docs/tool-reference.md said "default-on" the entire
+	 * time; only the model-facing schema was wrong. Derived from the resolver rather
+	 * than asserted as a literal, so the prose cannot drift from the code again.
+	 */
+	it("states the real async default instead of inverting it", () => {
+		const backgroundByDefault = resolveAsyncByDefault({});
+		assert.equal(backgroundByDefault, true, "baseline: an omitted asyncByDefault means background");
+		for (const [name, schema] of [
+			["subagent", schemas.SubagentDelegationParams],
+			["subagent_workflow", schemas.SubagentWorkflowParams],
+		] as const) {
+			const description = String(properties(schema).async?.description ?? "");
+			assert.ok(description.length > 0, `${name} should describe async`);
+			if (backgroundByDefault) {
+				assert.doesNotMatch(description, /default (false|off)/i, `${name} claims a non-background default the resolver contradicts: ${description}`);
+				assert.match(description, /background by default|Run in the background/i, `${name} should say the run backgrounds when async is omitted`);
+			}
+		}
+	});
+
 	it("keeps exactly the declared cross-cutting params shared and all others one-per-tool", () => {
 		// D10 relaxed the M1 invariant from a fixed exempt set to this declared share
 		// list (plan.md §3): growing it is a reviewable one-line change with a
 		// "same meaning on each tool" rationale, not a forbidden step.
 		const sharedRationale: Record<string, string> = {
-			async: "background run, default false — identical switch on delegation and workflow",
+			async: "background run, background unless resolved false — identical switch on delegation and workflow",
 			worktree: "isolate in a managed git worktree — identical switch on delegation and workflow",
 			agent: "name the agent to delegate to / the agent to inspect — same name, same registry",
 		};

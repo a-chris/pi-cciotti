@@ -10,11 +10,21 @@
 
 ## Install
 
+Install from this repository, not the npm registry:
+
 ```bash
-pi install npm:pi-subagents
+pi install git:github.com/a-chris/pi-subagents@v0.69.0
 ```
 
-That is the only required step. Background children use the host's SDK: npm Pi keeps its detached Node runner; the official Pi 0.85.1 Linux x64 standalone release loads the same runner through Pi's embedded SDK, without a separate SDK install. See [Standalone background execution](docs/standalone-background.md) for the supported boundary and validation gate.
+Omit `@v0.69.0` to track the default branch; pin a tag for a reproducible install. From a local clone of this repo, a path install works too and picks up edits on reload:
+
+```bash
+pi install /path/to/pi-subagents
+```
+
+> **Do not `pi install npm:pi-subagents`.** That name on npm belongs to the upstream project, so it installs upstream's newest release (currently 0.73.x) — which does not contain this fork's changes, and whose version numbers no longer line up with the tags in this repository.
+
+That is the only required step. Background children use the host's SDK: npm Pi keeps its detached Node runner; the official Pi 0.85.1 Linux x64 standalone release loads the same runner through Pi's embedded SDK, without a separate SDK install. See [Standalone background execution](docs/standalone-background.md) for the supported boundary and validation gate. To try the extension in a single session without installing it, use `pi -e /path/to/pi-subagents`.
 
 ## Try this first
 

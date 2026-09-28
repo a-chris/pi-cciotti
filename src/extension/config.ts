@@ -4,6 +4,7 @@ import { Key } from "@earendil-works/pi-tui";
 import { FLEET_KEYBINDING_ACTIONS, type ArtifactDirPreference, type ExtensionConfig } from "../shared/types.ts";
 import { validateMissionStoreConfig } from "../missions/store.ts";
 import { validateAuthorityPolicy } from "../policy/authority.ts";
+import { validateDelegationLevel } from "../policy/delegation-level.ts";
 import { getAgentDir } from "../shared/utils.ts";
 import { validatePermissionConfig } from "../runs/shared/permissions.ts";
 import { MAX_ABANDONED_SLOT_RELEASE_AFTER_MS, MIN_ABANDONED_SLOT_RELEASE_AFTER_MS } from "../runs/background/active-async-capacity.ts";
@@ -220,6 +221,7 @@ function validateConfig(config: Record<string, unknown>): void {
 	}
 	validateMissionStoreConfig(config.missions);
 	validateAuthorityPolicy(config.authorityPolicy);
+	validateDelegationLevel(config.delegationLevel);
 	validatePermissionConfig(config.permissions);
 	validateFleetKeybindingsConfig(config.fleetKeybindings);
 	validateArtifactConfig(config.artifactConfig);
@@ -241,7 +243,7 @@ function validateConfig(config: Record<string, unknown>): void {
 const FAIL_CLOSED_CONFIG_KEYS = [
 	"worktreeProvider", "worktreeBranchPrefix",
 	"modelResponseAliases", "modelExclusions", "toolDescriptionMode", "maxSubagentDepth",
-	"checkpointBeforeDeadlineMs", "timeoutMs", "toolTimeoutMs", "toolBudget", "control",
+	"checkpointBeforeDeadlineMs", "timeoutMs", "toolTimeoutMs", "toolBudget", "control", "delegationLevel",
 ] as const;
 
 function hasFailClosedConfigKey(raw: Record<string, unknown>): boolean {

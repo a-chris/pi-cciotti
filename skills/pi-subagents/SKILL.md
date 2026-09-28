@@ -11,7 +11,10 @@ description: |
 The parent works directly by default. Invoke subagents only when the operator
 requested delegation in the current request or through applicable user/project
 instructions. Task size, complexity, risk, tool-call count, recipe fit, or an
-available specialist does not independently authorize delegation.
+available specialist does not independently authorize delegation. Where the
+operator has set `delegationLevel` in subagent config, the delegation guideline in
+this session's prompt carries that standing authorization or restriction and is
+the authority for how eagerly to delegate.
 
 Once authorized, choose the smallest bounded shape that earns its token and
 elapsed-time overhead through concrete evidence, independent review,

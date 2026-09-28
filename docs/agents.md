@@ -396,7 +396,7 @@ Agent-local `skillPath` candidates never enter Pi's parent/global skills catalog
 
 ## The bundled pi-subagents skill
 
-The package bundles a `pi-subagents` skill that is automatically available to the parent agent when the extension is installed. Availability is not automatic routing or permission to delegate: the parent works directly unless the operator requests delegation in the current request or through applicable user/project instructions. Once authorized, use the smallest bounded child or workflow whose evidence, independent review, specialization, parallelism, or isolation benefit earns its overhead. It is for the orchestrating parent only: child subagents never receive it, and their context is explicitly filtered to strip parent-only orchestration instructions.
+The package bundles a `pi-subagents` skill that is automatically available to the parent agent when the extension is installed. Availability is not automatic routing or permission to delegate: the parent works directly unless the operator requests delegation in the current request or through applicable user/project instructions — including `delegationLevel` in subagent config, whose session guideline carries that standing authorization or restriction (see [configuration.md](configuration.md#delegationlevel)). Once authorized, use the smallest bounded child or workflow whose evidence, independent review, specialization, parallelism, or isolation benefit earns its overhead. It is for the orchestrating parent only: child subagents never receive it, and their context is explicitly filtered to strip parent-only orchestration instructions.
 
 What it covers:
 

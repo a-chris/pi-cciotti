@@ -11,6 +11,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ModelScopeRule } from "../runs/shared/model-scope.ts";
 import type { ResolvedSubagentCapabilityCeiling, SubagentCapabilityAudit } from "../runs/shared/capability-ceiling.ts";
 import type { AuthorityPolicyConfig } from "../policy/authority.ts";
+import type { DelegationLevel } from "../policy/delegation-level.ts";
 import type { ThinkingLevel } from "./model-info.ts";
 import type { GlobalMissionIndexRecord, MissionRecord, MissionStoreConfig } from "../missions/types.ts";
 import type { ExtensionBindings } from "../runs/shared/extension-bindings.ts";
@@ -2357,6 +2358,8 @@ export interface ExtensionConfig {
 	foregroundDetachShortcut?: string;
 	/** Show the Claude Code-style navigable fleet. Defaults to true. */
 	fleetView?: boolean;
+	/** How eagerly the orchestrator may delegate. Defaults to "standard". */
+	delegationLevel?: DelegationLevel;
 	/** Place the persistent FleetView above or below the editor. Defaults to belowEditor. */
 	fleetViewPlacement?: FleetViewPlacement;
 	/** Local keybindings for the full Fleet inspector. */

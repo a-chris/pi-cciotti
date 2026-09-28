@@ -62,6 +62,7 @@ import { resolveCurrentSubagentCapabilityCeiling } from "../runs/shared/capabili
 import { formatDuration, shortenPath } from "../shared/formatters.ts";
 import { loadConfig, resolveAsyncByDefault } from "./config.ts";
 import { SUBAGENT_CONTROL_DESCRIPTION, SUBAGENT_DELEGATION_DESCRIPTION, SUBAGENT_WORKFLOW_DESCRIPTION, buildSubagentToolPromptMetadata } from "./tool-description.ts";
+import { resolveDelegationLevel } from "../policy/delegation-level.ts";
 import { formatWorkflowPreflightSummary, normalizeWorkflowPreflight } from "../workflows/workflow-preflight.ts";
 import { finalizeToolResult } from "./tool-result.ts";
 import { collectGoalContinuationNotices } from "../missions/goal-driver.ts";
@@ -400,6 +401,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 	const config = loadConfig();
 	const waitToolConfig = resolveWaitToolConfig(config.waitTool);
 	const asyncByDefault = resolveAsyncByDefault(config);
+	const delegationLevel = resolveDelegationLevel(config.delegationLevel);
 	const fleetViewEnabled = config.fleetView !== false;
 	const fleetViewPlacement = resolveFleetViewPlacement(config.fleetViewPlacement);
 	const asyncWidgetEnabled = config.asyncWidget !== false;
@@ -696,7 +698,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		name: SUBAGENT_DELEGATION_TOOL,
 		label: "Subagent",
 		description: SUBAGENT_DELEGATION_DESCRIPTION,
-		...buildSubagentToolPromptMetadata(),
+		...buildSubagentToolPromptMetadata(delegationLevel),
 		parameters: SubagentDelegationParams,
 
 		async execute(id, params, signal, onUpdate, ctx) {

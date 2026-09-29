@@ -18,15 +18,16 @@ function agent(name: string, overrides: Partial<AgentConfig> = {}): AgentConfig 
 }
 
 describe("advertised agent prompt", () => {
-	it("includes only opted-in, capability-permitted agents in stable order", () => {
+	it("excludes only opted-out and blocked agents, and defaults unlisted agents in", () => {
 		const prompt = buildAdvertisedAgentPrompt([
 			agent("zeta", { advertise: true }),
-			agent("hidden"),
+			agent("silent"),
+			agent("hidden", { advertise: false }),
 			agent("disabled", { advertise: true, disabled: true }),
 			agent("alpha", { advertise: true }),
 		], {
 			version: 1,
-			allowedAgents: ["alpha", "hidden", "zeta"],
+			allowedAgents: ["alpha", "hidden", "silent", "zeta"],
 			denyExtensions: false,
 			sources: ["test"],
 		});
@@ -34,6 +35,8 @@ describe("advertised agent prompt", () => {
 		assert.ok(prompt);
 		assert.match(prompt, /<name>alpha<\/name>/);
 		assert.match(prompt, /<name>zeta<\/name>/);
+		// advertise defaults to true: an agent that says nothing is still advertised.
+		assert.match(prompt, /<name>silent<\/name>/);
 		assert.doesNotMatch(prompt, /hidden|disabled/);
 		assert.ok(prompt.indexOf("alpha") < prompt.indexOf("zeta"));
 	});
@@ -64,8 +67,10 @@ describe("advertised agent prompt", () => {
 		assert.match(systemPrompt, /<name>beta<\/name>/);
 	});
 
-	it("returns no catalog when no agent opts in", () => {
-		assert.equal(buildAdvertisedAgentPrompt([agent("hidden")]), undefined);
+	it("returns no catalog when every agent opts out", () => {
+		// With advertise defaulting to true, only an explicit false withdraws an agent,
+		// and a fully opted-out directory emits no block at all - nothing to retrieve.
+		assert.equal(buildAdvertisedAgentPrompt([agent("hidden", { advertise: false })]), undefined);
 		assert.equal(appendAdvertisedAgentPrompt("base prompt\n\n", undefined), "base prompt\n\n");
 	});
 

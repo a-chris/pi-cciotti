@@ -484,7 +484,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		if (!advertisedContext) return;
 		clearAgentDiscoveryCache();
 		advertisedAgents = discoverAgents(advertisedContext.cwd, "both", advertisedContext.model?.provider).agents
-			.filter((agent) => agent.advertise === true);
+			.filter((agent) => agent.advertise !== false);
 	};
 	const hasResultDeliveryDemand = () => {
 		if ([...state.asyncJobs.values()].some((job) => job.status === "queued" || job.status === "running")) return true;

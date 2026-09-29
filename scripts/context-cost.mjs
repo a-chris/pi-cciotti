@@ -88,8 +88,8 @@ const promptRows = [
 	row("promptSnippet + guidelines", `${promptMetadata.promptSnippet}\n${promptMetadata.promptGuidelines.join("\n")}`, "pi merges these into the system prompt"),
 ];
 // Same pipeline as the extension's before_agent_start hook: effective "both"
-// scope, advertise===true, then the catalog builder's own caps (16 / 12 KiB).
-const advertisedAgents = discoverAgents(cwd, "both").agents.filter((agent) => agent.advertise === true);
+// scope, advertise not opted out, then the catalog builder's own caps (16 / 12 KiB).
+const advertisedAgents = discoverAgents(cwd, "both").agents.filter((agent) => agent.advertise !== false);
 const advertised = buildAdvertisedAgentPrompt(advertisedAgents);
 const advertisedNames = advertised ? [...advertised.matchAll(/<name>([^<]+)<\/name>/gu)].map((m) => m[1]) : [];
 promptRows.push(row("<advertised_subagents>", advertised ?? "", advertised ? `${advertisedNames.length} agents` : "nothing advertises in this cwd"));

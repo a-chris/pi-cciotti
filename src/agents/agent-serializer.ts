@@ -62,7 +62,9 @@ export function serializeAgent(config: AgentConfig, options: SerializeAgentOptio
 	lines.push(`name: ${frontmatterNameForConfig(config)}`);
 	if (config.packageName) lines.push(`package: ${config.packageName}`);
 	lines.push(`description: ${config.description}`);
-	if (config.advertise === true || preserve("advertise")) lines.push(`advertise: ${config.advertise === true ? "true" : "false"}`);
+	// advertise defaults to true, so only an explicit choice is written: omitting the key
+	// must not serialize `advertise: false`, which would silently opt an agent out.
+	if (config.advertise !== undefined || preserve("advertise")) lines.push(`advertise: ${config.advertise === false ? "false" : "true"}`);
 	const aliasesValue = joinComma(config.aliases);
 	if (aliasesValue || preserve("alias", "aliases")) lines.push(`aliases: ${aliasesValue ?? ""}`);
 

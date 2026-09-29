@@ -31,8 +31,11 @@ export function buildAdvertisedAgentPrompt(
 	capabilityCeiling?: ResolvedSubagentCapabilityCeiling,
 	delegationLevel?: DelegationLevel,
 ): string | undefined {
+	// `advertise` defaults to true: an agent that says nothing is advertised, and
+	// `advertise: false` in frontmatter is the opt-out. Runtime-registered agents are
+	// excluded separately - they are session-scoped and never opted into prompt discovery.
 	const advertised = agents
-		.filter((agent) => agent.source !== "runtime" && agent.advertise === true && agent.disabled !== true && isAgentAllowedByCapabilityCeiling(agent.name, capabilityCeiling))
+		.filter((agent) => agent.source !== "runtime" && agent.advertise !== false && agent.disabled !== true && isAgentAllowedByCapabilityCeiling(agent.name, capabilityCeiling))
 		.sort((left, right) => left.name.localeCompare(right.name));
 	if (advertised.length === 0) return undefined;
 

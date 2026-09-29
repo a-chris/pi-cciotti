@@ -427,6 +427,25 @@ body`);
 		assert.match(serializeAgent(worker), /^advertise: true$/m);
 	}));
 
+	it("keeps an explicit opt-out through serialization, where the default is now true", () => withTempHome(() => {
+		// serializeAgent used to write the key only for `true`. With the default flipped,
+		// that would drop `advertise: false` on the next management write and silently
+		// put the agent back in the parent prompt.
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-unadvertised-agent-"));
+		tempDirs.push(project);
+		writeAgent(path.join(project, ".pi", "agents", "quiet.md"), "---\nname: quiet\ndescription: Quiet\nadvertise: false\n---\nbody");
+		writeAgent(path.join(project, ".pi", "agents", "plain.md"), "---\nname: plain\ndescription: Plain\n---\nbody");
+
+		const quiet = discoverAgents(project, "both").agents.find((agent) => agent.name === "quiet")!;
+		assert.equal(quiet.advertise, false);
+		assert.match(serializeAgent(quiet), /^advertise: false$/m);
+
+		// An agent that never chose anything stays unmentioned rather than being pinned.
+		const plain = discoverAgents(project, "both").agents.find((agent) => agent.name === "plain")!;
+		assert.equal(plain.advertise, undefined);
+		assert.doesNotMatch(serializeAgent(plain), /^advertise:/m);
+	}));
+
 	it("rejects non-boolean advertise values", () => withTempHome(() => {
 		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-invalid-advertise-"));
 		tempDirs.push(project);

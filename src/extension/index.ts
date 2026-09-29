@@ -803,7 +803,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		const selectedTools = event.systemPromptOptions?.selectedTools ?? (typeof pi.getActiveTools === "function" ? pi.getActiveTools() : []);
 		const sessionId = state.currentSessionId ?? resolveCurrentSessionId(ctx.sessionManager);
 		const advertisedPrompt = Array.isArray(selectedTools) && selectedTools.includes(SUBAGENT_DELEGATION_TOOL)
-			? buildAdvertisedAgentPrompt(advertisedAgents, resolveCurrentSubagentCapabilityCeiling(sessionId))
+			? buildAdvertisedAgentPrompt(advertisedAgents, resolveCurrentSubagentCapabilityCeiling(sessionId), delegationLevel)
 			: undefined;
 		const systemPrompt = appendAdvertisedAgentPrompt(event.systemPrompt, advertisedPrompt);
 		if (systemPrompt !== event.systemPrompt) return { systemPrompt };

@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import type { DelegationLevel } from "../policy/delegation-level.ts";
 import type { ResolvedSubagentCapabilityCeiling } from "../runs/shared/capability-ceiling.ts";
 import { isAgentAllowedByCapabilityCeiling } from "../runs/shared/capability-ceiling.ts";
 import type { AgentConfig } from "./agents.ts";
@@ -28,11 +29,28 @@ function promptDescription(description: string): string {
 export function buildAdvertisedAgentPrompt(
 	agents: readonly AgentConfig[],
 	capabilityCeiling?: ResolvedSubagentCapabilityCeiling,
+	delegationLevel?: DelegationLevel,
 ): string | undefined {
 	const advertised = agents
 		.filter((agent) => agent.source !== "runtime" && agent.advertise === true && agent.disabled !== true && isAgentAllowedByCapabilityCeiling(agent.name, capabilityCeiling))
 		.sort((left, right) => left.name.localeCompare(right.name));
 	if (advertised.length === 0) return undefined;
+
+	// `never` drops the entries, never the guidance. The sentence telling the model to
+	// confirm an agent through action:"list" before executing is what turns a guessed
+	// name into a failed run instead of a confident wrong one, and it costs a fixed
+	// ~400 bytes whether or not entries follow it. The entries are the part that grows
+	// with the agent directory, and `never` is the one level where the operator has said
+	// they should not be re-injected on every parent turn. No <omitted/> is emitted:
+	// these are withheld by policy, not trimmed for budget, and saying "omitted 16"
+	// would read as a catalog defect and invite the model to guess at the remainder.
+	if (delegationLevel === "never") {
+		return [
+			"<advertised_subagents>",
+			"Delegation level never: no subagents are listed, but file-defined subagents still exist and their names are not instructions to delegate. Invoke subagent only when the operator explicitly asks for delegation now, as when their task names an agent. Otherwise call subagent_control with { action: \"list\" } to read available agents, and confirm the selected agent appears there; if it does not, the run would fail, so pick a listed agent.",
+			"</advertised_subagents>",
+		].join("\n");
+	}
 
 	const render = (entries: string[]) => [
 		"<advertised_subagents>",

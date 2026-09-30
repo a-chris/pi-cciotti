@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { discoverAgentsAll, type AgentSource } from "../agents/agents.ts";
 import { isAsyncAvailable } from "../runs/background/async-execution.ts";
 import { formatSpawnBudgetSummary, getSpawnBudgetSnapshot } from "../runs/shared/spawn-budget.ts";
+import { resolveDelegationLevel } from "../policy/delegation-level.ts";
 import { getActiveAsyncCapacitySnapshot, resolveAbandonedSlotReleaseAfterMs, resolveMaxActiveAsyncRunsPerSession } from "../runs/background/active-async-capacity.ts";
 
 import { discoverAvailableSkills, type SkillSource } from "../agents/skills.ts";
@@ -217,6 +218,7 @@ export function buildDoctorReport(input: DoctorReportInput): string {
 		"",
 		"Runtime",
 		`- cwd: ${input.cwd}`,
+		`- delegation level: ${resolveDelegationLevel(input.config.delegationLevel)} (${input.config.delegationLevel ? "config" : "default"})`,
 		lineFromCheck("async support", () => `- async support: ${deps.isAsyncAvailable() ? "available" : "unavailable"}`),
 		...formatSessionLines(input),
 		"",

@@ -30,9 +30,8 @@ import {
 import {
 	SUBAGENT_CONTROL_DESCRIPTION,
 	SUBAGENT_DELEGATION_DESCRIPTION,
-	SUBAGENT_TOOL_PROMPT_GUIDELINES,
-	SUBAGENT_TOOL_PROMPT_SNIPPET,
 	SUBAGENT_WORKFLOW_DESCRIPTION,
+	buildSubagentToolPromptMetadata,
 } from "../src/extension/tool-description.ts";
 import {
 	SubagentControlParams,
@@ -81,13 +80,16 @@ if (!/^(0|false)$/u.test(process.env.PI_SUBAGENT_WAIT_TOOL_ENABLED ?? "")) {
 	tools.push(row("bg_wait", declaration("bg_wait", captured, SubagentWaitParams)));
 }
 
-// B: what lands in the parent system prompt.
+// B: what lands in the parent system prompt. The guideline is the one sentence
+// config.delegationLevel contributes, so the default level is what a fresh
+// install pays; other levels differ by a few words, not by a stacked rule.
+const promptMetadata = buildSubagentToolPromptMetadata();
 const promptRows = [
-	row("promptSnippet + guidelines", `${SUBAGENT_TOOL_PROMPT_SNIPPET}\n${SUBAGENT_TOOL_PROMPT_GUIDELINES.join("\n")}`, "pi merges these into the system prompt"),
+	row("promptSnippet + guidelines", `${promptMetadata.promptSnippet}\n${promptMetadata.promptGuidelines.join("\n")}`, "pi merges these into the system prompt"),
 ];
 // Same pipeline as the extension's before_agent_start hook: effective "both"
-// scope, advertise===true, then the catalog builder's own caps (16 / 12 KiB).
-const advertisedAgents = discoverAgents(cwd, "both").agents.filter((agent) => agent.advertise === true);
+// scope, advertise not opted out, then the catalog builder's own caps (16 / 12 KiB).
+const advertisedAgents = discoverAgents(cwd, "both").agents.filter((agent) => agent.advertise !== false);
 const advertised = buildAdvertisedAgentPrompt(advertisedAgents);
 const advertisedNames = advertised ? [...advertised.matchAll(/<name>([^<]+)<\/name>/gu)].map((m) => m[1]) : [];
 promptRows.push(row("<advertised_subagents>", advertised ?? "", advertised ? `${advertisedNames.length} agents` : "nothing advertises in this cwd"));

@@ -9,9 +9,12 @@ Parent extensions may register a session-scoped, out-of-band ceiling through `pi
 ## When to Use
 
 All launch guidance below assumes delegation was requested by the operator in
-the current request or applicable user/project instructions. Complexity,
-workflow fit, and potential quality gains help choose a shape after that gate;
-they do not authorize a launch.
+the current request or applicable user/project instructions. Where subagent
+config sets `delegationLevel`, that session guideline is the applicable
+instruction: it says how much delegation the operator has authorized, and does
+not need to be re-derived from task size or complexity. Complexity, workflow fit,
+and potential quality gains help choose a shape after that gate; they do not
+authorize a launch.
 
 - **Complex work orchestration**: after delegation is authorized, keep the parent on its ordinary strong default model and launch only when a bounded child materially improves evidence, independent review, specialization, useful parallelism, or isolated execution. For hard orchestration or root-cause questions, use a top-reasoning model only as a bounded read-only critic/oracle escalation, never as an autonomous root. Lightweight one-off delegation can stay lightweight.
 - **Advisory review**: use fresh-context `reviewer` agents for adversarial code review; `oracle` reads a summary brief of the parent's decisions, so escalate to it when inherited decisions, drift, model routing, root cause, or hard tradeoffs matter

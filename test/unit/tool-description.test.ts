@@ -9,10 +9,10 @@ import {
 	buildSubagentToolPromptMetadata,
 	SUBAGENT_CONTROL_DESCRIPTION,
 	SUBAGENT_DELEGATION_DESCRIPTION,
-	SUBAGENT_TOOL_PROMPT_GUIDELINES,
 	SUBAGENT_TOOL_PROMPT_SNIPPET,
 	SUBAGENT_WORKFLOW_DESCRIPTION,
 } from "../../src/extension/tool-description.ts";
+import { DELEGATION_LEVELS, delegationLevelGuideline } from "../../src/policy/delegation-level.ts";
 import { SUBAGENT_CHILD_ENV } from "../../src/runs/shared/child-runtime-config.ts";
 import * as schemas from "../../src/extension/schemas.ts";
 
@@ -132,20 +132,23 @@ describe("subagent facade tool descriptions", () => {
 		}
 	});
 
-	it("keeps prompt metadata concise and current by default", () => {
+	it("keeps prompt metadata concise and level-owned", () => {
 		assert.equal(SUBAGENT_TOOL_PROMPT_SNIPPET, "For operator-requested delegation, use subagents; compose multi-child work in one workflow call.");
-		assert.deepEqual(SUBAGENT_TOOL_PROMPT_GUIDELINES, [
-			"Do not invoke subagents unless the operator requested delegation directly or through applicable instructions.",
-		]);
-		const metadata = buildSubagentToolPromptMetadata();
-		assert.equal(metadata.promptSnippet, SUBAGENT_TOOL_PROMPT_SNIPPET);
-		assert.deepEqual(metadata.promptGuidelines, SUBAGENT_TOOL_PROMPT_GUIDELINES);
-		assert.ok(Buffer.byteLength(metadata.promptGuidelines!.join("\n")) < 400);
-		for (const guideline of metadata.promptGuidelines!) assert.match(guideline, /subagent/);
+		// One guideline per session, owned by config.delegationLevel: a second fixed
+		// sentence would disagree with any level that loosens or tightens it.
+		assert.deepEqual(buildSubagentToolPromptMetadata().promptGuidelines, [delegationLevelGuideline("standard")]);
+		assert.equal(buildSubagentToolPromptMetadata().promptSnippet, SUBAGENT_TOOL_PROMPT_SNIPPET);
+		for (const level of DELEGATION_LEVELS) {
+			const guidelines = buildSubagentToolPromptMetadata(level).promptGuidelines!;
+			assert.equal(guidelines.length, 1, `${level} must contribute exactly one guideline`);
+			assert.equal(guidelines[0], delegationLevelGuideline(level));
+			assert.match(guidelines[0], /subagent/);
+			assert.ok(Buffer.byteLength(guidelines.join("\n")) < 400);
+		}
 	});
 });
 
-function readRegisteredTools(agentDir: string): { name: string; description: string; properties: string[] }[] {
+function readRegisteredTools(agentDir: string): { name: string; description: string; properties: string[]; promptGuidelines?: string[] }[] {
 	const script = String.raw`
 		import registerSubagentExtension from "./src/extension/index.ts";
 		const events = { on() { return () => {}; }, emit() {} };
@@ -167,7 +170,7 @@ function readRegisteredTools(agentDir: string): { name: string; description: str
 		registerSubagentExtension(fakePi);
 		const facade = registered
 			.filter((tool) => tool.name && tool.name.startsWith("subagent"))
-			.map((tool) => ({ name: tool.name, description: tool.description, properties: Object.keys(tool.parameters.properties) }));
+			.map((tool) => ({ name: tool.name, description: tool.description, properties: Object.keys(tool.parameters.properties), promptGuidelines: tool.promptGuidelines }));
 		process.stdout.write(JSON.stringify(facade));
 	`;
 	const output = execFileSync(
@@ -184,7 +187,7 @@ function readRegisteredTools(agentDir: string): { name: string; description: str
 	);
 	// SAFETY: the inline registration script writes only the object we push for
 	// each registered facade tool, so the parsed shape is guaranteed.
-	return JSON.parse(output) as { name: string; description: string; properties: string[] }[];
+	return JSON.parse(output) as { name: string; description: string; properties: string[]; promptGuidelines?: string[] }[];
 }
 
 describe("registered facade tools", { timeout: 120000 }, () => {
@@ -199,5 +202,23 @@ describe("registered facade tools", { timeout: 120000 }, () => {
 		assert.deepEqual(byName.subagent.properties.sort(), ["agent", "async", "cwd", "output", "prequel", "reads", "task", "worktree"].sort());
 		assert.deepEqual(byName.subagent_workflow.properties.sort(), ["args", "async", "baseRef", "source", "workflow", "worktree"].sort());
 		assert.deepEqual(byName.subagent_control.properties.sort(), ["action", "agent", "id", "message", "mission", "topic"].sort());
+	});
+
+	/**
+	 * The setting has to reach the registered tool, not just the config object: a
+	 * level that only changed a TUI label would leave the model reading the default
+	 * rule while the operator believed they had loosened or tightened it.
+	 */
+	it("registers the delegation guideline from config.delegationLevel", () => {
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-facade-level-"));
+		try {
+			fs.mkdirSync(path.join(agentDir, "extensions", "subagent"), { recursive: true });
+			fs.writeFileSync(path.join(agentDir, "extensions", "subagent", "config.json"), JSON.stringify({ delegationLevel: "never" }), "utf-8");
+			const tools = readRegisteredTools(agentDir);
+			const delegation = tools.find((tool) => tool.name === "subagent");
+			assert.deepEqual(delegation?.promptGuidelines, [delegationLevelGuideline("never")]);
+		} finally {
+			fs.rmSync(agentDir, { recursive: true, force: true });
+		}
 	});
 });

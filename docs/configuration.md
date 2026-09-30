@@ -464,6 +464,29 @@ Automatic missions are enabled by default for ordinary launches with a task. Use
 - `retainTerminal` is a positive count (default `200`); pruning removes only the oldest completed, failed, or cancelled records and their pointers, never planned, active, waiting, needs-decision, or corrupt records.
 - The user-global index contains pointers only; missing-record pointers self-heal when globally listed. Set `globalIndex: false` to disable writes or `globalIndexDir` to redirect it.
 
+## `delegationLevel`
+
+```json
+{ "delegationLevel": "rarely" }
+```
+
+How eagerly the orchestrating parent may delegate. One of `never`, `rarely`, `standard` (default), `aggressive`. Levels are incremental — each authorizes more than the last:
+
+| Level | Delegation is appropriate when |
+| --- | --- |
+| `never` | The operator explicitly asks for delegation in the current request. |
+| `rarely` | The work is a large slice, or delegation is clearly needed. |
+| `standard` | Delegate only when the operator requested delegation, directly or through applicable instructions. This is the level that keeps the pre-existing behaviour, so an install that never sets the key sees no change. |
+| `aggressive` | Standing operator policy: delegate bounded work whenever it materially helps; the parent keeps decisions and final acceptance. |
+
+The level is read once at extension load and contributes exactly one guideline bullet to the parent system prompt, so it costs about a sentence per session — not per call. `never` and `rarely` tighten the rule; `aggressive` is the operator's standing authorization, which is what the "the operator requested delegation" gate otherwise has to come from.
+
+`never` additionally withdraws the advertised agent catalog: the `<advertised_subagents>` block keeps its guidance (descriptions are not instructions to delegate; confirm the agent through `subagent_control({ action: "list" })` before executing) but lists no agents, and the block names `list` as where to read them. Measured on a 16-agent directory that is 2,797 bytes per parent turn down to 482. Retrieval is not lost — `action: "list"` returns every agent with its description, more than the catalog carried, and the agent's own task may name one directly. `rarely`, `standard`, and `aggressive` keep the catalog byte-identical to before the setting existed.
+
+Apart from that catalog, the level changes **guidance only**: it never adds or removes the capability to delegate, and it does not touch agent definitions, spawn budgets, concurrency, or the child surface. The value applies to new sessions (Pi reload or restart); `/subagents-doctor` reports the level in effect.
+
+Set it in `~/.pi/agent/extensions/subagent/config.json`, the same user-scoped file as every other key here. An unknown value fails that config load instead of silently falling back to defaults.
+
 ## `authorityPolicy`
 
 ```json

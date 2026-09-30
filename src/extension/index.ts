@@ -62,6 +62,7 @@ import { resolveCurrentSubagentCapabilityCeiling } from "../runs/shared/capabili
 import { formatDuration, shortenPath } from "../shared/formatters.ts";
 import { loadConfig, resolveAsyncByDefault } from "./config.ts";
 import { SUBAGENT_CONTROL_DESCRIPTION, SUBAGENT_DELEGATION_DESCRIPTION, SUBAGENT_WORKFLOW_DESCRIPTION, buildSubagentToolPromptMetadata } from "./tool-description.ts";
+import { resolveDelegationLevel } from "../policy/delegation-level.ts";
 import { formatWorkflowPreflightSummary, normalizeWorkflowPreflight } from "../workflows/workflow-preflight.ts";
 import { finalizeToolResult } from "./tool-result.ts";
 import { collectGoalContinuationNotices } from "../missions/goal-driver.ts";
@@ -400,6 +401,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 	const config = loadConfig();
 	const waitToolConfig = resolveWaitToolConfig(config.waitTool);
 	const asyncByDefault = resolveAsyncByDefault(config);
+	const delegationLevel = resolveDelegationLevel(config.delegationLevel);
 	const fleetViewEnabled = config.fleetView !== false;
 	const fleetViewPlacement = resolveFleetViewPlacement(config.fleetViewPlacement);
 	const asyncWidgetEnabled = config.asyncWidget !== false;
@@ -482,7 +484,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		if (!advertisedContext) return;
 		clearAgentDiscoveryCache();
 		advertisedAgents = discoverAgents(advertisedContext.cwd, "both", advertisedContext.model?.provider).agents
-			.filter((agent) => agent.advertise === true);
+			.filter((agent) => agent.advertise !== false);
 	};
 	const hasResultDeliveryDemand = () => {
 		if ([...state.asyncJobs.values()].some((job) => job.status === "queued" || job.status === "running")) return true;
@@ -696,7 +698,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		name: SUBAGENT_DELEGATION_TOOL,
 		label: "Subagent",
 		description: SUBAGENT_DELEGATION_DESCRIPTION,
-		...buildSubagentToolPromptMetadata(),
+		...buildSubagentToolPromptMetadata(delegationLevel),
 		parameters: SubagentDelegationParams,
 
 		async execute(id, params, signal, onUpdate, ctx) {
@@ -801,7 +803,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		const selectedTools = event.systemPromptOptions?.selectedTools ?? (typeof pi.getActiveTools === "function" ? pi.getActiveTools() : []);
 		const sessionId = state.currentSessionId ?? resolveCurrentSessionId(ctx.sessionManager);
 		const advertisedPrompt = Array.isArray(selectedTools) && selectedTools.includes(SUBAGENT_DELEGATION_TOOL)
-			? buildAdvertisedAgentPrompt(advertisedAgents, resolveCurrentSubagentCapabilityCeiling(sessionId))
+			? buildAdvertisedAgentPrompt(advertisedAgents, resolveCurrentSubagentCapabilityCeiling(sessionId), delegationLevel)
 			: undefined;
 		const systemPrompt = appendAdvertisedAgentPrompt(event.systemPrompt, advertisedPrompt);
 		if (systemPrompt !== event.systemPrompt) return { systemPrompt };

@@ -4,20 +4,24 @@
  * subagent_control action:guide (e.g. tool-reference, workflows, agents).
  */
 
+import { delegationLevelGuideline, type DelegationLevel } from "../policy/delegation-level.ts";
+
 export const SUBAGENT_TOOL_PROMPT_SNIPPET = "For operator-requested delegation, use subagents; compose multi-child work in one workflow call.";
-export const SUBAGENT_TOOL_PROMPT_GUIDELINES = [
-	"Do not invoke subagents unless the operator requested delegation directly or through applicable instructions.",
-];
 
 export interface SubagentToolPromptMetadata {
 	promptSnippet?: string;
 	promptGuidelines?: string[];
 }
 
-export function buildSubagentToolPromptMetadata(): SubagentToolPromptMetadata {
+/**
+ * `config.delegationLevel` owns how eagerly to delegate, so the guideline is one
+ * level-owned sentence rather than a fixed conservative rule plus an exception it
+ * contradicts: choosing a level is itself the operator's standing instruction.
+ */
+export function buildSubagentToolPromptMetadata(delegationLevel?: DelegationLevel): SubagentToolPromptMetadata {
 	return {
 		promptSnippet: SUBAGENT_TOOL_PROMPT_SNIPPET,
-		promptGuidelines: SUBAGENT_TOOL_PROMPT_GUIDELINES,
+		promptGuidelines: [delegationLevelGuideline(delegationLevel)],
 	};
 }
 

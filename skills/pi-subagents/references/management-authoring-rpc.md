@@ -74,7 +74,7 @@ A minimal agent file looks like this:
 name: my-agent
 package: code-analysis
 description: What this agent does
-advertise: true
+advertise: false
 aliases: developer, coder
 model: provider/model-id
 thinking: high
@@ -91,10 +91,11 @@ Your system prompt here.
 ```
 
 That is only a starting point. Omit `package` for the traditional unqualified runtime name; when you
-set it, the runtime name is `{package}.{name}`. Set `advertise: true` only when the parent should
-receive this agent's name and description before deciding whether to delegate; advertisement is off
-by default. A `disabled: true` override hides an agent from discovery without deleting it, and
-removing the override or the file restores the bundled default. Common optional fields include:
+set it, the runtime name is `{package}.{name}`. `advertise` defaults to true, so an agent's name and
+description reach the parent prompt unless you set `advertise: false` to hold it back - opt out of
+agents the parent should not see, rather than opting each one in. A `disabled: true` override hides
+an agent from discovery without deleting it, and removing the override or the file restores the
+bundled default. Common optional fields include:
 
 - `defaultProgress`
 - `defaultReads`

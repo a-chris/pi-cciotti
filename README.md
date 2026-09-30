@@ -78,6 +78,8 @@ Installing the extension does not start an automatic reviewer in the background.
 When you finish implementing, run a reviewer subagent before summarizing.
 ```
 
+To set that appetite once instead of per request, set `delegationLevel` in the subagent config: `never`, `rarely`, `standard` (default), or `aggressive`. See [Configuration](docs/configuration.md#delegationlevel).
+
 ## Builtin agents
 
 The extension ships with agents you can use immediately:

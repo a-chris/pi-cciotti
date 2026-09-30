@@ -40,6 +40,9 @@ const DELEGATION_PARAMS = facadeParams(SubagentDelegationParams);
 const WORKFLOW_PARAMS = facadeParams(SubagentWorkflowParams);
 const MODEL_FACING_PARAMS = new Set([...DELEGATION_PARAMS, ...WORKFLOW_PARAMS, ...facadeParams(SubagentControlParams)]);
 
+/** Word values that share a shape with shorthand keys (`async: true,`) and are never keys. */
+const BARE_WORD_VALUES = new Set(["true", "false", "null", "undefined"]);
+
 const read = (file: string): string => readFileSync(join(process.cwd(), file), "utf-8");
 
 /**
@@ -139,9 +142,12 @@ function allCallLiterals(): CallExample[] {
 					}
 				}
 				if (depth === 1) {
-					const key = /^([a-zA-Z]+)\s*:/.exec(text.slice(i));
+					// Lookahead, so a shorthand key or the closing brace is never consumed as
+					// part of the key text.
+					const key = /^([a-zA-Z]+)(?=\s*[:,}]|$)/.exec(text.slice(i));
 					if (key) {
-						keys.push(key[1]!);
+						// Bare words after a colon are values (`async: true,`), not keys.
+						if (!BARE_WORD_VALUES.has(key[1]!)) keys.push(key[1]!);
 						i += key[0].length - 1;
 					}
 				}
@@ -246,6 +252,27 @@ describe("served docs match the facade contract", () => {
 			}
 		}
 		assert.deepEqual([...new Set(offenders)].sort(), [], "control examples pass params the model surface does not carry");
+	});
+
+	it("names no surface-owned param in the call reference the model reads", () => {
+		// README.md and docs/tool-reference.md teach what the model can pass, so a
+		// param named there in inline code reads as a call input. NEVER_MODEL_PARAMS
+		// live only on the script (`runs.*` options, `param?:` type syntax) or the
+		// slash/RPC surfaces, which their own topics document — tool-reference.md
+		// carried eight such mentions after the facade cutover because the prose
+		// (unlike call literals) was never compared to the schemas.
+		const offenders: string[] = [];
+		for (const file of ["README.md", "docs/tool-reference.md"] as const) {
+			for (const [lineNumber, text] of read(file).split(/\r?\n/).entries()) {
+				for (const span of text.matchAll(/`([^`]+)`/g)) {
+					const parsed = /^([a-zA-Z]+)(\?)?/.exec(span[1]!);
+					if (!parsed || !NEVER_MODEL_PARAMS.has(parsed[1]!)) continue;
+					if (parsed[2]) continue; // `param?: type` documents the script contract
+					offenders.push(`${file}:${lineNumber + 1} \`${span[1]}\``);
+				}
+			}
+		}
+		assert.deepEqual(offenders, [], "the call reference names params the facade drops; they belong to the script/slash/RPC surfaces");
 	});
 
 	it("uses only that facade's params in every delegation and workflow example", () => {

@@ -128,15 +128,15 @@ function formatResumeGuidance(runId: string | undefined, children: Array<{ agent
 	const workflowChildren = knownChildren.filter(({ child }) => typeof child.runId === "string" && child.runId.trim() && hasExistingSessionFile(child.sessionFile));
 	const resumableWorkflowChildren = workflowChildren;
 	if (workflowChildren.length > 0) {
-		return resumableWorkflowChildren.map(({ child }) => `Revive workflow child${typeof child.workflowKey === "string" && child.workflowKey.trim() ? ` '${child.workflowKey}'` : ""}: subagent({ action: "resume", id: "${child.runId}", message: "..." })`).join("\n");
+		return resumableWorkflowChildren.map(({ child }) => `Revive workflow child${typeof child.workflowKey === "string" && child.workflowKey.trim() ? ` '${child.workflowKey}'` : ""}: subagent_control({ action: "resume", id: "${child.runId}", message: "..." })`).join("\n");
 	}
 	const singleSessionFile = knownChildren[0]?.child.sessionFile ?? fallbackSessionFile;
 	if (children.length === 1 && knownChildren.length === 1 && hasExistingSessionFile(singleSessionFile)) {
-		return `Revive: subagent({ action: "resume", id: "${runId}", message: "..." })`;
+		return `Revive: subagent_control({ action: "resume", id: "${runId}", message: "..." })`;
 	}
 	const childWithSession = knownChildren.find(({ child }) => hasExistingSessionFile(child.sessionFile));
 	if (childWithSession) {
-		return `Revive child: subagent({ action: "resume", id: "${runId}", index: ${childWithSession.index}, message: "..." })`;
+		return `Revive child: subagent_control({ action: "resume", id: "${runId}", message: "..." })`;
 	}
 	return "Resume: unavailable; no child session file was persisted.";
 }
@@ -220,16 +220,14 @@ function formatRememberedForegroundStatus(run: ForegroundResumeRun): string {
 		if (child.outputSaveError) lines.push(`  Output warning: ${child.outputSaveError}`);
 		if (child.transcriptError) lines.push(`  Transcript warning: ${child.transcriptError}`);
 	}
-	lines.push("", `Status: subagent({ action: "status", id: "${run.runId}" })`);
-	if (run.children.length === 1) lines.push(`Transcript: subagent({ action: "status", id: "${run.runId}", view: "transcript" })`);
-	else lines.push(`Transcript: subagent({ action: "status", id: "${run.runId}", index: 0, view: "transcript" })`);
+	lines.push("", `Status: subagent_control({ action: "status", id: "${run.runId}" })`);
 	const detached = run.children.some((child) => child.status === "detached");
 	const resumable = run.children.find((child) => hasExistingSessionFile(child.sessionFile));
 	if (detached) {
 	} else if (resumable) {
 		lines.push(run.children.length === 1
-			? `Revive: subagent({ action: "resume", id: "${run.runId}", message: "..." })`
-			: `Revive child: subagent({ action: "resume", id: "${run.runId}", index: ${resumable.index}, message: "..." })`);
+			? `Revive: subagent_control({ action: "resume", id: "${run.runId}", message: "..." })`
+			: `Revive child: subagent_control({ action: "resume", id: "${run.runId}", message: "..." })`);
 	} else {
 		lines.push("Resume: unavailable; no child session file was persisted.");
 	}
@@ -337,7 +335,7 @@ function formatNestedExactStatus(rootRunId: string, run: NestedRunSummary): stri
 		}
 	}
 	lines.push(...formatNestedRunStatusLines(run.children, { indent: "  ", commandHints: true }));
-	lines.push("Commands:", `  Status: subagent({ action: "status", id: "${run.id}" })`, `  Interrupt: subagent({ action: "interrupt", id: "${run.id}" })`, `  Resume: subagent({ action: "resume", id: "${run.id}", message: "..." })`, `  Steer: subagent({ action: "steer", id: "${run.id}", message: "..." })`, `  Root status: subagent({ action: "status", id: "${rootRunId}" })`);
+	lines.push("Commands:", `  Status: subagent_control({ action: "status", id: "${run.id}" })`, `  Interrupt: subagent_control({ action: "interrupt", id: "${run.id}" })`, `  Resume: subagent_control({ action: "resume", id: "${run.id}", message: "..." })`, `  Steer: subagent_control({ action: "steer", id: "${run.id}", message: "..." })`, `  Root status: subagent_control({ action: "status", id: "${rootRunId}" })`);
 	return lines.join("\n");
 }
 
@@ -374,7 +372,7 @@ export function inspectSubagentStatus(params: RunStatusParams, deps: RunStatusDe
 			if (params.view === "transcript") {
 				if (runs.length === 1) return inspectSubagentStatus({ ...params, id: runs[0]!.id }, deps);
 				return {
-					content: [{ type: "text", text: runs.length === 0 ? "No active async run transcript is available." : `Transcript view requires an id when ${runs.length} active async runs exist. Use subagent({ action: "status", view: "fleet" }) to choose one.` }],
+					content: [{ type: "text", text: runs.length === 0 ? "No active async run transcript is available." : `Transcript view requires an id when ${runs.length} active async runs exist. Use subagent_control({ action: "status" }) to choose one.` }],
 					isError: true,
 					details: { mode: "single", results: [] },
 				};
@@ -647,14 +645,14 @@ export function inspectSubagentStatus(params: RunStatusParams, deps: RunStatusDe
 					if (step.externalJob?.resultArtifactPath) lines.push(`  Result artifact: ${step.externalJob.resultArtifactPath}`);
 					if ((step.status === "complete" || step.status === "completed") && step.externalJob?.state === "completed" && step.externalJob.providerJobId && externalJobFollowUpSupported(step.runner.provider)) {
 						hasExternalJobFollowUpHint = true;
-						lines.push(`  Follow-up: subagent({ action: "resume", id: "${status.runId}", index: ${index}, message: "..." })`);
+						lines.push(`  Follow-up: subagent_control({ action: "resume", id: "${status.runId}", message: "..." })`);
 					}
 				}
 				lines.push(...formatNestedRunStatusLines(step.children, { indent: "  ", commandHints: true, maxLines: 20 }));
 				const stepOutputPath = path.join(asyncDir, `output-${index}.log`);
 				if (stepOutputPath !== outputPath && fs.existsSync(stepOutputPath)) lines.push(`  Output: ${stepOutputPath}`);
 				if (step.status === "running" && step.runner?.type !== "external-cli" && step.runner?.type !== "external-job" && status.mode !== "workflow") {
-					lines.push(`  Steer: subagent({ action: "steer", id: "${status.runId}", index: ${index}, message: "..." })`);
+					lines.push(`  Steer: subagent_control({ action: "steer", id: "${status.runId}", message: "..." })`);
 				} else if (step.status === "running" && (step.runner?.type === "external-cli" || step.runner?.type === "external-job")) {
 					lines.push("  Steer: unavailable; external runners do not accept live messages.");
 				}
@@ -670,9 +668,7 @@ export function inspectSubagentStatus(params: RunStatusParams, deps: RunStatusDe
 			if (status.mode === "workflow" && status.state === "running") {
 				if (liveWorkflowControls.length === 0) lines.push("Steer: unavailable; no live foreground route is registered in the active session.");
 				else for (const control of liveWorkflowControls) {
-					for (const index of [...control.activeChildren!.keys()].sort((left, right) => left - right)) {
-						lines.push(`Steer live foreground child: subagent({ action: "steer", id: "${control.runId}", index: ${index}, message: "..." })`);
-					}
+					lines.push(`Steer live foreground child: subagent_control({ action: "steer", id: "${control.runId}", message: "..." })`);
 				}
 				lines.push(...workflowAsyncChildSteeringGuidance(status, deps.state));
 			}
@@ -680,7 +676,7 @@ export function inspectSubagentStatus(params: RunStatusParams, deps: RunStatusDe
 			if (status.workflowReceiptPath) lines.push(`Workflow receipt: ${status.workflowReceiptPath}`);
 			if (status.sessionFile) lines.push(`Session: ${status.sessionFile}`);
 			const allExternal = (status.steps?.length ?? 0) > 0 && status.steps!.every((step) => step.runner?.type === "external-cli" || step.runner?.type === "external-job");
-			if (status.state === "running" && !allExternal && status.mode !== "workflow") lines.push(`Steer running child: subagent({ action: "steer", id: "${status.runId}", message: "..." })`);
+			if (status.state === "running" && !allExternal && status.mode !== "workflow") lines.push(`Steer running child: subagent_control({ action: "steer", id: "${status.runId}", message: "..." })`);
 			if (status.state !== "running") {
 				lines.push(allExternal
 					? hasExternalJobFollowUpHint ? "Resume: use the external-job follow-up hint above." : "Resume: unavailable; external runners do not persist Pi sessions."

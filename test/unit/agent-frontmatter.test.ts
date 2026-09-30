@@ -696,7 +696,10 @@ Do work
 		assert.match(oracle?.systemPrompt ?? "", /asking or consulting the oracle/);
 		assert.match(oracle?.systemPrompt ?? "", /name the decision that still needs the main agent/);
 		assert.match(oracle?.systemPrompt ?? "", /There is no mid-run coordination channel back to the main agent/);
-		assert.equal(agents.some((candidate) => candidate.name === "planner"), false);
+		const planner = agents.find((candidate) => candidate.name === "planner");
+		assert.equal(planner?.defaultContext, "summary", "planner should default to a summary brief");
+		assert.ok(planner?.contextBrief, "planner should shape its own summary brief");
+		assert.equal(planner?.output, "plan.md", "planner should write plan.md");
 		assert.equal(agents.some((candidate) => candidate.name === "context-builder"), false);
 		assert.equal(agents.some((candidate) => candidate.name === "gpt-pro"), false);
 	});

@@ -89,12 +89,13 @@ The extension ships with agents you can use immediately:
 | `scout` | Fast local codebase recon: relevant files, entry points, data flow, risks. |
 | `researcher` | Web/docs research with sources and a concise research brief. Requires [pi-web-access in the child](docs/agents.md#web-research-prerequisites). |
 | `evidence-auditor` | Independently checks whether important research claims are supported by their sources. Requires [pi-web-access in the child](docs/agents.md#web-research-prerequisites). |
+| `planner` | Writes an executable `plan.md` from the brainstormed direction. Plans only; the manual review gate before `perl` executes. |
 | `worker` | Implementation work. Edits files, validates, escalates unapproved decisions instead of guessing. |
 | `reviewer` | Code review and small fixes against the task/plan, tests, edge cases, and simplicity. |
 | `oracle` | A second opinion before acting. Challenges assumptions without editing. |
 | `delegate` | A lightweight general delegate that behaves close to the parent session. |
 
-Rule of thumb: `scout` before you understand the code, `researcher` before you trust external facts, `evidence-auditor` before you rely on important research, `worker` to implement, `reviewer` to check, and `oracle` when the decision itself feels risky.
+Rule of thumb: `scout` before you understand the code, `planner` to settle the plan before implementing, `researcher` before you trust external facts, `evidence-auditor` before you rely on important research, `worker` to implement, `reviewer` to check, and `oracle` when the decision itself feels risky.
 
 ## Common workflows
 
@@ -110,6 +111,7 @@ The package includes `/council` and `council-mode`, plus documented model-based
 | Debate a material decision | "Use `/council` with model-based advisors to compare this decision." |
 | Implement then review | "Implement this, then review it." |
 | Review until clean | "Run a review loop on this change with a max of 3 rounds." |
+| Plan, review, then execute | "`/perl <task>` writes `plan.md` for my review; bare `/perl` executes it with a review loop." |
 | Execute a plan carefully | "Have worker implement this approved plan, then run reviewers and apply the feedback." |
 | Scout before planning | "Use scout to inspect the auth flow before planning." |
 | Run in the background | "Run this in the background." |

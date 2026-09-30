@@ -34,6 +34,7 @@ The package includes reusable prompt templates for common workflows. You do not 
 |--------|------------|
 | `/parallel-review` | Launch fresh-context reviewers with distinct angles, then synthesize what to fix. |
 | `/review-loop` | Run parent-controlled worker, reviewer, and fix-worker cycles until clean or capped. |
+| `/perl` | Plan a task into `plan.md` for your review; bare `/perl` then executes the reviewed plan through scout, worker, and a bounded review/fix loop. |
 | `/parallel-research` | Combine `researcher` and `scout` for external evidence, local code context, and practical tradeoffs. |
 | `/gather-context-and-clarify` | Scout/research first, then ask the user the clarification questions that matter. |
 | `/parallel-cleanup` | Run review-only cleanup passes after implementation. |
@@ -79,9 +80,12 @@ Use a named workflow resource when a permission or policy extension needs to dis
 ```js
 subagent_workflow({ workflow: "review", args: { task: "Review the change" } });
 subagent_workflow({ workflow: "run-ci", args: { command: "npm test" } });
+subagent_workflow({ workflow: "perl", args: { task: "Implement the auth fix" } });
 ```
 
-The host resolves the name and validates bounded plain-JSON `args` before starting the workflow. Resource provenance is recorded in workflow details and receipts for downstream permission/policy checks. Resource authority is not caller-supplied: `runs.host` is available only when the resolved resource explicitly grants the requested host key and command. An inline `source` script and a file-backed `source: { path }` remain raw, unknown-provenance inputs, so their `runs.host` calls are unavailable through the public execution boundary. Named resources cannot be combined with `agent`, `task`, or `source`; this first slice ships only the package-owned `review` and `run-ci` resources, not a user/project resource registry.
+The host resolves the name and validates bounded plain-JSON `args` before starting the workflow. Resource provenance is recorded in workflow details and receipts for downstream permission/policy checks. Resource authority is not caller-supplied: `runs.host` is available only when the resolved resource explicitly grants the requested host key and command. An inline `source` script and a file-backed `source: { path }` remain raw, unknown-provenance inputs, so their `runs.host` calls are unavailable through the public execution boundary. Named resources cannot be combined with `agent`, `task`, or `source`; the package-owned resources are `review`, `run-ci`, and `perl`, and there is no user/project resource registry.
+
+`perl` is a plan/execute pair keyed on the `plan.md` file in the working directory. `args.task` runs the plan phase only: the `planner` agent writes `plan.md` and the run stops. A call without `task` executes the existing `plan.md` through `scout` (writes `context.md`), `worker`, and up to `args.maxRounds` (default 3, max 10) review/fix rounds with a machine-readable reviewer verdict. The manual review gate is the file itself: review or edit `plan.md` between the two calls, then call `perl` again to execute.
 
 ### Opt-in bounded workflows
 

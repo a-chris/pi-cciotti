@@ -13,10 +13,10 @@ const DELEGATION_LEVEL_SET = new Set<string>(DELEGATION_LEVELS);
  * standing authorization the operator granted by setting it.
  */
 const GUIDELINES = {
-	never: "Delegation level 'never': do not invoke subagents unless the operator explicitly asks for delegation in the current request.",
+	never: "Delegation level 'never': do not invoke subagents unless the operator explicitly asks for delegation in the current session.",
 	rarely: "Delegation level 'rarely': invoke subagents only for a large slice of work, or when delegation is clearly needed.",
-	standard: "Delegation level 'standard': do not invoke subagents unless the operator requested delegation directly or through applicable instructions.",
-	aggressive: "Delegation level 'aggressive': the operator grants standing delegation, so invoke subagents for bounded work when it materially helps; the parent keeps decisions and final acceptance.",
+	standard: "Delegation level 'standard': be willing to invoke subagents for moderate or complex work when it materially helps while keeping decisions and final acceptance.",
+	aggressive: "Delegation level 'aggressive': prefer using subagents rather than handling everything yourself. Don't hesitate to delegate when it materially helps, while keeping decisions and final acceptance.",
 } satisfies Record<DelegationLevel, string>;
 
 export function isDelegationLevel(value: unknown): value is DelegationLevel {

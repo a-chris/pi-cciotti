@@ -235,8 +235,8 @@ export function formatControlNoticeMessage(event: ControlEvent): string {
 	}
 
 	const nudgeMessage = formatControlNudge(event);
-	const steerCommand = `subagent({ action: "steer", id: "${runTarget}", ${event.index !== undefined ? `index: ${event.index}, ` : ""}message: ${JSON.stringify(nudgeMessage)} })`;
-	const nestedResumeCommand = `subagent({ action: "resume", id: "${runTarget}", message: ${JSON.stringify(nudgeMessage)} })`;
+	const steerCommand = `subagent_control({ action: "steer", id: "${runTarget}", message: ${JSON.stringify(nudgeMessage)} })`;
+	const nestedResumeCommand = `subagent_control({ action: "resume", id: "${runTarget}", message: ${JSON.stringify(nudgeMessage)} })`;
 	if (event.type === "active_long_running") {
 		const facts = formatLongRunningFacts(event);
 		return [
@@ -247,8 +247,8 @@ export function formatControlNoticeMessage(event: ControlEvent): string {
 			"Hint: Inspect status first. Use steer for a top-level live async child, routed resume for a live nested child, or resume to revive a paused/completed/failed child.",
 			`Top-level live async nudge: ${steerCommand}`,
 			`Routed live nested nudge: ${nestedResumeCommand}`,
-			`Status: subagent({ action: "status", id: "${runTarget}" })`,
-			`Interrupt: subagent({ action: "interrupt", id: "${runTarget}" })`,
+			`Status: subagent_control({ action: "status", id: "${runTarget}" })`,
+			`Interrupt: subagent_control({ action: "interrupt", id: "${runTarget}" })`,
 		].filter((line): line is string => Boolean(line)).join("\n");
 	}
 
@@ -262,8 +262,8 @@ export function formatControlNoticeMessage(event: ControlEvent): string {
 		"Hint: Inspect status first unless the run is clearly blocked. Use steer for a top-level live async child, routed resume for a live nested child, or resume to revive a paused/completed/failed child.",
 		`Top-level live async nudge: ${steerCommand}`,
 		`Routed live nested nudge: ${nestedResumeCommand}`,
-		`Status: subagent({ action: "status", id: "${runTarget}" })`,
-		`Interrupt: subagent({ action: "interrupt", id: "${runTarget}" })`,
+		`Status: subagent_control({ action: "status", id: "${runTarget}" })`,
+		`Interrupt: subagent_control({ action: "interrupt", id: "${runTarget}" })`,
 	].filter((line): line is string => Boolean(line)).join("\n");
 }
 

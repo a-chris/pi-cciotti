@@ -1566,7 +1566,7 @@ function externalJobFollowUpStarted(input: { sourceRunId: string; runId: string;
 		input.duplicate ? `External-job follow-up already exists for ${input.sourceRunId}.` : `Started external-job follow-up for ${input.sourceRunId}.`,
 		`Follow-up run: ${input.runId}`,
 		`Async dir: ${input.asyncDir}`,
-		`Status if needed: subagent({ action: "status", id: "${input.runId}" })`,
+		`Status if needed: subagent_control({ action: "status", id: "${input.runId}" })`,
 	];
 	return { content: [{ type: "text", text: formatAsyncStartedMessage(lines.join("\n"), input.interactive) }], details: { mode: "single", results: [], asyncId: input.runId, asyncDir: input.asyncDir } };
 }
@@ -1599,7 +1599,7 @@ async function resumeExternalJobFollowUp(input: {
 	absoluteDeadlineAt?: number;
 }): Promise<AgentToolResult<Details>> {
 	if (input.target.kind === "live" || input.target.state === "running" || input.target.state === "queued") {
-		return { content: [{ type: "text", text: `External-job run '${input.target.runId}' is still running. Wait for completion, then use subagent({ action: "resume", id: "${input.target.runId}", message: "..." }).` }], isError: true, details: { mode: "management", results: [] } };
+		return { content: [{ type: "text", text: `External-job run '${input.target.runId}' is still running. Wait for completion, then use subagent_control({ action: "resume", id: "${input.target.runId}", message: "..." }).` }], isError: true, details: { mode: "management", results: [] } };
 	}
 	const runner = input.target.runner;
 	const externalJob = input.target.externalJob;
@@ -1766,7 +1766,7 @@ async function resumeAsyncRun(input: {
 				type: "text",
 				text: [
 					`Async child '${target.runId}' index ${target.index} is still running. action='resume' only revives paused, completed, or failed children.`,
-					`Send live input with subagent({ action: "steer", id: "${target.runId}", index: ${target.index}, message: "..." }).`,
+					`Send live input with subagent_control({ action: "steer", id: "${target.runId}", message: "..." }).`,
 				].join("\n"),
 			}],
 			isError: true,
@@ -1950,7 +1950,7 @@ async function resumeAsyncRun(input: {
 			`Chain run: ${attachedId}`,
 			`Root: ${target.agent} (step ${target.index + 1})`,
 			result.details.asyncDir ? `Async dir: ${result.details.asyncDir}` : undefined,
-			`Status if needed: subagent({ action: "status", id: "${attachedId}" })`,
+			`Status if needed: subagent_control({ action: "status", id: "${attachedId}" })`,
 		].filter((line): line is string => Boolean(line));
 		return { content: [{ type: "text", text: formatAsyncStartedMessage(lines.join("\n"), input.ctx.hasUI) }], details: result.details };
 	}
@@ -2172,7 +2172,7 @@ async function resumeAsyncRun(input: {
 		`Agent: ${target.agent}`,
 		`Session: ${target.sessionFile}`,
 		result.details.asyncDir ? `Async dir: ${result.details.asyncDir}` : undefined,
-		`Status if needed: subagent({ action: "status", id: "${revivedId}" })`,
+		`Status if needed: subagent_control({ action: "status", id: "${revivedId}" })`,
 	].filter((line): line is string => Boolean(line));
 	return {
 		content: [{ type: "text", text: formatAsyncStartedMessage(lines.join("\n"), input.ctx.hasUI) }],
@@ -3944,7 +3944,7 @@ async function runSinglePath(data: ExecutionContextData, deps: ExecutorDeps): Pr
 
 	const worktreeSuffix = worktreeHandoff?.suffix ? `\n\n${worktreeHandoff.suffix}` : "";
 	if (r.detached) {
-		const statusRecovery = `subagent({ action: "status", id: "${runId}" }) to recover the result; do not resume or launch a replacement while it remains detached.`;
+		const statusRecovery = `subagent_control({ action: "status", id: "${runId}" }) to recover the result; do not resume or launch a replacement while it remains detached.`;
 		const blockingRecovery = `bg_wait({ id: "${runId}" }). Use ${statusRecovery}`;
 		const message = r.detachedReason === "user request"
 			? `Detached at user request: ${params.agent}. The child continues independently. Register a completion wake-up with bg_wait({ id: "${runId}", nonBlocking: true }), or use ${statusRecovery}`
@@ -4253,7 +4253,7 @@ function missingWorkflowReceiptResumeHint(reference: WorkflowReceiptResumeRefere
 
 		const target = resolveResumeTarget({ id: childRunId }, state, { asyncRequireSessionFile: true, exactOnly: true });
 		if (target.kind !== "revive") return undefined;
-		const hint = `Direct resumable child for workflow key '${reference.key}': subagent({ action: "resume", id: ${JSON.stringify(childRunId)}, message: "..." })`;
+		const hint = `Direct resumable child for workflow key '${reference.key}': subagent_control({ action: "resume", id: ${JSON.stringify(childRunId)}, message: "..." })`;
 		return Buffer.byteLength(hint, "utf8") <= MAX_WORKFLOW_RESUME_HINT_BYTES ? hint : undefined;
 	} catch {
 		return undefined;

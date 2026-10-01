@@ -264,7 +264,7 @@ describe("async run status inspection", () => {
 			assert.match(text, /Diagnosis: Async runner process 12345 exited or disappeared/);
 			assert.match(text, new RegExp(`Result: ${path.join(resultsDir, "run-stale.json").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
 			assert.match(text, /Step 1: scout failed, error: Async runner process 12345 exited or disappeared/);
-			assert.match(text, /Revive: subagent\(\{ action: "resume", id: "run-stale", message: "\.\.\." \}\)/);
+			assert.match(text, /Revive: subagent_control\(\{ action: "resume", id: "run-stale", message: "\.\.\." \}\)/);
 			const resultJson = JSON.parse(fs.readFileSync(path.join(resultsDir, "run-stale.json"), "utf-8"));
 			assert.equal(resultJson.success, false);
 			assert.equal(resultJson.results[0].sessionFile, sessionFile);
@@ -350,7 +350,7 @@ describe("async run status inspection", () => {
 
 			const text = textContent(result);
 			assert.equal(result.isError, undefined);
-			assert.match(text, /Follow-up: subagent\(\{ action: "resume", id: "run-external-follow-up", index: 0, message: "\.\.\." \}\)/);
+			assert.match(text, /Follow-up: subagent_control\(\{ action: "resume", id: "run-external-follow-up", message: "\.\.\." \}\)/);
 			assert.match(text, /Resume: use the external-job follow-up hint above\./);
 		} finally {
 			fs.rmSync(root, { recursive: true, force: true });
@@ -804,8 +804,8 @@ describe("async run status inspection", () => {
 			assert.match(text, /Async runs:/);
 			assert.match(text, /0\. worker: Inspect fleet \| running/);
 			assert.match(text, /run-fleet \| running .*\| parallel \| 1 agent running · 0\/2 done/);
-			assert.match(text, /transcript: subagent\(\{ action: "status", id: "run-fleet", view: "transcript" \}\)/);
-			assert.match(text, /transcript: subagent\(\{ action: "status", id: "run-fleet", index: 0, view: "transcript" \}\)/);
+			assert.match(text, /status: subagent_control\(\{ action: "status", id: "run-fleet" \}\)/);
+			assert.doesNotMatch(text, /view: "transcript"/);
 		} finally {
 			fs.rmSync(root, { recursive: true, force: true });
 		}
@@ -1059,7 +1059,7 @@ describe("async run status inspection", () => {
 			assert.equal(result.isError, undefined);
 			assert.match(text, /Step 1: orchestrator running/);
 			assert.match(text, /↳ reviewer: Read the status \[nested-status-child\] running \| tool read/);
-			assert.match(text, /Status: subagent\(\{ action: "status", id: "nested-status-child" \}\)/);
+			assert.match(text, /Status: subagent_control\(\{ action: "status", id: "nested-status-child" \}\)/);
 		} finally {
 			fs.rmSync(root, { recursive: true, force: true });
 			fs.rmSync(path.dirname(route.eventSink), { recursive: true, force: true });
@@ -1267,9 +1267,9 @@ describe("async run status inspection", () => {
 			assert.match(text, /Root: run-nested-exact-root/);
 			assert.match(text, /Agent: validator/);
 			assert.match(text, /1\. leaf running/);
-			assert.match(text, /Root status: subagent\(\{ action: "status", id: "run-nested-exact-root" \}\)/);
-			assert.match(text, /Interrupt: subagent\(\{ action: "interrupt", id: "nested-exact-child" \}\)/);
-			assert.match(text, /Resume: subagent\(\{ action: "resume", id: "nested-exact-child", message: "\.\.\." \}\)/);
+			assert.match(text, /Root status: subagent_control\(\{ action: "status", id: "run-nested-exact-root" \}\)/);
+			assert.match(text, /Interrupt: subagent_control\(\{ action: "interrupt", id: "nested-exact-child" \}\)/);
+			assert.match(text, /Resume: subagent_control\(\{ action: "resume", id: "nested-exact-child", message: "\.\.\." \}\)/);
 		} finally {
 			fs.rmSync(root, { recursive: true, force: true });
 			fs.rmSync(path.dirname(route.eventSink), { recursive: true, force: true });
@@ -1304,7 +1304,7 @@ describe("async run status inspection", () => {
 			});
 
 			const text = textContent(result);
-			assert.match(text, /Revive child: subagent\(\{ action: "resume", id: "run-multi", index: 0, message: "\.\.\." \}\)/);
+			assert.match(text, /Revive child: subagent_control\(\{ action: "resume", id: "run-multi", message: "\.\.\." \}\)/);
 			assert.doesNotMatch(text, /unsupported for multi-child/);
 		} finally {
 			fs.rmSync(root, { recursive: true, force: true });
@@ -1335,8 +1335,8 @@ describe("async run status inspection", () => {
 
 			const result = inspectSubagentStatus({ id: "workflow-parent" }, { asyncDirRoot: asyncRoot, resultsDir: path.join(root, "results") });
 			const text = textContent(result);
-			assert.match(text, /Revive workflow child 'review': subagent\(\{ action: "resume", id: "child-review", message: "\.\.\." \}\)/);
-			assert.match(text, /Revive workflow child 'write': subagent\(\{ action: "resume", id: "child-write", message: "\.\.\." \}\)/);
+			assert.match(text, /Revive workflow child 'review': subagent_control\(\{ action: "resume", id: "child-review", message: "\.\.\." \}\)/);
+			assert.match(text, /Revive workflow child 'write': subagent_control\(\{ action: "resume", id: "child-write", message: "\.\.\." \}\)/);
 			assert.doesNotMatch(text, /id: "workflow-parent", index:/);
 		} finally {
 			fs.rmSync(root, { recursive: true, force: true });
@@ -1365,7 +1365,7 @@ describe("async run status inspection", () => {
 			const result = inspectSubagentStatus({ id: "run-result-index" }, { asyncDirRoot: asyncRoot, resultsDir });
 
 			const text = textContent(result);
-			assert.match(text, /Revive child: subagent\(\{ action: "resume", id: "run-result-index", index: 1, message: "\.\.\." \}\)/);
+			assert.match(text, /Revive child: subagent_control\(\{ action: "resume", id: "run-result-index", message: "\.\.\." \}\)/);
 		} finally {
 			fs.rmSync(root, { recursive: true, force: true });
 		}
@@ -1659,7 +1659,7 @@ describe("async run status inspection", () => {
 			assert.equal(result.isError, undefined);
 			assert.match(text, /State: failed/);
 			assert.match(text, /Result: /);
-			assert.match(text, /Revive: subagent\(\{ action: "resume", id: "run-result-only", message: "\.\.\." \}\)/);
+			assert.match(text, /Revive: subagent_control\(\{ action: "resume", id: "run-result-only", message: "\.\.\." \}\)/);
 			assert.match(text, /result survived missing status/);
 			assert.match(text, /Recovery needed: review the diff and artifacts before resuming or launching dependent stages\./);
 			assert.match(text, /requested report: missing/);

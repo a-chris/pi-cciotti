@@ -528,7 +528,7 @@ async function waitForDetachedForegroundRun(
 		if (pending.length === 0) {
 			const outcome = summarizeForegroundChildren(current, initialDetachedIndices);
 			return result(
-				`Waited ${formatDuration(now() - startedAt)} for remembered detached foreground run "${run.runId}"; done. Outcome: ${outcome || "no recovered child status"}. Completion event observed; inspect with subagent({ action: "status", id: "${run.runId}" }) for recovered output.`,
+				`Waited ${formatDuration(now() - startedAt)} for remembered detached foreground run "${run.runId}"; done. Outcome: ${outcome || "no recovered child status"}. Completion event observed; inspect with subagent_control({ action: "status", id: "${run.runId}" }) for recovered output.`,
 			);
 		}
 		const updateNow = now();
@@ -587,7 +587,7 @@ export async function waitForSubagents(
 	deps: SubagentWaitDeps,
 ): Promise<AgentToolResult<Details>> {
 	if (deps.enabled === false) {
-		return result("bg_wait is disabled by config.waitTool or PI_SUBAGENT_WAIT_TOOL_ENABLED; returning immediately without blocking background work. Active work keeps going, and you can inspect subagents with subagent({ action: \"status\" }) or rely on completion notifications.");
+		return result("bg_wait is disabled by config.waitTool or PI_SUBAGENT_WAIT_TOOL_ENABLED; returning immediately without blocking background work. Active work keeps going, and you can inspect subagents with subagent_control({ action: \"status\" }) or rely on completion notifications.");
 	}
 	if (!deps.state.currentSessionId) {
 		return result("bg_wait requires an active session identity to scope background work safely.", true);
@@ -652,7 +652,7 @@ export async function waitForSubagents(
 			}
 			try {
 				const registration = deps.subscribe({ targetKind: selected.kind, runId: selected.id, requestedId: params.id, timeoutMs });
-				return result(`Armed wait subscription ${registration.token} for exact ${selected.kind} run ${selected.id}. Returning immediately; this session will be woken on completion, failure, attention, reconciliation failure, or timeout. Inspect armed subscriptions with subagent({ action: "status" }).`);
+				return result(`Armed wait subscription ${registration.token} for exact ${selected.kind} run ${selected.id}. Returning immediately; this session will be woken on completion, failure, attention, reconciliation failure, or timeout. Inspect armed subscriptions with subagent_control({ action: "status" }).`);
 			} catch (error) {
 				return result(error instanceof Error ? error.message : String(error), true);
 			}
@@ -759,7 +759,7 @@ export async function waitForSubagents(
 
 	const relevantAttention = attention.filter((run) => initialAsyncIds.has(run.id));
 	const attentionNote = relevantAttention.length > 0
-		? ` ${relevantAttention.length} run(s) need attention: ${relevantAttention.map((run) => run.id).join(", ")} — inspect with subagent({ action: "status" }) then steer a top-level live async child, resume a paused/completed/failed child, or interrupt explicitly.`
+		? ` ${relevantAttention.length} run(s) need attention: ${relevantAttention.map((run) => run.id).join(", ")} — inspect with subagent_control({ action: "status" }) then steer a top-level live async child, resume a paused/completed/failed child, or interrupt explicitly.`
 		: "";
 	const stillRunning = active.filter((run) => initialAsyncIds.has(run.id)).length
 		+ providerActive.filter((item) => initialProviderIds.has(backgroundWorkIdentity(item))).length;

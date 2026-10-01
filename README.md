@@ -111,7 +111,7 @@ The package includes `/council` and `council-mode`, plus documented model-based
 | Debate a material decision | "Use `/council` with model-based advisors to compare this decision." |
 | Implement then review | "Implement this, then review it." |
 | Review until clean | "Run a review loop on this change with a max of 3 rounds." |
-| Plan, review, then execute | "`/perl <task>` writes `plan.md` for my review; bare `/perl` executes it with a review loop." |
+| Plan, review, then execute | "`/perl <task>` writes `plan.md` for my review; bare `/perl` executes it with a review loop. All steps run in one worktree on `perl/work` (`.pi-perl-<repo>`), and a `slug` arg gives a concurrent task its own lane (`.pi-perl-<repo>-<slug>`)" |
 | Execute a plan carefully | "Have worker implement this approved plan, then run reviewers and apply the feedback." |
 | Scout before planning | "Use scout to inspect the auth flow before planning." |
 | Run in the background | "Run this in the background." |

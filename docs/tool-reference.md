@@ -142,7 +142,7 @@ Each workflow key identifies one workflow child. Use a new stable workflow key f
 
 Inside the script, `await runs.run(key, { resume, task })` waits for the revived child to finish and returns its completed output and new `runId`. Each resume can return a new retained run id, so loops must continue from the latest returned `runId`. Top-level `{ action: "resume" }` remains detached and returns a background-run receipt.
 
-For a simple implementation challenge outside a workflow script, send the challenge through `subagent_control({ action: "resume", id: "<retained-writer-run>", message: "Reconsider the implementation and make any better current-scope change." })` only when that writer's `runs.run` result reported a resumable `runId`. If no retained writer is resumable, start a same-role fallback challenge and record why it is a fallback. Use workflow `runs.run({ resume })` only when the script must await the revived writer output before the next step. Do not use `steer` as the sole challenge action for a completed retained child; `steer` with `mode: "follow_up"` only queues text for the next `resume`.
+For a simple implementation challenge outside a workflow script, send the challenge through `subagent_control({ action: "resume", id: "<retained-writer-run>", message: "Reconsider the implementation and make any better current-scope change." })` only when that writer's `runs.run` result reported a resumable `runId`. If no retained writer is resumable, start a same-role fallback challenge and record why it is a fallback. Use workflow `runs.run({ resume })` only when the script must await the revived writer output before the next step. Do not use `steer` as the sole challenge action for a completed retained child; a follow-up steer only queues text for the next `resume`.
 
 `resume` and `agent` are mutually exclusive. The revived child keeps its stored agent, model, and tool contract. `gate` is rejected on retained resume items because resume uses the retained child contract.
 
@@ -161,7 +161,7 @@ Agent definitions are not loaded into context by default. The read verbs let the
 { action: "get", agent: "reviewer" }
 ```
 
-`list` prints one line per discovered agent. `models` prints the provider/model ids and which agents resolve to them; with `agent` it narrows to that agent's effective model, thinking level, and where the value came from. `get` prints one agent's full field set. Scope selection (`agentScope`) and the capability rows (`runner.available`, ceiling sources, and the rest) belong to the `/subagents` admin surface, not to a call param.
+`list` prints one line per discovered agent. `models` prints the provider/model ids and which agents resolve to them; with `agent` it narrows to that agent's effective model, thinking level, and where the value came from. `get` prints one agent's full field set. Scope selection and the capability rows (`runner.available`, ceiling sources, and the rest) belong to the `/subagents` admin surface, not to a call param.
 
 ### Opening a mission
 
@@ -199,8 +199,7 @@ subagent_control({ action: "steer", id: "<run-id>", message: "guidance for the r
 
 `status` resolves exact foreground ids, top-level async ids, and nested run ids before falling back to prefix matching.
 
-- `view: "fleet"` is an optional read-only active-run surface with transcript commands; it does not add steering or stop controls.
-- `view: "transcript"` tails the selected run's live `output-<index>.log` or persisted session transcript, with `lines` capped at 500.
+- The read-only fleet overview and transcript tails belong to the `/subagents` slash command and the RPC surfaces, not to a tool call; bare `status` lists the active async runs and armed wait subscriptions, and an id returns that run's status with its output and session paths.
 - Nested status shows the root/parent path, nested children, session/artifact paths when known, and nested control commands.
 - Inside child-safe fanout mode, bare `status` requires an id when no local foreground run is active, so children cannot enumerate unrelated top-level async runs.
 - Bare `interrupt` still targets only the visible top-level run; interrupting a nested run requires its explicit nested id.
@@ -209,7 +208,7 @@ subagent_control({ action: "steer", id: "<run-id>", message: "guidance for the r
 
 `resume` revives a paused, completed, or failed async/foreground child by starting a new child from its stored session file. Stopped runs remain non-resumable, and it does not interrupt a live top-level async child. Use `steer` for acknowledged live async guidance.
 
-- Multi-child async runs and remembered foreground single, parallel, or chain runs can be revived by passing `index` to choose the child.
+- A single-child run revives by run id. Picking one child of several is not addressable from the model surface — the call fails closed naming the child count — while workflow children carry their own run ids in status output and revive by them.
 - Nested runs can be resumed by nested id when their live route or persisted nested session metadata is available.
 - Completed external-job runs can use the same `resume` action as a provider follow-up when the registered provider exposes `followUp(input)`. Running external-job parents fail closed with guidance to wait for completion. Unsupported providers fail with an update/reload message.
 - Revive starts a new child session from the old session context; it does not resume the live session, and it requires the chosen child to have a persisted `.jsonl` session file.
@@ -224,19 +223,19 @@ subagent_control({ action: "steer", id: "<run-id>", message: "guidance for the r
 - Direct id calls execute immediately.
 - `/subagents-stop` without an id opens a selector with confirmation when a TUI is available. Use `↑`/`↓` or `j`/`k` to move through the selector.
 - In non-TUI contexts the slash command prints exact `subagent_control({ action: "stop", id })` and `/subagents-stop <id>` commands.
-- Pass a child id to stop one child of a multi-child async run or workflow while the rest continue: `/subagents-stop <run-id> <child-id>` (equivalent to `subagent_control({ action: "stop", id, childId })`). Child ids come from status output, the async status snapshot, or `/subagents-inspect-rpc` replies. Only pending or running children are stoppable; the request is rejected for anything else instead of widening to a run-level stop.
+- Pass a child id to stop one child of a multi-child async run or workflow while the rest continue: `/subagents-stop <run-id> <child-id>`. Child ids come from status output, the async status snapshot, or `/subagents-inspect-rpc` replies. Only pending or running children are stoppable; the request is rejected for anything else instead of widening to a run-level stop.
 
 ### steer
 
 `steer` waits up to three seconds for a correlated receipt and returns a request id with `delivered`, `scheduled`, `pending`, `partial`, `recovered`, or `failed` plus per-child states. The receipt also has `deliveryStatus: "delivered" | "queued"`. For async runs, delivery means the child consumed the correlated user input; foreground delivery means the in-process Pi transport accepted it. Neither means model compliance. A pending indexed child returns `scheduled`.
 
-The optional `mode` is `steer` by default and keeps the current interrupt behavior. `follow_up` waits for the next turn boundary. `auto` uses the same native steer delivery path as `steer`, without automatic pause-and-revive recovery after a missed acknowledgment. The retained revival-brief queue holds 20 messages and returns a clear error when full; this is not a live follow-up queue bound. A live follow-up acknowledgment reports queue acceptance, not consumption. Async runs later record correlated consumption or fail unconsumed requests at settlement; foreground follow-ups have no later correlated receipt. A `follow_up` sent to a completed retained workflow child becomes the first brief for its next `resume`; it does not revive the child by itself.
+Tool calls steer in the default direct mode; the follow-up and auto delivery modes belong to the script and slash/RPC surfaces. A follow-up waits for the next turn boundary. Auto uses the same native steer delivery path as direct steering, without automatic pause-and-revive recovery after a missed acknowledgment. The retained revival-brief queue holds 20 messages and returns a clear error when full; this is not a live follow-up queue bound. A live follow-up acknowledgment reports queue acceptance, not consumption. Async runs later record correlated consumption or fail unconsumed requests at settlement; foreground follow-ups have no later correlated receipt. A follow-up sent to a completed retained workflow child becomes the first brief for its next `resume`; it does not revive the child by itself.
 
 Only a top-level single run may interrupt after the acknowledgment deadline and recover after a further 15-second pause/revival bound; durable multi-child and nested runs never auto-interrupt. Recovery launches a replacement only after the source is confirmed paused, a valid persisted session exists, and deadline, turn, and tool budgets remain. It preserves the original child contract and remaining limits; otherwise the source stays paused with an explicit failure. Late acceptance is recorded but cannot cancel committed recovery.
 
 The persisted `steering` ledger retains 20 requests and replaces the old `steerCount`/`lastSteerAt` fields.
 
-The `/subagents-steer <run-id> [--child <child-id>] <message>` slash command is the host bridge for non-TUI sessions and RPC hosts. `--child` accepts the stable child identity shown in status output and inspect replies (workflow key, child run id, or `step:<index>`) and resolves it to the child index before steering; unknown or ambiguous child ids fail closed. Flags are parsed only between the run id and the message tail — once the message starts, `--` tokens are message text. The bridge always disables pause-and-revive recovery (`steeringRecovery: false`), matching the extension RPC `nonRecoveringSteer` guarantee so the caller keeps authority over the exact child it addressed.
+The `/subagents-steer <run-id> [--child <child-id>] <message>` slash command is the host bridge for non-TUI sessions and RPC hosts. `--child` accepts the stable child identity shown in status output and inspect replies (workflow key, child run id, or `step:<index>`) and resolves it to the child index before steering; unknown or ambiguous child ids fail closed. Flags are parsed only between the run id and the message tail — once the message starts, `--` tokens are message text. The bridge always disables pause-and-revive recovery, matching the extension RPC `nonRecoveringSteer` guarantee so the caller keeps authority over the exact child it addressed.
 
 ## `bg_wait`
 

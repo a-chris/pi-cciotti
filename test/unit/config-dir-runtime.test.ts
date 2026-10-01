@@ -32,7 +32,7 @@ describe("config directory resolution", () => {
 	});
 
 	it("honors Pi package metadata without importing the peer package", () => {
-		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-config-dir-"));
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-config-dir-"));
 		try {
 			const packageRoot = path.join(tempDir, "coding-agent");
 			const distDir = path.join(packageRoot, "dist");
@@ -51,7 +51,7 @@ describe("config directory resolution", () => {
 	});
 
 	it("uses an explicit Pi package root before the process entrypoint walk", () => {
-		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-config-root-"));
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-config-root-"));
 		try {
 			const packageRoot = path.join(tempDir, "coding-agent-root");
 			fs.mkdirSync(packageRoot, { recursive: true });
@@ -67,7 +67,7 @@ describe("config directory resolution", () => {
 	});
 
 	it("invalidates cached runtime resolution when the package root changes", () => {
-		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-config-cache-"));
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-config-cache-"));
 		try {
 			const firstRoot = path.join(tempDir, "first");
 			const secondRoot = path.join(tempDir, "second");

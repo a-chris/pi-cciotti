@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 test("ordinary prompt audit works without optional Pi peers", async () => {
-	const isolatedRoot = await mkdtemp(join(tmpdir(), "pi-subagents-prompt-audit-"));
+	const isolatedRoot = await mkdtemp(join(tmpdir(), "pi-cciotti-prompt-audit-"));
 	const promptAuditPath = join(isolatedRoot, "src/runs/foreground/prompt-audit.ts");
 	const streamOptionsPath = join(isolatedRoot, "src/shared/agent-stream-options.ts");
 	const opencodeSessionHeadersPath = join(isolatedRoot, "src/shared/opencode-session-headers.ts");

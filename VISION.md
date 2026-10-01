@@ -1,8 +1,8 @@
 # Vision
 
-## What pi-subagents is
+## What pi-cciotti is
 
-pi-subagents lets one Pi session delegate focused work to child agents with evidence and control. Children run one-shot and report back; there is no mid-run parent↔child messaging channel.
+pi-cciotti lets one Pi session delegate focused work to child agents with evidence and control. Children run one-shot and report back; there is no mid-run parent↔child messaging channel.
 It serves a single Pi operator first: one person who wants more leverage from one session without losing control of what runs in their name.
 It stays flexible enough for other people and other workflows, but it does not redesign itself around them.
 It owns the Pi delegation layer: child launch contracts, workflow orchestration, supervision, observability, and result handoff.

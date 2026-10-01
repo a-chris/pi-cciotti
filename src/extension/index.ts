@@ -1062,7 +1062,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 
 	const installRuntime = (ctx: ExtensionContext) => {
 		if (runtimeCleaned) {
-			throw new Error("Cannot restart a cleaned pi-subagents extension runtime; register a new extension instance.");
+			throw new Error("Cannot restart a cleaned pi-cciotti extension runtime; register a new extension instance.");
 		}
 		const sessionManager = ctx.sessionManager as object;
 		const previousRuntime = runtimeRegistry.bySessionManager.get(sessionManager);

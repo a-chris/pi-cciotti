@@ -13,10 +13,10 @@ import type { AgentConfig } from "../../src/agents/agents.ts";
 import { createStructuredOutputRuntime } from "../../src/runs/shared/structured-output.ts";
 
 // Uses the existing isolated SDK fixture; never install dependencies or call a provider.
-const sdkRoot = process.env.PI_SUBAGENTS_NATIVE_SDK;
+const sdkRoot = process.env.PI_CCIOTTI_NATIVE_SDK;
 for (const host of ["foreground", "runner"] as const) {
 	for (const [systemPromptMode, structured] of [["append", false], ["replace", false], ["append", true], ["replace", true]] as const) {
-		it(`exact acceptance survives actual SDK split-turn compaction: ${host}/${systemPromptMode}/${structured ? "structured" : "fenced"}`, { skip: !sdkRoot && "Set PI_SUBAGENTS_NATIVE_SDK to the isolated 0.85.1 SDK root" }, async () => {
+		it(`exact acceptance survives actual SDK split-turn compaction: ${host}/${systemPromptMode}/${structured ? "structured" : "fenced"}`, { skip: !sdkRoot && "Set PI_CCIOTTI_NATIVE_SDK to the isolated 0.85.1 SDK root" }, async () => {
 			const entry = execFileSync(process.execPath, ["--input-type=module", "-e", "console.log(import.meta.resolve('@earendil-works/pi-coding-agent'))"], { cwd: sdkRoot, encoding: "utf8" }).trim();
 			const pi: PiCodingAgentModule = await import(entry);
 			assert.equal(pi.VERSION, "0.85.1");

@@ -4,7 +4,7 @@ Public seams for other Pi extensions and host integrations: the in-process RPC, 
 
 ## Trusted workflow resources
 
-Loaded trusted TypeScript extensions can import `registerWorkflowResource` from `pi-subagents/workflow-resources`. This subpath does not load the main extension and exposes no resolver or permit constructor. Its exported types are `RegisterWorkflowResourceInput`, `WorkflowResourceDefinition`, and `WorkflowResourceRegistration`:
+Loaded trusted TypeScript extensions can import `registerWorkflowResource` from `pi-cciotti/workflow-resources`. This subpath does not load the main extension and exposes no resolver or permit constructor. Its exported types are `RegisterWorkflowResourceInput`, `WorkflowResourceDefinition`, and `WorkflowResourceRegistration`:
 
 ```typescript
 registerWorkflowResource({
@@ -33,7 +33,7 @@ This extension owns two fixed commands; `scripts/finite-check.mjs` must be an ex
 
 ```typescript
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { registerWorkflowResource } from "pi-subagents/workflow-resources";
+import { registerWorkflowResource } from "pi-cciotti/workflow-resources";
 
 export default function (pi: ExtensionAPI) {
   let registration: { dispose(): void } | undefined;
@@ -155,7 +155,7 @@ The DTO intentionally never exposes run, async, or tool IDs. Clients must ignore
 
 ## Runtime agent registration from independent extensions
 
-An independently installed Pi extension can register an agent with the installed `pi-subagents` owner through the process-local `pi-subagents:runtime-agent-register:v1` event. Emit after extension setup, such as during `session_start`. Event delivery is synchronous, so the owner writes the result onto the request before `emit()` returns.
+An independently installed Pi extension can register an agent with the installed `pi-cciotti` owner through the process-local `pi-cciotti:runtime-agent-register:v1` event. Emit after extension setup, such as during `session_start`. Event delivery is synchronous, so the owner writes the result onto the request before `emit()` returns.
 
 ```typescript
 const request: {
@@ -179,14 +179,14 @@ const request: {
   },
 };
 
-pi.events.emit("pi-subagents:runtime-agent-register:v1", request);
-if (!request.result) throw new Error("pi-subagents is not installed or not ready");
+pi.events.emit("pi-cciotti:runtime-agent-register:v1", request);
+if (!request.result) throw new Error("pi-cciotti is not installed or not ready");
 if (!request.result.ok) throw request.result.error;
 const registration = request.result.registration;
 // Call registration.dispose() during your extension cleanup.
 ```
 
-If `pi-subagents` is a resolvable dependency of the consumer package, `pi-subagents/agents` exports `RUNTIME_AGENT_REGISTER_EVENT`, the request/result types, and `registerAgentViaEvents()` for the same contract. A separately installed Pi package is not automatically a Node dependency of another package. In that case, use the event contract directly instead of a runtime import. A type-only development dependency is optional.
+If `pi-cciotti` is a resolvable dependency of the consumer package, `pi-cciotti/agents` exports `RUNTIME_AGENT_REGISTER_EVENT`, the request/result types, and `registerAgentViaEvents()` for the same contract. A separately installed Pi package is not automatically a Node dependency of another package. In that case, use the event contract directly instead of a runtime import. A type-only development dependency is optional.
 
 The installed owner applies the existing runtime-agent validation, collision checks, limits, runtime source metadata, and cleanup. If more than one owner listens, the first handler that writes `request.result` wins. Unsupported versions, malformed requests, and registration failures return `{ ok: false, error }`. No result means no compatible owner handled the event.
 
@@ -194,14 +194,14 @@ This contract is process-local. It does not register agents in child sessions or
 
 ## External jobs in FleetView
 
-Use `pi-subagents/external-runs` to publish display-only current-session jobs owned by another extension:
+Use `pi-cciotti/external-runs` to publish display-only current-session jobs owned by another extension:
 
 ```ts
 import {
   registerExternalRun,
   updateExternalRun,
   unregisterExternalRun,
-} from "pi-subagents/external-runs";
+} from "pi-cciotti/external-runs";
 
 registerExternalRun({
   id: "dependency-review",
@@ -230,10 +230,10 @@ External jobs are observational. The caller owns execution, persistence, cancell
 
 ## Launch contract preflight
 
-Use `pi-subagents/preflight` when an extension needs to inspect the resolved child launch contract before deciding whether to run anything:
+Use `pi-cciotti/preflight` when an extension needs to inspect the resolved child launch contract before deciding whether to run anything:
 
 ```ts
-import { resolveSubagentLaunchContract } from "pi-subagents/preflight";
+import { resolveSubagentLaunchContract } from "pi-cciotti/preflight";
 
 const result = await resolveSubagentLaunchContract({
   agent: "reviewer",
@@ -278,7 +278,7 @@ Boundaries:
 
 ## Structured delegation API
 
-Other Pi extensions can ask `pi-subagents` to run one configured foreground leaf agent through the structured delegation API. It uses the established `prompt-template:subagent:*` event family and the same executor as the `subagent` tool; it does not add another launcher.
+Other Pi extensions can ask `pi-cciotti` to run one configured foreground leaf agent through the structured delegation API. It uses the established `prompt-template:subagent:*` event family and the same executor as the `subagent` tool; it does not add another launcher.
 
 ```ts
 import {
@@ -286,7 +286,7 @@ import {
   SUBAGENT_DELEGATION_RESPONSE_EVENT,
   type SubagentDelegationRequest,
   type SubagentDelegationResponse,
-} from "pi-subagents/delegation";
+} from "pi-cciotti/delegation";
 
 const request: SubagentDelegationRequest = {
   requestId: crypto.randomUUID(),
@@ -345,14 +345,14 @@ Constraints:
 - The caller selects a configured agent, but agent discovery and effective tools remain package-owned. A request cannot grant arbitrary tools, and tool restrictions are not an operating-system sandbox.
 - The detached RPC remains async-only; this API is foreground-only.
 
-Unversioned prompt-template payloads with `requestId`, `agent`, `task`, `context`, `model`, and `cwd` are rejected as legacy direct delegation. New integrations must use the structured owned-leaf request above. `pi-subagents/delegation` is the canonical contract for extension integrations.
+Unversioned prompt-template payloads with `requestId`, `agent`, `task`, `context`, `model`, and `cwd` are rejected as legacy direct delegation. New integrations must use the structured owned-leaf request above. `pi-cciotti/delegation` is the canonical contract for extension integrations.
 
 ## Capability ceilings
 
 Parent extensions can enforce an out-of-band, session-scoped capability ceiling without adding a model-visible field to `subagent`:
 
 ```ts
-import { registerSubagentCapabilityCeiling } from "pi-subagents/capability-ceiling";
+import { registerSubagentCapabilityCeiling } from "pi-cciotti/capability-ceiling";
 
 const restriction = registerSubagentCapabilityCeiling({
   sessionId: ctx.sessionManager.getSessionId(),
@@ -386,7 +386,7 @@ Public status exposes bounded audit counts and sources, never full extension pat
 Other Pi extensions can make their current-session jobs visible to `bg_wait` through the process-local provider contract:
 
 ```ts
-import { registerBackgroundWorkProvider } from "pi-subagents/background-work";
+import { registerBackgroundWorkProvider } from "pi-cciotti/background-work";
 
 const dispose = registerBackgroundWorkProvider({
   name: "my-background-extension",
@@ -404,7 +404,7 @@ Semantics:
 - `listActiveWork` receives an optional `{ sessionId, nowMs }` context during snapshots. Providers can use `sessionId` to avoid scanning unrelated work; existing zero-argument `() => items` providers continue to work, and returned items are still validated and filtered to the exact requested session.
 - It filters snapshots to the active session, fails closed if a provider disappears while its work is tracked, and surfaces malformed snapshots or provider errors with provider context.
 - Wake channels only shorten polling; validated snapshots remain authoritative.
-- Providers share a registry through `Symbol.for("pi-subagents.background-work.v1")`, allowing independently loaded extension modules to meet in one Pi process.
+- Providers share a registry through `Symbol.for("pi-cciotti.background-work.v1")`, allowing independently loaded extension modules to meet in one Pi process.
 - Registration is reload-safe: a new provider with the same name replaces the old callback, and the old disposer cannot remove the replacement. Call the disposer during extension shutdown when possible.
 
 Children do not gain provider tools or extensions automatically. Add `bg_wait` to the child agent's `tools` allowlist and load each provider through `extensions` or `subagentOnlyExtensions`. The parent's effective `waitTool` setting reaches every child through its typed runtime config; `PI_SUBAGENT_WAIT_TOOL_ENABLED` keeps precedence in the parent.
@@ -416,7 +416,7 @@ Local foreground children never load the parent's ambient extensions: they share
 Extensions that own long-running advisor jobs can register a process-local provider for `runner.type: external-job` agents:
 
 ```ts
-import { registerExternalJobProvider } from "pi-subagents/external-job-provider";
+import { registerExternalJobProvider } from "pi-cciotti/external-job-provider";
 
 const dispose = registerExternalJobProvider({
   name: "surf-oracle",
@@ -464,7 +464,7 @@ Detached children do not stop when the session does. They are the host process's
 
 This matters because "is the parent busy?" is the wrong idle signal. A parent that launches a detached run and hands control back — which is what the async launch output tells it to do — is not prompting, streaming, compacting, or running a shell command. A host that reaps sessions on those signals alone will dispose exactly the session that was waiting to be woken.
 
-When pi-subagents runs inside a compatible pi-web host, it discovers the versioned `Symbol.for("@agegr/pi-web/session-liveness/v1")` registry and registers one provider for the current session. The provider reports live `queued`/`running` async jobs, active nested descendants (including foreground routes retained after their direct parent settles), foreground controls that still have a scheduling owner or active child, and completion notifications waiting for their batch-delivery timer. Retained terminal history, future schedules, and wait subscriptions do not make a session live by themselves. The registration is replaced on session changes and released during runtime shutdown or reload; other hosts remain unaffected.
+When pi-cciotti runs inside a compatible pi-web host, it discovers the versioned `Symbol.for("@agegr/pi-web/session-liveness/v1")` registry and registers one provider for the current session. The provider reports live `queued`/`running` async jobs, active nested descendants (including foreground routes retained after their direct parent settles), foreground controls that still have a scheduling owner or active child, and completion notifications waiting for their batch-delivery timer. Retained terminal history, future schedules, and wait subscriptions do not make a session live by themselves. The registration is replaced on session changes and released during runtime shutdown or reload; other hosts remain unaffected.
 
 If your host reclaims idle sessions, keep a session alive while it still has live detached work:
 

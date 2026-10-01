@@ -192,7 +192,7 @@ function readRegisteredTools(agentDir: string): { name: string; description: str
 
 describe("registered facade tools", { timeout: 120000 }, () => {
 	it("registers the three facade tools with matching descriptions and params", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-facade-reg-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-facade-reg-"));
 		const tools = readRegisteredTools(agentDir);
 		const byName = Object.fromEntries(tools.map((tool) => [tool.name, tool]));
 		assert.deepEqual(Object.keys(byName).sort(), ["subagent", "subagent_control", "subagent_workflow"]);
@@ -210,7 +210,7 @@ describe("registered facade tools", { timeout: 120000 }, () => {
 	 * rule while the operator believed they had loosened or tightened it.
 	 */
 	it("registers the delegation guideline from config.delegationLevel", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-facade-level-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-facade-level-"));
 		try {
 			fs.mkdirSync(path.join(agentDir, "extensions", "subagent"), { recursive: true });
 			fs.writeFileSync(path.join(agentDir, "extensions", "subagent", "config.json"), JSON.stringify({ delegationLevel: "never" }), "utf-8");

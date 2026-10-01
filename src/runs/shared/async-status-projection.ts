@@ -5,7 +5,7 @@ import { HOST_STEP_MAX_COUNT, HOST_STEP_MAX_DETAIL_CHARS, HOST_STEP_MAX_LABEL_CH
 import { workflowPreflightLaneForRuntimeKey } from "../../workflows/workflow-preflight.ts";
 import { workflowGraphStageNodes } from "./workflow-graph.ts";
 
-export const ASYNC_STATUS_SNAPSHOT_KIND = "pi-subagents.async-status-snapshot";
+export const ASYNC_STATUS_SNAPSHOT_KIND = "pi-cciotti.async-status-snapshot";
 export const ASYNC_STATUS_SNAPSHOT_VERSION = 1;
 
 const DEFAULT_MAX_RUNS = 20;

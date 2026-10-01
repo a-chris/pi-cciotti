@@ -14,14 +14,14 @@ it("traces bounded completion reasons through NODE_DEBUG without changing delive
 		return child;
 	};
 	const disabled = run("");
-	const enabled = run("pi-subagents-notify");
+	const enabled = run("pi-cciotti-notify");
 	assert.equal(disabled.stderr, "");
 	assert.equal(enabled.stdout, disabled.stdout);
 	assert.equal(JSON.parse(enabled.stdout).length, 7);
 	assert.deepEqual(JSON.parse(enabled.stdout).at(-1).options, { triggerTurn: false });
 	const records = enabled.stderr.trim().split("\n").map((line) => {
 		assert.ok(line.length < 512, line);
-		assert.match(line, /^PI-SUBAGENTS-NOTIFY \d+: /);
+		assert.match(line, /^PI-CCIOTTI-NOTIFY \d+: /);
 		return JSON.parse(line.slice(line.indexOf("{")));
 	});
 	assert.deepEqual([...new Set(records.map((row) => row.reason))].sort(), [

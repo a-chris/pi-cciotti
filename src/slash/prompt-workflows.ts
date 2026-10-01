@@ -252,7 +252,7 @@ export function registerPromptWorkflowCommands(input: {
 	const { pi, run } = input;
 
 	pi.registerCommand("prompt-workflow", {
-		description: "Run a prompt template through native pi-subagents: /prompt-workflow <name> [args]",
+		description: "Run a prompt template through native pi-cciotti: /prompt-workflow <name> [args]",
 		handler: async (rawArgs, ctx) => {
 			const words = shellWords(rawArgs);
 			const name = words.shift();

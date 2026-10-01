@@ -481,7 +481,7 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 		mockPi.onCall({ delay: 5_000, output: "two done" });
 		// This fixture owns real parallel deadline enforcement; dirty recovery is
 		// covered below with mutation ordered before an explicit timeout request.
-		const repo = createRepo("pi-subagents-parallel-timeout-");
+		const repo = createRepo("pi-cciotti-parallel-timeout-");
 		try {
 			const id = `async-timeout-parallel-${Date.now().toString(36)}`;
 			executeAsyncChain(id, {
@@ -559,7 +559,7 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 	});
 
 	it("classifies a timed-out dirty child with a missing requested report as recovery-needed", { skip: !isAsyncAvailable() ? "jiti not available" : process.platform === "win32" ? "timeout signal delivery intermittent on Windows CI" : undefined }, async () => {
-		const repo = createRepo("pi-subagents-timeout-recovery-");
+		const repo = createRepo("pi-cciotti-timeout-recovery-");
 		const changedPath = path.join(repo, "input.md");
 		const partialChange = "partial child change\n";
 		mockPi.onCall({

@@ -594,7 +594,7 @@ description: Package ambiguous
 ---
 Package prompt.
 `);
-		fs.writeFileSync(path.join(packageRoot, "package.json"), JSON.stringify({ "pi-subagents": { agents: ["agents"] } }));
+		fs.writeFileSync(path.join(packageRoot, "package.json"), JSON.stringify({ "pi-cciotti": { agents: ["agents"] } }));
 		fs.writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ packages: [packageRoot] }));
 		writeAgent(path.join(process.env.PI_CODING_AGENT_DIR!, "agents", "ambiguous.md"), `---
 name: ambiguous

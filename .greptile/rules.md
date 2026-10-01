@@ -1,4 +1,4 @@
-# pi-subagents review rules
+# pi-cciotti review rules
 
 Only report findings that identify a concrete, reachable release risk, direct contract contradiction, or clear local simplification. Avoid speculative hardening, broad rewrites, optional future-proofing, and unsupported edge-case warnings.
 

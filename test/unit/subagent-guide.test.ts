@@ -7,7 +7,7 @@ describe("subagent guide", () => {
 	it("reads the packaged overview by default", () => {
 		const guide = readSubagentGuide();
 
-		assert.match(guide, /# pi-subagents/);
+		assert.match(guide, /# pi-cciotti/);
 	});
 
 	it("lists valid topics for an unknown topic without changing files", () => {

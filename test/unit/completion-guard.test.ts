@@ -278,7 +278,7 @@ test("hyphenated fix adjectives in review tasks do not trigger the completion gu
 });
 
 test("read-only issue drafting tasks do not trigger on suggested fix wording", () => {
-	const task = "Draft GitHub issue for pi-subagents bug from current conversation. Include title, environment/context, reproduction steps, actual/expected, logs excerpt, suspected cause, suggested fix. Terse but complete. No tools needed.";
+	const task = "Draft GitHub issue for pi-cciotti bug from current conversation. Include title, environment/context, reproduction steps, actual/expected, logs excerpt, suspected cause, suggested fix. Terse but complete. No tools needed.";
 	const result = evaluateCompletionMutationGuard({
 		agent: "delegate",
 		task,

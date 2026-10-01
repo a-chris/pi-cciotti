@@ -159,7 +159,7 @@ function inheritParentProviders(modelRuntime: ModelRuntimeInstance, parentProvid
 	return registered;
 }
 
-const CHILD_PROMPT_RUNTIME_EXTENSION_PATH = "<inline:pi-subagents:prompt-runtime>";
+const CHILD_PROMPT_RUNTIME_EXTENSION_PATH = "<inline:pi-cciotti:prompt-runtime>";
 
 /** The prompt runtime filters parent-only context before ambient extensions inspect
  *  the child prompt. Other inline hooks keep their normal position after ambient

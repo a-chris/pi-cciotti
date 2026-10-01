@@ -9,7 +9,7 @@ import type { RequiredChildExtensionSnapshot } from "../../shared/required-child
 /**
  * Set in processes that host child sessions (the async runner). The extension
  * entry point registers nothing when it sees it, so an ambient copy of
- * pi-subagents loaded into a child session stays inert.
+ * pi-cciotti loaded into a child session stays inert.
  */
 export const SUBAGENT_CHILD_ENV = "PI_SUBAGENT_CHILD";
 /** Root parent session id the parent publishes for pi-permission-system ask forwarding. */

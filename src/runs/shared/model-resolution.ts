@@ -255,7 +255,7 @@ export interface ResolveSubagentModelOverrideOptions {
 }
 
 function defaultScopeWarn(violation: ModelScopeViolation): void {
-	console.warn(`[pi-subagents] ${violation.message}`);
+	console.warn(`[pi-cciotti] ${violation.message}`);
 }
 
 function configuredScopes(scope: ModelScopeCheckRule | ModelScopeCheckRule[] | undefined): ModelScopeCheckRule[] {

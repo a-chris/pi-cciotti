@@ -402,7 +402,7 @@ async function runSingleAttempt(
 	if (options.parentProviderRegistry) launch.session.parentProviderRegistry = options.parentProviderRegistry;
 	const { toolPlan, capabilityAudit, warnings, launchResolvedExtensions, capture } = launch;
 	if (!shared.launchWarnings.emitted && warnings.length > 0) {
-		for (const warning of warnings) console.warn(`[pi-subagents] ${warning}`);
+		for (const warning of warnings) console.warn(`[pi-cciotti] ${warning}`);
 		shared.launchWarnings.emitted = true;
 	}
 
@@ -1662,7 +1662,7 @@ async function runSyncCompletionInner(
 		agent.skillPath,
 		agent.filePath ? path.dirname(agent.filePath) : skillCwd,
 	);
-	if (skillNames.some((skill) => skill.trim() === "pi-subagents") && missingSkills.includes("pi-subagents")) {
+	if (skillNames.some((skill) => skill.trim() === "pi-cciotti") && missingSkills.includes("pi-cciotti")) {
 		return redactResultPrompt(withRunContext({
 			index: options.index ?? 0,
 			agent: agentName,
@@ -1670,7 +1670,7 @@ async function runSyncCompletionInner(
 			exitCode: 1,
 			messages: [],
 			usage: emptyUsage(),
-			error: "Skills not found: pi-subagents",
+			error: "Skills not found: pi-cciotti",
 		}, options.context));
 	}
 	const systemPrompt = buildEffectiveSystemPrompt({ agent, resolvedSkills, cwd: skillCwd, ...(options.outputPath ? { outputPath: options.outputPath } : {}) });

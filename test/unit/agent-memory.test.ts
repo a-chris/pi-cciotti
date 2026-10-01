@@ -39,7 +39,7 @@ function mkdtemp(prefix: string): string {
 }
 
 function withTempHome<T>(fn: (home: string) => T): T {
-	const home = mkdtemp("pi-subagents-mem-home-");
+	const home = mkdtemp("pi-cciotti-mem-home-");
 	const oldHome = process.env.HOME;
 	const oldUserProfile = process.env.USERPROFILE;
 	const oldPiCodingAgentDir = process.env.PI_CODING_AGENT_DIR;
@@ -60,7 +60,7 @@ function withTempHome<T>(fn: (home: string) => T): T {
 
 // Create a temp project root that findNearestProjectRoot will recognise (.pi dir present).
 function mkProject(): string {
-	const dir = mkdtemp("pi-subagents-mem-project-");
+	const dir = mkdtemp("pi-cciotti-mem-project-");
 	fs.mkdirSync(path.join(dir, ".pi", "agents"), { recursive: true });
 	return dir;
 }
@@ -137,26 +137,26 @@ describe("agentHasWriteTools", () => {
 
 describe("resolveMemoryDir", () => {
 	it("resolves a simple and nested path under the root", () => {
-		const root = mkdtemp("pi-subagents-mem-root-");
+		const root = mkdtemp("pi-cciotti-mem-root-");
 		assert.deepEqual(resolveMemoryDir(root, "reviewer"), { dir: path.join(root, "reviewer") });
 		assert.deepEqual(resolveMemoryDir(root, "team/reviewer"), { dir: path.join(root, "team", "reviewer") });
 	});
 
 	it("rejects empty paths", () => {
-		const root = mkdtemp("pi-subagents-mem-root-");
+		const root = mkdtemp("pi-cciotti-mem-root-");
 		assert.ok("error" in resolveMemoryDir(root, ""));
 		assert.ok("error" in resolveMemoryDir(root, "   "));
 	});
 
 	it("rejects dot and parent segments", () => {
-		const root = mkdtemp("pi-subagents-mem-root-");
+		const root = mkdtemp("pi-cciotti-mem-root-");
 		assert.ok("error" in resolveMemoryDir(root, "."));
 		assert.ok("error" in resolveMemoryDir(root, ".."));
 		assert.ok("error" in resolveMemoryDir(root, "a/../b"));
 	});
 
 	it("rejects absolute and Windows drive-like paths", () => {
-		const root = mkdtemp("pi-subagents-mem-root-");
+		const root = mkdtemp("pi-cciotti-mem-root-");
 		assert.ok("error" in resolveMemoryDir(root, "/tmp/reviewer"));
 		assert.ok("error" in resolveMemoryDir(root, "C:\\Users\\reviewer"));
 		assert.ok("error" in resolveMemoryDir(root, "C:reviewer"));
@@ -164,8 +164,8 @@ describe("resolveMemoryDir", () => {
 	});
 
 	it("rejects a symlinked ancestor before prompting a first write", () => {
-		const root = mkdtemp("pi-subagents-mem-root-");
-		const outside = mkdtemp("pi-subagents-mem-outside-");
+		const root = mkdtemp("pi-cciotti-mem-root-");
+		const outside = mkdtemp("pi-cciotti-mem-outside-");
 		const linkPath = path.join(root, "leak");
 		try {
 			fs.symlinkSync(outside, linkPath);
@@ -177,8 +177,8 @@ describe("resolveMemoryDir", () => {
 	});
 
 	it("rejects a memory dir that is a symlink escaping the root", () => {
-		const root = mkdtemp("pi-subagents-mem-root-");
-		const outside = mkdtemp("pi-subagents-mem-outside-");
+		const root = mkdtemp("pi-cciotti-mem-root-");
+		const outside = mkdtemp("pi-cciotti-mem-outside-");
 		const linkPath = path.join(root, "leak");
 		try {
 			fs.symlinkSync(outside, linkPath);
@@ -193,12 +193,12 @@ describe("resolveMemoryDir", () => {
 
 describe("readMemoryFile", () => {
 	it("returns null when no memory file exists", () => {
-		const dir = mkdtemp("pi-subagents-mem-dir-");
+		const dir = mkdtemp("pi-cciotti-mem-dir-");
 		assert.equal(readMemoryFile(dir), null);
 	});
 
 	it("reads contents and reports byte capping", () => {
-		const dir = mkdtemp("pi-subagents-mem-dir-");
+		const dir = mkdtemp("pi-cciotti-mem-dir-");
 		writeMemoryFile(dir, "line one\nline two\n");
 		const result = readMemoryFile(dir);
 		assert.ok(result && typeof result === "object" && !("error" in result) && result !== "unsafe");
@@ -207,7 +207,7 @@ describe("readMemoryFile", () => {
 	});
 
 	it("flags byte-capped contents", () => {
-		const dir = mkdtemp("pi-subagents-mem-dir-");
+		const dir = mkdtemp("pi-cciotti-mem-dir-");
 		const bigLine = "x".repeat(500);
 		writeMemoryFile(dir, Array.from({ length: 50 }, () => bigLine).join("\n"));
 		const result = readMemoryFile(dir);
@@ -216,7 +216,7 @@ describe("readMemoryFile", () => {
 	});
 
 	it("does not return more than the memory byte cap", () => {
-		const dir = mkdtemp("pi-subagents-mem-dir-");
+		const dir = mkdtemp("pi-cciotti-mem-dir-");
 		writeMemoryFile(dir, "x".repeat(1024 * 1024));
 		const result = readMemoryFile(dir);
 		assert.ok(result && result !== "unsafe");
@@ -225,8 +225,8 @@ describe("readMemoryFile", () => {
 	});
 
 	it("rejects a symlinked memory file that escapes the memory dir", () => {
-		const dir = mkdtemp("pi-subagents-mem-dir-");
-		const outsideFile = path.join(mkdtemp("pi-subagents-mem-outside-"), "secret.md");
+		const dir = mkdtemp("pi-cciotti-mem-dir-");
+		const outsideFile = path.join(mkdtemp("pi-cciotti-mem-outside-"), "secret.md");
 		fs.writeFileSync(outsideFile, "leaked", "utf-8");
 		try {
 			fs.symlinkSync(outsideFile, path.join(dir, AGENT_MEMORY_FILE));
@@ -305,7 +305,7 @@ describe("buildAgentMemoryInjection", () => {
 	});
 
 	it("returns empty for project scope when no project root is found", () => {
-		const nowhere = mkdtemp("pi-subagents-mem-noroot-");
+		const nowhere = mkdtemp("pi-cciotti-mem-noroot-");
 		// Skip deterministically if an ancestor happens to register as a project root.
 		if (findNearestProjectRoot(nowhere) !== null) return;
 		const agent = makeAgent({ memory: { scope: "project", path: "x" }, tools: ["read"] });
@@ -322,7 +322,7 @@ describe("buildAgentMemoryInjection", () => {
 		const project = mkProject();
 		const memoryDir = path.join(project, ".pi", AGENT_MEMORY_DIR_NAME, "leak");
 		fs.mkdirSync(memoryDir, { recursive: true });
-		const outsideFile = path.join(mkdtemp("pi-subagents-mem-outside-"), "secret.md");
+		const outsideFile = path.join(mkdtemp("pi-cciotti-mem-outside-"), "secret.md");
 		fs.writeFileSync(outsideFile, "leaked", "utf-8");
 		try {
 			fs.symlinkSync(outsideFile, path.join(memoryDir, AGENT_MEMORY_FILE));

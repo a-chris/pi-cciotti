@@ -104,8 +104,8 @@ function runToolCalls(agentDir: string, repoDir: string, calls: unknown[]): Reco
 
 describe("control facade drives its verbs end to end", { timeout: 180000 }, () => {
 	it("reads one agent with get/models + agent and opens a mission with mission.create", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-d10-agents-"));
-		const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-d10-repo-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-d10-agents-"));
+		const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-d10-repo-"));
 		const calls: unknown[][] = [
 			["subagent_control", "get-agent", { action: "get", agent: "reviewer" }],
 			["subagent_control", "models-agent", { action: "models", agent: "reviewer" }],
@@ -180,8 +180,8 @@ describe("control facade drives its verbs end to end", { timeout: 180000 }, () =
 	});
 
 	it("delegates one child and runs an inline workflow through their facades", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-d10-deleg-"));
-		const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-d10-work-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-d10-deleg-"));
+		const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-d10-work-"));
 		const calls: unknown[][] = [
 			["subagent", "delegate", { agent: "scout", task: "Reply with exactly: d10-delegation-ok", async: false, output: false }],
 			["subagent_workflow", "workflow", { source: "return 'd10-workflow-ok'", async: false }],

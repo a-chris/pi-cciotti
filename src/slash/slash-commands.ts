@@ -1123,7 +1123,7 @@ export function registerSlashCommands(
 		handler: async (_args, _ctx) => {
 			const profiles = listSubagentProfiles();
 			if (profiles.length === 0) {
-				sendSlashText(pi, "Subagent profiles\n\nNo subagent profiles found in ~/.pi/agent/profiles/pi-subagents/");
+				sendSlashText(pi, "Subagent profiles\n\nNo subagent profiles found in ~/.pi/agent/profiles/pi-cciotti/");
 				return;
 			}
 			sendSlashText(pi, `Subagent profiles\n\n${profiles.join("\n")}`);

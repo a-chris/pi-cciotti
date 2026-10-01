@@ -34,7 +34,7 @@ function readRecovery(sessionFile: string): PrunedForkRecoveryPayload {
 
 describe("pruned fork sessions", () => {
 	it("spills transcript overflow to private recovery with stable visible refs", async () => {
-		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-pruned-fork-"));
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-pruned-fork-"));
 		try {
 			const parentSession = path.join(tempDir, "parent.jsonl");
 			const childSession = path.join(tempDir, "child.jsonl");
@@ -74,7 +74,7 @@ describe("pruned fork sessions", () => {
 	});
 
 	it("summarizes non-tool assistant overflow before user text", async () => {
-		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-pruned-assistant-"));
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-pruned-assistant-"));
 		try {
 			const parentSession = path.join(tempDir, "parent.jsonl");
 			const childSession = path.join(tempDir, "child.jsonl");
@@ -96,7 +96,7 @@ describe("pruned fork sessions", () => {
 	});
 
 	it("fails closed for invalid JSON and missing item summaries", async () => {
-		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-pruned-invalid-summary-"));
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-pruned-invalid-summary-"));
 		try {
 			const childSession = path.join(tempDir, "child.jsonl");
 			writeJsonl(childSession, largeForkEntries(path.join(tempDir, "parent.jsonl")));
@@ -111,7 +111,7 @@ describe("pruned fork sessions", () => {
 	});
 
 	it("rejects a newline-escaped duplicate of a spilled raw body", async () => {
-		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-pruned-raw-leak-"));
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-pruned-raw-leak-"));
 		try {
 			const parentSession = path.join(tempDir, "parent.jsonl");
 			const childSession = path.join(tempDir, "child.jsonl");
@@ -129,7 +129,7 @@ describe("pruned fork sessions", () => {
 	});
 
 	it("rejects a duplicate spilled tool-call argument after parsing", async () => {
-		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-pruned-tool-call-leak-"));
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-pruned-tool-call-leak-"));
 		try {
 			const parentSession = path.join(tempDir, "parent.jsonl");
 			const childSession = path.join(tempDir, "child.jsonl");
@@ -147,7 +147,7 @@ describe("pruned fork sessions", () => {
 	});
 
 	it("fails closed on recovery validation and an unspillable budget overflow", async () => {
-		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-pruned-budget-"));
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-pruned-budget-"));
 		try {
 			const parentSession = path.join(tempDir, "parent.jsonl");
 			const invalidRecoverySession = path.join(tempDir, "invalid-recovery.jsonl");
@@ -171,7 +171,7 @@ describe("pruned fork sessions", () => {
 	});
 
 	it("blocks fork use until overflow pruning succeeds and keeps thinking sanitization", async () => {
-		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-pruned-resolver-"));
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-pruned-resolver-"));
 		try {
 			const parentSession = path.join(tempDir, "parent.jsonl");
 			const childSession = path.join(tempDir, "child.jsonl");
@@ -195,7 +195,7 @@ describe("pruned fork sessions", () => {
 	});
 
 	it("does not expose a full fork after pruning fails", async () => {
-		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-pruned-failure-"));
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-pruned-failure-"));
 		try {
 			const parentSession = path.join(tempDir, "parent.jsonl");
 			const childSession = path.join(tempDir, "child.jsonl");

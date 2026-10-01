@@ -28,10 +28,10 @@ import { SUBAGENT_GUIDE_TOPICS } from "../../src/extension/subagent-guide.ts";
 const servedFiles = [
 	"README.md",
 	...SUBAGENT_GUIDE_TOPICS.filter((topic) => topic !== "overview").map((topic) => `docs/${topic}.md`),
-	"skills/pi-subagents/SKILL.md",
+	"skills/pi-cciotti/SKILL.md",
 	"skills/council-mode/SKILL.md",
 	"prompts/council.md",
-	...readdirSync("skills/pi-subagents/references").filter((name) => name.endsWith(".md")).map((name) => `skills/pi-subagents/references/${name}`),
+	...readdirSync("skills/pi-cciotti/references").filter((name) => name.endsWith(".md")).map((name) => `skills/pi-cciotti/references/${name}`),
 ];
 
 const CONTROL_VERBS = new Set<string>(SUBAGENT_CONTROL_ACTIONS);

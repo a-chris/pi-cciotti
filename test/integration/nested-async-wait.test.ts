@@ -10,7 +10,7 @@ import { DIRS } from "../../src/shared/types.ts";
 import { makeAgent } from "../support/helpers.ts";
 
 it("native reviewer consumes nested persona results via exact, prefix, and aggregate waits", {
-	skip: !process.env.PI_SUBAGENTS_NATIVE_PI_ROOT && "Requires PI_SUBAGENTS_NATIVE_PI_ROOT and native-peer-loader.mjs",
+	skip: !process.env.PI_CCIOTTI_NATIVE_PI_ROOT && "Requires PI_CCIOTTI_NATIVE_PI_ROOT and native-peer-loader.mjs",
 	timeout: 60000,
 }, async () => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-native-nested-wait-"));
@@ -19,7 +19,7 @@ it("native reviewer consumes nested persona results via exact, prefix, and aggre
 	const savedEnv = { ...process.env };
 	process.env.PI_CODING_AGENT_DIR = agentDir;
 	process.env.PI_OFFLINE = "1";
-	process.env.PI_SUBAGENTS_NATIVE_WAIT_AUDIT = auditPath;
+	process.env.PI_CCIOTTI_NATIVE_WAIT_AUDIT = auditPath;
 	const extension = fileURLToPath(new URL("../fixtures/native-nested-wait-provider.ts", import.meta.url));
 	fs.mkdirSync(path.join(agentDir, "agents"), { recursive: true });
 	fs.writeFileSync(path.join(agentDir, "settings.json"), JSON.stringify({ compaction: { enabled: false }, retry: { enabled: false } }));
@@ -52,7 +52,7 @@ it("native reviewer consumes nested persona results via exact, prefix, and aggre
 	} finally {
 		await factory.dispose();
 		setChildSessionFactory(undefined);
-		for (const key of ["PI_CODING_AGENT_DIR", "PI_OFFLINE", "PI_SUBAGENTS_NATIVE_WAIT_AUDIT"]) {
+		for (const key of ["PI_CODING_AGENT_DIR", "PI_OFFLINE", "PI_CCIOTTI_NATIVE_WAIT_AUDIT"]) {
 			if (savedEnv[key] === undefined) delete process.env[key]; else process.env[key] = savedEnv[key];
 		}
 		fs.rmSync(root, { recursive: true, force: true });

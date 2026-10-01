@@ -19,8 +19,8 @@ function writeJson(filePath: string, value: unknown): void {
 
 describe("subagents.modelScope discovery", () => {
 	beforeEach(() => {
-		tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-scope-home-"));
-		tempProject = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-scope-project-"));
+		tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-scope-home-"));
+		tempProject = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-scope-project-"));
 		process.env.HOME = tempHome;
 		process.env.USERPROFILE = tempHome;
 		delete process.env.PI_CODING_AGENT_DIR;

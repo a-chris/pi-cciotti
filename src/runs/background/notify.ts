@@ -416,7 +416,7 @@ export function formatGroupedCompletion(details: SubagentNotifyDetails[]): strin
 	return blocks.join("\n").trimEnd();
 }
 
-const notificationDebug = debuglog("pi-subagents-notify");
+const notificationDebug = debuglog("pi-cciotti-notify");
 type TraceIdentity = Pick<CompletionNotification, "id" | "runId" | "source">;
 type NotificationReason = "disposed" | "missing_session" | "foreground_session_mismatch" | "not_owned"
 	| "deduped_ttl" | "deduped_pending" | "batch_deferred"

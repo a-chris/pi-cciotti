@@ -9,7 +9,7 @@ import { missionStatePath } from "../../src/missions/workflow-state.ts";
 import type { RetainedChild } from "../../src/runs/background/retained-children.ts";
 
 function fixture() {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-goal-mission-"));
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-goal-mission-"));
 	const projectRoot = path.join(root, "project");
 	fs.mkdirSync(projectRoot, { recursive: true });
 	const location = resolveMissionStoreLocation({ projectRoot, agentDir: path.join(root, "agent") });

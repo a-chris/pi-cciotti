@@ -7,7 +7,7 @@ import { validateToolBudgetConfig } from "../runs/shared/tool-budget.ts";
 import { BUILTIN_AGENT_NAMES } from "./builtin-names.ts";
 import type { AgentConfig, AgentDefaultContext, AgentDiscoveryDiagnostic } from "./agents.ts";
 
-export const RUNTIME_AGENT_REGISTRY_KEY = "pi-subagents.runtime-agents.v1";
+export const RUNTIME_AGENT_REGISTRY_KEY = "pi-cciotti.runtime-agents.v1";
 
 const MAX_RUNTIME_AGENTS_PER_PI = 200;
 const MAX_AGENT_NAME_LENGTH = 128;

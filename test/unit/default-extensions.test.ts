@@ -33,9 +33,9 @@ function writeProjectAgent(name: string, extensions?: string): void {
 
 describe("subagents.defaultExtensions", () => {
 	beforeEach(() => {
-		tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-home-"));
+		tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-home-"));
 		tempProject = fs.mkdtempSync(
-			path.join(os.tmpdir(), "pi-subagents-project-"),
+			path.join(os.tmpdir(), "pi-cciotti-project-"),
 		);
 		process.env.HOME = tempHome;
 		process.env.USERPROFILE = tempHome;

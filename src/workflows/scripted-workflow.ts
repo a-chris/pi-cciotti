@@ -1684,7 +1684,7 @@ export async function runWorkflowScript(options: RunWorkflowScriptOptions): Prom
 	try {
 		acornPath = resolveWorkflowParserEntry();
 	} catch (error) {
-		throw new Error("Workflow parser dependency 'acorn' is unavailable from pi-subagents. Reinstall pi-subagents dependencies before launching workflowScript.", { cause: error });
+		throw new Error("Workflow parser dependency 'acorn' is unavailable from pi-cciotti. Reinstall pi-cciotti dependencies before launching workflowScript.", { cause: error });
 	}
 	const worker = new Worker(WORKER_SOURCE, { eval: true, workerData: { acornPath } });
 	const emits: unknown[] = [];

@@ -249,23 +249,23 @@ describe("skills filesystem fallback", () => {
 		assert.match(injection, /amp&amp;skill[\\/]SKILL\.md/);
 	});
 
-	it("does not expose pi-subagents as a child-injectable skill", () => {
-		makeProjectSkill(tempDir, "pi-subagents", "Parent orchestration only.");
+	it("does not expose pi-cciotti as a child-injectable skill", () => {
+		makeProjectSkill(tempDir, "pi-cciotti", "Parent orchestration only.");
 		makeProjectSkill(tempDir, "safe-bash", "Use safe bash.");
 
 		const available = discoverAvailableSkills(tempDir).map((skill) => skill.name);
-		assert.equal(available.includes("pi-subagents"), false);
+		assert.equal(available.includes("pi-cciotti"), false);
 		assert.equal(available.includes("safe-bash"), true);
 
-		const { resolved, missing } = resolveSkills(["pi-subagents", "safe-bash"], tempDir);
-		assert.deepEqual(missing, ["pi-subagents"]);
+		const { resolved, missing } = resolveSkills(["pi-cciotti", "safe-bash"], tempDir);
+		assert.deepEqual(missing, ["pi-cciotti"]);
 		assert.deepEqual(resolved.map((skill) => skill.name), ["safe-bash"]);
 
 		const agentDir = path.join(tempDir, "agent");
-		writeSkillFile(path.join(agentDir, "skills", "pi-subagents"), "Still parent-only.");
-		const local = resolveSkills(["pi-subagents"], tempDir, ["./skills"], agentDir);
+		writeSkillFile(path.join(agentDir, "skills", "pi-cciotti"), "Still parent-only.");
+		const local = resolveSkills(["pi-cciotti"], tempDir, ["./skills"], agentDir);
 		assert.deepEqual(local.resolved, []);
-		assert.deepEqual(local.missing, ["pi-subagents"]);
+		assert.deepEqual(local.missing, ["pi-cciotti"]);
 	});
 
 	it("classifies package-provided skills as project-package", () => {
@@ -437,7 +437,7 @@ describe("skills filesystem fallback", () => {
 			JSON.stringify({
 				name: "windows-global-package",
 				pi: { skills: ["./skills"] },
-				"pi-subagents": { agents: ["./agents"] },
+				"pi-cciotti": { agents: ["./agents"] },
 			}, null, 2),
 			"utf-8",
 		);
@@ -503,7 +503,7 @@ Windows global agent.
 			JSON.stringify({
 				name: "fallback-global-package",
 				pi: { skills: ["./skills"] },
-				"pi-subagents": { agents: ["./agents"] },
+				"pi-cciotti": { agents: ["./agents"] },
 			}, null, 2),
 			"utf-8",
 		);

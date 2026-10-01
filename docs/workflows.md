@@ -14,7 +14,7 @@ Packaged `worker`, `oracle`, and `reviewer` declare a summary brief in their age
 
 Child-safety boundaries are enforced at runtime:
 
-- Child sessions do not receive the bundled `pi-subagents` skill.
+- Child sessions do not receive the bundled `pi-cciotti` skill.
 - Forked child context filtering removes parent-only subagent artifacts (including old hidden orchestration-instruction messages, slash/status/control messages, and prior parent `subagent` tool-call/tool-result history) while preserving ordinary prose and unrelated tool calls/results.
 - By default, children do not register the `subagent` tool and receive boundary instructions that they are not the parent orchestrator and must not propose or run subagents.
 
@@ -352,7 +352,7 @@ Setup waits remain nonblocking and cancellable. Normal cleanup, including detach
 
 ## Prompt-template integration
 
-`pi-subagents` includes a native prompt-workflow adapter for reusable subagent prompt templates, so you do not need `pi-prompt-template-model` for the common subagent workflow path.
+`pi-cciotti` includes a native prompt-workflow adapter for reusable subagent prompt templates, so you do not need `pi-prompt-template-model` for the common subagent workflow path.
 
 Create a prompt in `.pi/prompts/` or `~/.pi/agent/prompts/`:
 

@@ -252,13 +252,13 @@ describe("arbiter stream selection", () => {
 
 describe("createTaskMutationArbiter", () => {
 	it("is disabled by the env opt-out", () => {
-		const previous = process.env.PI_SUBAGENTS_LLM_INTENT_ARBITER;
-		process.env.PI_SUBAGENTS_LLM_INTENT_ARBITER = "0";
+		const previous = process.env.PI_CCIOTTI_LLM_INTENT_ARBITER;
+		process.env.PI_CCIOTTI_LLM_INTENT_ARBITER = "0";
 		try {
 			assert.equal(createTaskMutationArbiter(fakeCtx()), undefined);
 		} finally {
-			if (previous === undefined) delete process.env.PI_SUBAGENTS_LLM_INTENT_ARBITER;
-			else process.env.PI_SUBAGENTS_LLM_INTENT_ARBITER = previous;
+			if (previous === undefined) delete process.env.PI_CCIOTTI_LLM_INTENT_ARBITER;
+			else process.env.PI_CCIOTTI_LLM_INTENT_ARBITER = previous;
 		}
 	});
 

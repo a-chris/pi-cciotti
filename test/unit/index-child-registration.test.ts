@@ -103,7 +103,7 @@ describe("subagent extension child mode", () => {
 	});
 
 	it("shows omitted workflow async as background even when asyncByDefault is false", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-workflow-manifest-config-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-workflow-manifest-config-"));
 		try {
 			const configDir = path.join(agentDir, "extensions", "subagent");
 			fs.mkdirSync(configDir, { recursive: true });
@@ -258,7 +258,7 @@ describe("subagent extension child mode", () => {
 	});
 
 	it("keeps summary inline tool display to one stable row for every supported state", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-inline-display-config-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-inline-display-config-"));
 		try {
 			const configDir = path.join(agentDir, "extensions", "subagent");
 			fs.mkdirSync(configDir, { recursive: true });
@@ -340,7 +340,7 @@ describe("subagent extension child mode", () => {
 	});
 
 	it("uses configured main-window renderer spacing for call rows", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-renderer-density-config-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-renderer-density-config-"));
 		try {
 			const configDir = path.join(agentDir, "extensions", "subagent");
 			fs.mkdirSync(configDir, { recursive: true });
@@ -370,7 +370,7 @@ describe("subagent extension child mode", () => {
 	});
 
 	it("uses configured main-window renderer density for slash results", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-slash-renderer-density-config-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-slash-renderer-density-config-"));
 		try {
 			const configDir = path.join(agentDir, "extensions", "subagent");
 			fs.mkdirSync(configDir, { recursive: true });
@@ -408,7 +408,7 @@ describe("subagent extension child mode", () => {
 	});
 
 	it("rerenders slash results with the active theme after an appearance change", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-slash-renderer-theme-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-slash-renderer-theme-"));
 		try {
 			const script = String.raw`
 				import registerSubagentExtension from "./index.ts";
@@ -469,7 +469,7 @@ describe("subagent extension child mode", () => {
 	});
 
 	it("registers bg_wait and honors waitTool disabled config", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-wait-tool-config-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-wait-tool-config-"));
 		try {
 			const configDir = path.join(agentDir, "extensions", "subagent");
 			fs.mkdirSync(configDir, { recursive: true });
@@ -526,7 +526,7 @@ describe("subagent extension child mode", () => {
 	});
 
 	it("does not restore the async widget from tool results when asyncWidget is disabled", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-async-widget-config-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-async-widget-config-"));
 		try {
 			const configDir = path.join(agentDir, "extensions", "subagent");
 			fs.mkdirSync(configDir, { recursive: true });
@@ -571,7 +571,7 @@ describe("subagent extension child mode", () => {
 	});
 
 	it("shows active async work in the under-editor widget when FleetView is enabled", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-async-widget-fleet-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-async-widget-fleet-"));
 		try {
 			const configDir = path.join(agentDir, "extensions", "subagent");
 			fs.mkdirSync(configDir, { recursive: true });
@@ -660,7 +660,7 @@ describe("subagent extension child mode", () => {
 			};
 			registerSubagentExtension(pi);
 			for (const handler of handlers.get("session_start")) await handler({ reason: "startup" }, ctx);
-			if (provider?.name !== "pi-subagents" || provider?.sessionId !== sessionId || provider?.sessionFile !== sessionFile) {
+			if (provider?.name !== "pi-cciotti" || provider?.sessionId !== sessionId || provider?.sessionFile !== sessionFile) {
 				throw new Error("liveness provider did not preserve exact session identity: " + JSON.stringify(provider));
 			}
 			if (provider.isActive()) throw new Error("idle runtime reported live work");
@@ -819,7 +819,7 @@ describe("subagent extension child mode", () => {
 	});
 
 	it("disposes pending completion notifications on session shutdown", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-notify-shutdown-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-notify-shutdown-"));
 		const configDir = path.join(agentDir, "extensions", "subagent");
 		fs.mkdirSync(configDir, { recursive: true });
 		fs.writeFileSync(path.join(configDir, "config.json"), JSON.stringify({ completionBatch: { enabled: true, debounceMs: 150 } }), "utf-8");
@@ -894,7 +894,7 @@ describe("subagent extension child mode", () => {
 	});
 
 	it("disposes pending completion notifications during runtime reload cleanup", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-notify-reload-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-notify-reload-"));
 		const configDir = path.join(agentDir, "extensions", "subagent");
 		fs.mkdirSync(configDir, { recursive: true });
 		fs.writeFileSync(path.join(configDir, "config.json"), JSON.stringify({ completionBatch: { enabled: true, debounceMs: 150 } }), "utf-8");
@@ -1006,7 +1006,7 @@ describe("subagent extension child mode", () => {
 	});
 
 	it("ignores the current stale UI context during runtime reload cleanup", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-stale-ui-reload-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-stale-ui-reload-"));
 		const configDir = path.join(agentDir, "extensions", "subagent");
 		fs.mkdirSync(configDir, { recursive: true });
 		fs.writeFileSync(path.join(configDir, "config.json"), JSON.stringify({ asyncWidget: false, fleetView: false }), "utf-8");
@@ -1054,7 +1054,7 @@ describe("subagent extension child mode", () => {
 	});
 
 	it("claims the explicit predecessor session during session replacement", () => {
-		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-session-transition-"));
+		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-session-transition-"));
 		const configDir = path.join(agentDir, "extensions", "subagent");
 		fs.mkdirSync(configDir, { recursive: true });
 		fs.writeFileSync(path.join(configDir, "config.json"), JSON.stringify({ completionBatch: { enabled: false } }), "utf-8");

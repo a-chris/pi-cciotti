@@ -153,7 +153,7 @@ describe("settings subagents.agentExcludeDirs", () => {
 		const previousExtraDirs = process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS;
 		try {
 			if (source === "environment") process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS = alias;
-			if (source === "package") fs.writeFileSync(path.join(container, "package.json"), JSON.stringify({ name: "alias-fixture", "pi-subagents": { agents: ["./agents"] } }));
+			if (source === "package") fs.writeFileSync(path.join(container, "package.json"), JSON.stringify({ name: "alias-fixture", "pi-cciotti": { agents: ["./agents"] } }));
 			settings(user, { agentExcludeDirs: [hidden], ...(source === "wildcard" ? { agentScanDirs: [path.join(root, "sources", "*", "agents")] } : {}) }, source === "package" ? { packages: [container] } : {});
 			assert.equal(discoverAgents(project, "both").agents.some((agent) => agent.name === "allowed-source"), false);
 			fs.unlinkSync(alias);
@@ -208,7 +208,7 @@ describe("settings subagents.agentExcludeDirs", () => {
 	it("does not re-include excluded package roots or change chain discovery", () => {
 		const pkg = path.join(root, "pkg");
 		writeAgent(path.join(pkg, "agents"), "package-hidden");
-		fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "exclude-fixture", "pi-subagents": { agents: ["./agents"], chains: ["./agents"] } }));
+		fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "exclude-fixture", "pi-cciotti": { agents: ["./agents"], chains: ["./agents"] } }));
 		fs.writeFileSync(path.join(pkg, "agents", "kept.chain.json"), JSON.stringify({ name: "kept-chain", description: "Retained chain", chain: [{ agent: "scout", task: "Inspect" }] }));
 		settings(user, {}, { packages: [pkg] });
 		assert.equal(discoverAgentsAll(project).package.some((agent) => agent.name === "package-hidden"), true);
@@ -226,11 +226,11 @@ describe("settings subagents.agentExcludeDirs", () => {
 		writeAgent(excludedAgents, "package-hidden");
 		writeAgent(path.join(root, "allowed"), "outside");
 		const manifest = path.join(pkg, "package.json");
-		fs.writeFileSync(manifest, JSON.stringify({ name: "fixture", "pi-subagents": { agents: ["./agents"] } }));
+		fs.writeFileSync(manifest, JSON.stringify({ name: "fixture", "pi-cciotti": { agents: ["./agents"] } }));
 		settings(user, { agentExcludeDirs: [pkg] }, { packages: [pkg] });
 		const reads = recordReads();
 		assert.equal(discoverAgents(project, "both").agents.some((agent) => agent.name === "outside"), false);
-		fs.writeFileSync(manifest, JSON.stringify({ name: "fixture", "pi-subagents": { agents: ["../allowed"] } }));
+		fs.writeFileSync(manifest, JSON.stringify({ name: "fixture", "pi-cciotti": { agents: ["../allowed"] } }));
 		const cached = discoverAgents(project, "both");
 		assert.equal(cached.agents.some((agent) => agent.name === "outside"), true);
 		assert.equal(cached.agents.some((agent) => agent.name === "package-hidden"), false);

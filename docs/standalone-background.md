@@ -12,7 +12,7 @@ The resolver recognizes Bun's Windows virtual entrypoint prefixes, `B:/~BUN/` an
 
 A local Windows x64 smoke passed with **xz-dev/pi `0.85.1-xz.169.1.gb5f4d0ff`, Bun 1.4.2**: a fresh async worker executed a read-only Git command, returned its result, delivered the native completion notification, and exited with code 0 and no remaining runner process. This is not validation of the official Windows distribution or every Bun-compiled Pi host. Windows remains **experimental**: the full standalone lifecycle matrix has not been validated there.
 
-Node-hosted npm Pi keeps its existing runner path and is not affected by this virtual-entrypoint detection defect. Installing only the pi-subagents extension through npm does not change a Bun-compiled Pi host into an npm Pi host.
+Node-hosted npm Pi keeps its existing runner path and is not affected by this virtual-entrypoint detection defect. Installing only the pi-cciotti extension through npm does not change a Bun-compiled Pi host into an npm Pi host.
 
 ## Official binary gate
 

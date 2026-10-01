@@ -19,7 +19,7 @@ export function validatePermissionRules(value: unknown, label: string): Permissi
 	const result: PermissionRules = {};
 	for (const [tool, decision] of Object.entries(value)) {
 		if (!tool.trim()) throw new Error(`${label} contains an empty tool name.`);
-		if (tool === "bash") throw new Error(`${label}.bash is unsupported; pi-subagents leaves bash policy to pi-guard.`);
+		if (tool === "bash") throw new Error(`${label}.bash is unsupported; pi-cciotti leaves bash policy to pi-guard.`);
 		if (INTERNAL_TOOLS.has(tool)) throw new Error(`${label}.${tool} is reserved for child coordination and cannot be gated.`);
 		if (!DECISIONS.has(decision as PermissionDecision)) throw new Error(`${label}.${tool} must be allow, ask, or deny.`);
 		result[tool] = decision as PermissionDecision;

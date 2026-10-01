@@ -110,7 +110,7 @@ describe("subagent extension RPC bridge", () => {
 		);
 		assert.deepEqual(
 			(reply as { data: { capabilities?: { asyncStatusSnapshot?: unknown } } }).data.capabilities?.asyncStatusSnapshot,
-			{ kind: "pi-subagents.async-status-snapshot", version: 1 },
+			{ kind: "pi-cciotti.async-status-snapshot", version: 1 },
 		);
 		assert.deepEqual(
 			(reply as { data: { capabilities?: { statusProjection?: unknown } } }).data.capabilities?.statusProjection,
@@ -353,7 +353,7 @@ describe("subagent extension RPC bridge", () => {
 
 		const reply = await request(events, "async-snapshot", "status");
 		const snapshot = (reply as any).data.asyncSnapshot;
-		assert.equal(snapshot.kind, "pi-subagents.async-status-snapshot");
+		assert.equal(snapshot.kind, "pi-cciotti.async-status-snapshot");
 		assert.equal(snapshot.version, 1);
 		assert.deepEqual(snapshot.runs.map((run: { id: string }) => run.id).sort(), ["done", "run-1"]);
 		assert.equal(JSON.stringify(snapshot).includes("PRIVATE_RPC_LEAK"), false);

@@ -58,7 +58,7 @@ function writePackageAgent(name: string): void {
 
 describe("agent eject/disable/enable/reset management actions", () => {
 	beforeEach(() => {
-		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-eject-"));
+		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-eject-"));
 		oldAgentDir = process.env.PI_CODING_AGENT_DIR;
 		process.env.PI_CODING_AGENT_DIR = path.join(tempDir, "agent-home");
 		clearSkillCache();

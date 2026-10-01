@@ -1,10 +1,10 @@
 <p>
-  <img src="banner.png" alt="pi-subagents" width="1100">
+  <img src="banner.png" alt="pi-cciotti" width="1100">
 </p>
 
-# pi-subagents
+# pi-cciotti
 
-`pi-subagents` lets Pi delegate work to focused child agents. Use it for code review, scouting, implementation, parallel audits, saved workflows, background jobs, and anything else that benefits from a second or third set of model eyes.
+`pi-cciotti` lets Pi delegate work to focused child agents. Use it for code review, scouting, implementation, parallel audits, saved workflows, background jobs, and anything else that benefits from a second or third set of model eyes.
 
 <https://github.com/user-attachments/assets/702554ec-faaf-4635-80aa-fb5d6e292fd1>
 
@@ -13,18 +13,18 @@
 Install from this repository, not the npm registry:
 
 ```bash
-pi install https://github.com/a-chris/pi-subagents
+pi install https://github.com/a-chris/pi-cciotti
 ```
 
 This tracks the default branch. To pin a tag for a reproducible install, add it to the URL (`@v0.69.0`); `pi update --extensions` then reconciles the checkout to that ref. From a local clone of this repo, a path install works too and picks up edits on reload:
 
 ```bash
-pi install /path/to/pi-subagents
+pi install /path/to/pi-cciotti
 ```
 
-> **Do not `pi install npm:pi-subagents`.** That name on npm belongs to the upstream project, so it installs upstream's newest release (currently 0.73.x) — which does not contain this fork's changes, and whose version numbers no longer line up with the tags in this repository.
+> **Install from this repository, not npm.** `pi-cciotti` is not published to the npm registry. The registry name `pi-subagents` belongs to the upstream project this fork is based on: `pi install npm:pi-subagents` would install upstream's newest release (currently 0.74.0), which does not contain this fork's changes and whose version numbers no longer line up with the tags in this repository.
 
-That is the only required step. Background children use the host's SDK: npm Pi keeps its detached Node runner; the official Pi 0.85.1 Linux x64 standalone release loads the same runner through Pi's embedded SDK, without a separate SDK install. See [Standalone background execution](docs/standalone-background.md) for the supported boundary and validation gate. To try the extension in a single session without installing it, use `pi -e /path/to/pi-subagents`.
+That is the only required step. Background children use the host's SDK: npm Pi keeps its detached Node runner; the official Pi 0.85.1 Linux x64 standalone release loads the same runner through Pi's embedded SDK, without a separate SDK install. See [Standalone background execution](docs/standalone-background.md) for the supported boundary and validation gate. To try the extension in a single session without installing it, use `pi -e /path/to/pi-cciotti`.
 
 ## This fork
 

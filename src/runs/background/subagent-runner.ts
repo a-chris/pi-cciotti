@@ -147,7 +147,7 @@ import { runExternalJob } from "../shared/external-job-runner.ts";
 import { createOrcaProgressTab, type OrcaProgressTab } from "../shared/orca-progress-tabs.ts";
 import type { ResolvedSubagentCapabilityCeiling } from "../shared/capability-ceiling.ts";
 
-// This process hosts child sessions. An ambient copy of pi-subagents loaded
+// This process hosts child sessions. An ambient copy of pi-cciotti loaded
 // into one of them must register nothing; the variable marks the process as a
 // child host.
 process.env[SUBAGENT_CHILD_ENV] = "1";
@@ -1043,7 +1043,7 @@ export async function runSingleStepInner(
 		}
 		const { warnings, capabilityAudit: attemptCapabilityAudit } = launch;
 		if (!launchWarningsEmitted && warnings.length > 0) {
-			for (const warning of warnings) console.warn(`[pi-subagents] ${warning}`);
+			for (const warning of warnings) console.warn(`[pi-cciotti] ${warning}`);
 			launchWarningsEmitted = true;
 		}
 		if (step.definitionDigest) {
@@ -2458,7 +2458,7 @@ export async function runSubagent(
 		if (reportedGitProbeErrors.has(externalCwd)) return;
 		reportedGitProbeErrors.add(externalCwd);
 		const detail = error instanceof Error ? error.message : String(error);
-		console.error(`[pi-subagents] Git activity evidence unavailable for '${externalCwd.slice(-300)}'; check the cwd and Git installation: ${detail.slice(0, 500)}`);
+		console.error(`[pi-cciotti] Git activity evidence unavailable for '${externalCwd.slice(-300)}'; check the cwd and Git installation: ${detail.slice(0, 500)}`);
 	};
 	const readSharedGitFingerprint = (externalCwd: string): Promise<string | undefined> => {
 		const inFlight = gitProbesByCwd.get(externalCwd);

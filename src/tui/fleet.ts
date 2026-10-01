@@ -288,7 +288,7 @@ export function collectFleetSnapshot(
 
 	if (state.currentSessionId) {
 		try {
-			for (const run of snapshotExternalRuns(state.currentSessionId, { ignoreMalformed: true, onMalformedRecord: (message) => console.warn(`[pi-subagents] Removed ${message}`) })) {
+			for (const run of snapshotExternalRuns(state.currentSessionId, { ignoreMalformed: true, onMalformedRecord: (message) => console.warn(`[pi-cciotti] Removed ${message}`) })) {
 				items.push({
 					key: `external:${run.id}`,
 					kind: "external",

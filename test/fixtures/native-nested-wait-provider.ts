@@ -6,7 +6,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 export default function (pi: ExtensionAPI) {
 	pi.on("tool_execution_update", (event, ctx) => {
 		if (event.toolName === "bg_wait" && ctx.model?.id.startsWith("arm-")) {
-			fs.writeFileSync(`${process.env.PI_SUBAGENTS_NATIVE_WAIT_AUDIT}.${ctx.model.id}.release`, "ready");
+			fs.writeFileSync(`${process.env.PI_CCIOTTI_NATIVE_WAIT_AUDIT}.${ctx.model.id}.release`, "ready");
 		}
 	});
 	pi.registerProvider("nested-wait-fixture", {
@@ -33,7 +33,7 @@ export default function (pi: ExtensionAPI) {
 					if (model.id === "persona") {
 						const arm = context.messages.filter((message) => message.role === "user").map((message) => JSON.stringify(message.content)).join("\n").match(/arm-[ab]/)?.[0];
 						if (!arm) throw new Error("Persona task omitted its owning arm");
-						const release = `${process.env.PI_SUBAGENTS_NATIVE_WAIT_AUDIT}.${arm}.release`;
+						const release = `${process.env.PI_CCIOTTI_NATIVE_WAIT_AUDIT}.${arm}.release`;
 						const deadline = Date.now() + 10000;
 						while (!fs.existsSync(release)) {
 							options?.signal?.throwIfAborted();
@@ -60,7 +60,7 @@ export default function (pi: ExtensionAPI) {
 						output.content = [{ type: "text", text: `CONSUMED_${model.id}: PERSONA_EVIDENCE` }];
 					}
 					output.stopReason = output.content.some((part) => part.type === "toolCall") ? "toolUse" : "stop";
-					fs.appendFileSync(process.env.PI_SUBAGENTS_NATIVE_WAIT_AUDIT!, JSON.stringify({ model: model.id, content: output.content }) + "\n");
+					fs.appendFileSync(process.env.PI_CCIOTTI_NATIVE_WAIT_AUDIT!, JSON.stringify({ model: model.id, content: output.content }) + "\n");
 					stream.push({ type: "start", partial: output });
 					stream.push({ type: "done", reason: output.stopReason, message: output });
 				} catch (error) {

@@ -30,7 +30,7 @@ function readMission(filePath: string | undefined): MissionRecord | undefined {
 export function formatInspectorDashboard(input: { status: AsyncStatus; asyncDir: string; index?: number; mission?: MissionRecord; allowSteer?: boolean; allowStop?: boolean; sessionRoots?: string[] }): string {
 	const { status, asyncDir, mission } = input;
 	const lines = [
-		`pi-subagents inspector for ${status.runId}`,
+		`pi-cciotti inspector for ${status.runId}`,
 		"This inspector mirrors lifecycle artifacts; closing it does not stop the run.",
 		"",
 	];
@@ -124,7 +124,7 @@ export function runInspector(argv = process.argv.slice(2)): void {
 	const render = () => {
 		const status = readStatus(options.asyncDir);
 		if (!status || status.runId !== options.runId) {
-			process.stdout.write(`\x1b[2J\x1b[Hpi-subagents inspector\n\nLifecycle status for ${options.runId} is unavailable.\n`);
+			process.stdout.write(`\x1b[2J\x1b[Hpi-cciotti inspector\n\nLifecycle status for ${options.runId} is unavailable.\n`);
 			return;
 		}
 		process.stdout.write(`\x1b[2J\x1b[H${formatInspectorDashboard({ status, asyncDir: options.asyncDir, index: options.index, mission: readMission(options.missionPath), allowSteer: options.allowSteer, allowStop: options.allowStop, sessionRoots: options.sessionRoots })}${notice ? `\n\n${notice}` : ""}\n> `);

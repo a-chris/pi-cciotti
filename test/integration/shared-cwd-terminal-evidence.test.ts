@@ -10,8 +10,8 @@ import { ASYNC_DIR, RESULTS_DIR, observeSharedCwdRunner } from "../support/async
 // Synthetic lifecycle only: no runner, providers, polling, or Windows control.
 test("shared-cwd failure artifact preserves correlated allowlisted lifecycle once", () => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "terminal-evidence-"));
-	const previous = process.env.PI_SUBAGENTS_TERMINAL_EVIDENCE_DIR;
-	process.env.PI_SUBAGENTS_TERMINAL_EVIDENCE_DIR = path.join(root, "artifacts");
+	const previous = process.env.PI_CCIOTTI_TERMINAL_EVIDENCE_DIR;
+	process.env.PI_CCIOTTI_TERMINAL_EVIDENCE_DIR = path.join(root, "artifacts");
 	const id = `terminal-evidence-${process.pid}`;
 	const runDir = path.join(ASYNC_DIR, id);
 	const resultFile = path.join(RESULTS_DIR, `${id}.json`);
@@ -71,8 +71,8 @@ test("shared-cwd failure artifact preserves correlated allowlisted lifecycle onc
 		assert.deepEqual(fs.readdirSync(path.dirname(artifact)), ["shared-cwd-terminal.json"]);
 	} finally {
 		observer.dispose();
-		if (previous === undefined) delete process.env.PI_SUBAGENTS_TERMINAL_EVIDENCE_DIR;
-		else process.env.PI_SUBAGENTS_TERMINAL_EVIDENCE_DIR = previous;
+		if (previous === undefined) delete process.env.PI_CCIOTTI_TERMINAL_EVIDENCE_DIR;
+		else process.env.PI_CCIOTTI_TERMINAL_EVIDENCE_DIR = previous;
 		fs.rmSync(runDir, { recursive: true, force: true });
 		fs.rmSync(resultFile, { force: true });
 		fs.rmSync(root, { recursive: true, force: true });
@@ -81,9 +81,9 @@ test("shared-cwd failure artifact preserves correlated allowlisted lifecycle onc
 
 test("shared-cwd evidence is failure-only and write errors retain safe log evidence", () => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "terminal-evidence-"));
-	const previous = process.env.PI_SUBAGENTS_TERMINAL_EVIDENCE_DIR;
+	const previous = process.env.PI_CCIOTTI_TERMINAL_EVIDENCE_DIR;
 	const destination = path.join(root, "artifacts");
-	process.env.PI_SUBAGENTS_TERMINAL_EVIDENCE_DIR = destination;
+	process.env.PI_CCIOTTI_TERMINAL_EVIDENCE_DIR = destination;
 	const observer = observeSharedCwdRunner("terminal-evidence-no-run");
 	try {
 		observer.snapshot = () => { throw new Error("raw secret error"); };
@@ -103,15 +103,15 @@ test("shared-cwd evidence is failure-only and write errors retain safe log evide
 		assert.equal(diagnostics.join("\n").includes("raw secret error"), false);
 		failedWrite.dispose();
 
-		delete process.env.PI_SUBAGENTS_TERMINAL_EVIDENCE_DIR;
+		delete process.env.PI_CCIOTTI_TERMINAL_EVIDENCE_DIR;
 		const logOnly = observeSharedCwdRunner("terminal-evidence-no-run");
 		logOnly.reportFailure((message) => diagnostics.push(message));
 		assert.equal(diagnostics.length, 4, "unconfigured local failures remain log-only");
 		logOnly.dispose();
 	} finally {
 		observer.dispose();
-		if (previous === undefined) delete process.env.PI_SUBAGENTS_TERMINAL_EVIDENCE_DIR;
-		else process.env.PI_SUBAGENTS_TERMINAL_EVIDENCE_DIR = previous;
+		if (previous === undefined) delete process.env.PI_CCIOTTI_TERMINAL_EVIDENCE_DIR;
+		else process.env.PI_CCIOTTI_TERMINAL_EVIDENCE_DIR = previous;
 		fs.rmSync(root, { recursive: true, force: true });
 	}
 });

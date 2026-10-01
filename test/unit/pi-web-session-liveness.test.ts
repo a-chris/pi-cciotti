@@ -196,7 +196,7 @@ describe("pi-web session liveness integration", () => {
 			isActive: () => active,
 		});
 		assert.equal(release.registered, true);
-		assert.equal(provider?.name, "pi-subagents");
+		assert.equal(provider?.name, "pi-cciotti");
 		assert.equal(provider?.sessionId, "session-a");
 		assert.equal(provider?.sessionFile, "/tmp/session-a.jsonl");
 		assert.equal(provider?.isActive(), true);

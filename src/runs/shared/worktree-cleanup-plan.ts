@@ -246,7 +246,7 @@ function resolveRepoRoot(repo: string): string {
 }
 
 function resolveCleanupBaseDir(repoRoot: string, configuredBaseDir: string | undefined): string {
-	const raw = configuredBaseDir ?? process.env.PI_SUBAGENTS_WORKTREE_DIR;
+	const raw = configuredBaseDir ?? process.env.PI_CCIOTTI_WORKTREE_DIR;
 	let dedicatedRoot: string;
 	if (raw === undefined || (configuredBaseDir === undefined && !raw.trim())) {
 		dedicatedRoot = path.join(path.dirname(repoRoot), "worktrees");

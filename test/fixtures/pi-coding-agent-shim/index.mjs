@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 
-export const __piSubagentsTestShim = true;
+export const __piCciottiTestShim = true;
 
 export function getMarkdownTheme() { return {}; }
 export function keyText(keybinding) { return keybinding === "app.tools.expand" ? "configured-expand-key" : ""; }

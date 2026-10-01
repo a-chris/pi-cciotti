@@ -35,7 +35,7 @@ describe("ensureAccessibleDir", () => {
 		fakeFs.failMkdirCodes = ["EPERM", "EBUSY"];
 		const waits: number[] = [];
 
-		ensureAccessibleDir("/tmp/pi-subagents-user/async-subagent-results", {
+		ensureAccessibleDir("/tmp/pi-cciotti-user/async-subagent-results", {
 			fs: fakeFs as any,
 			retryDirectoryErrors: true,
 			retryDelaysMs: [1, 2, 3],
@@ -52,7 +52,7 @@ describe("ensureAccessibleDir", () => {
 		fakeFs.failAccessCodes = ["EPERM", "EACCES"];
 		const waits: number[] = [];
 
-		ensureAccessibleDir("/tmp/pi-subagents-user/async-subagent-results", {
+		ensureAccessibleDir("/tmp/pi-cciotti-user/async-subagent-results", {
 			fs: fakeFs as any,
 			retryDirectoryErrors: true,
 			retryDelaysMs: [1, 2, 3],
@@ -69,7 +69,7 @@ describe("ensureAccessibleDir", () => {
 		fakeFs.failAccessCodes = ["ENOENT"];
 		const waits: number[] = [];
 
-		assert.throws(() => ensureAccessibleDir("/tmp/pi-subagents-user/async-subagent-results", {
+		assert.throws(() => ensureAccessibleDir("/tmp/pi-cciotti-user/async-subagent-results", {
 			fs: fakeFs as any,
 			retryDirectoryErrors: true,
 			retryDelaysMs: [1, 2, 3],

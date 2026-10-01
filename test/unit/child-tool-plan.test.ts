@@ -21,7 +21,7 @@ function runtimeSnapshotHost(serverName: string): McpRuntimeSnapshotHost {
 
 describe("child tool plan", () => {
 	it("fails a launch that selects MCP tools from the adapter's runtime snapshot", () => {
-		const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-runtime-mcp-"));
+		const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-runtime-mcp-"));
 		try {
 			assert.throws(
 				() => resolvePiLaunchToolPlan({ tools: ["read"], mcpDirectTools: ["runtime-only/search"], cwd, agentName: "browser", runtimeSnapshotHost: runtimeSnapshotHost("runtime-only") }),
@@ -180,7 +180,7 @@ describe("child tool plan host builtin intersection", () => {
 
 describe("production launch path supplies hostAvailableBuiltins", () => {
 	it("buildInProcessChildLaunch passes hostAvailableBuiltins to tool plan resolution", () => {
-		const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-launch-builtins-"));
+		const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-launch-builtins-"));
 		const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 		process.env.PI_CODING_AGENT_DIR = cwd;
 		try {

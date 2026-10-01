@@ -198,7 +198,7 @@ function formatPermissionSystemSection(): string[] {
 	const isChild = process.env["PI_SUBAGENT_CHILD"] === "1";
 	lines.push(`- subagent process: ${isChild ? "yes (PI_SUBAGENT_CHILD=1)" : "no"}`);
 	// Whether pi-permission-system is installed and where it stores config is
-	// outside pi-subagents' control, so we only report the forwarding signal we
+	// outside pi-cciotti' control, so we only report the forwarding signal we
 	// own. Run `pi list` to confirm the permission extension is installed.
 	return lines;
 }
@@ -206,7 +206,7 @@ function formatPermissionSystemSection(): string[] {
 function formatWorkflowScriptSection(): string[] {
 	return [
 		"- helpers: runs.run, runs.all, runs.steer, runs.status, runs.ref/refs, emit, console",
-		"- recovery: if runs.all is missing, reload or update pi-subagents; await Promise.all([runs.run(...)]) is also supported",
+		"- recovery: if runs.all is missing, reload or update pi-cciotti; await Promise.all([runs.run(...)]) is also supported",
 	];
 }
 

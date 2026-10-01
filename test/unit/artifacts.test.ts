@@ -21,7 +21,7 @@ describe("project-local artifact paths", () => {
 	});
 
 	function packageDir(packageJson: object, ignore?: { name: ".npmignore" | ".gitignore"; content: string }): string {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-artifacts-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-artifacts-"));
 		tempDirs.push(dir);
 		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify(packageJson), "utf-8");
 		if (ignore) fs.writeFileSync(path.join(dir, ignore.name), ignore.content, "utf-8");

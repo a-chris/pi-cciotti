@@ -40,7 +40,7 @@ afterEach(() => {
 });
 
 function tempDir(): string {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-orca-tabs-test-"));
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-orca-tabs-test-"));
 	tempDirs.push(dir);
 	return dir;
 }

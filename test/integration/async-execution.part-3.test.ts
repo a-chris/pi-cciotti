@@ -688,7 +688,7 @@ export default function() {
 			delay: 500,
 			output: "Implemented second sibling change.",
 		});
-		const repo = createRepo("pi-subagents-shared-cwd-mutation-guard-");
+		const repo = createRepo("pi-cciotti-shared-cwd-mutation-guard-");
 		const id = `async-parallel-shared-cwd-mutation-${Date.now().toString(36)}`;
 		let runnerStarted = false;
 		const observer = observeSharedCwdRunner(id);
@@ -1769,8 +1769,8 @@ export default function() {
 		assert.equal(prompts.filter((prompt) => /two async local skill/.test(prompt) && !/one async local skill/.test(prompt)).length, 1);
 	});
 
-	it("background single runs report unavailable pi-subagents skill requests", () => {
-		const id = `async-pi-subagents-skill-${Date.now().toString(36)}`;
+	it("background single runs report unavailable pi-cciotti skill requests", () => {
+		const id = `async-pi-cciotti-skill-${Date.now().toString(36)}`;
 		const result = executeAsyncSingle(id, {
 			agent: "worker",
 			task: "Do work",
@@ -1787,17 +1787,17 @@ export default function() {
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			skills: ["pi-subagents"],
+			skills: ["pi-cciotti"],
 		});
 
 		assert.equal(result.isError, true);
-		assert.match(result.content[0]?.text ?? "", /Skills not found: pi-subagents/);
+		assert.match(result.content[0]?.text ?? "", /Skills not found: pi-cciotti/);
 	});
 
-	it("background chains report unavailable pi-subagents skill requests", () => {
-		const id = `async-chain-pi-subagents-skill-${Date.now().toString(36)}`;
+	it("background chains report unavailable pi-cciotti skill requests", () => {
+		const id = `async-chain-pi-cciotti-skill-${Date.now().toString(36)}`;
 		const result = executeAsyncChain(id, {
-			chain: [{ agent: "worker", task: "Do work", skill: ["pi-subagents"] }],
+			chain: [{ agent: "worker", task: "Do work", skill: ["pi-cciotti"] }],
 			agents: [makeAgent("worker")],
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			cwd: tempDir,
@@ -1814,7 +1814,7 @@ export default function() {
 		});
 
 		assert.equal(result.isError, true);
-		assert.match(result.content[0]?.text ?? "", /Skills not found: pi-subagents/);
+		assert.match(result.content[0]?.text ?? "", /Skills not found: pi-cciotti/);
 	});
 
 	it("background chains resolve relative step cwd values against the shared cwd", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {

@@ -57,7 +57,7 @@ describe("resolveTempScopeId", () => {
 
 describe("shared temp paths", () => {
 	it("uses the explicit temp root before shared paths resolve", () => {
-		const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-temp-override-"));
+		const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-temp-override-"));
 		const override = path.join(fixture, "async state");
 		const isolatedHome = path.join(fixture, "home");
 		try {
@@ -65,7 +65,7 @@ describe("shared temp paths", () => {
 			const script = `import { ASYNC_DIR, RESULTS_DIR, TEMP_ROOT_DIR } from ${JSON.stringify(moduleUrl)}; console.log(JSON.stringify({ ASYNC_DIR, RESULTS_DIR, TEMP_ROOT_DIR }));`;
 			const result = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "--eval", script], {
 				encoding: "utf-8",
-				env: { ...process.env, HOME: isolatedHome, USERPROFILE: isolatedHome, PI_SUBAGENTS_TEMP_ROOT: override },
+				env: { ...process.env, HOME: isolatedHome, USERPROFILE: isolatedHome, PI_CCIOTTI_TEMP_ROOT: override },
 			});
 			assert.equal(result.status, 0, result.stderr);
 			assert.deepEqual(JSON.parse(result.stdout.trim()), {
@@ -79,7 +79,7 @@ describe("shared temp paths", () => {
 	});
 
 	it("isolates agent-dir profile writes from an inherited PI_CODING_AGENT_DIR", () => {
-		const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-isolation-"));
+		const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-isolation-"));
 		const tempRoot = path.join(fixture, "temp-root");
 		const callerAgentDir = path.join(fixture, "caller-agent");
 		try {
@@ -101,9 +101,9 @@ console.log(JSON.stringify({ agentDir: getAgentDir(), profilePath: path.join(pro
 			const env = {
 				...process.env,
 				PI_CODING_AGENT_DIR: callerAgentDir,
-				PI_SUBAGENTS_TEMP_ROOT: tempRoot,
+				PI_CCIOTTI_TEMP_ROOT: tempRoot,
 			};
-			delete env.PI_SUBAGENTS_TEST_LOADER;
+			delete env.PI_CCIOTTI_TEST_LOADER;
 			const result = spawnSync(process.execPath, [
 				"--experimental-strip-types",
 				"--import", loaderUrl,
@@ -118,7 +118,7 @@ console.log(JSON.stringify({ agentDir: getAgentDir(), profilePath: path.join(pro
 			const output = JSON.parse(result.stdout.trim()) as { agentDir: string; profilePath: string; settingsPath: string };
 			const isolatedAgentDir = path.join(tempRoot, "home", ".pi", "agent");
 			assert.equal(output.agentDir, isolatedAgentDir);
-			assert.equal(output.profilePath, path.join(isolatedAgentDir, "profiles", "pi-subagents", "isolated.json"));
+			assert.equal(output.profilePath, path.join(isolatedAgentDir, "profiles", "pi-cciotti", "isolated.json"));
 			assert.equal(output.settingsPath, path.join(isolatedAgentDir, "settings.json"));
 			assert.equal(fs.existsSync(output.profilePath), true);
 			assert.equal(fs.existsSync(output.settingsPath), true);
@@ -133,7 +133,7 @@ console.log(JSON.stringify({ agentDir: getAgentDir(), profilePath: path.join(pro
 		assert.equal(path.dirname(ASYNC_DIR), TEMP_ROOT_DIR);
 		assert.equal(path.dirname(CHAIN_RUNS_DIR), TEMP_ROOT_DIR);
 		assert.equal(path.dirname(TEMP_ARTIFACTS_DIR), TEMP_ROOT_DIR);
-		assert.match(path.basename(TEMP_ROOT_DIR), /^pi-subagents-/);
+		assert.match(path.basename(TEMP_ROOT_DIR), /^pi-cciotti-/);
 		assert.equal(path.basename(RESULTS_DIR), "async-subagent-results");
 		assert.equal(path.basename(ASYNC_DIR), "async-subagent-runs");
 		assert.equal(path.basename(CHAIN_RUNS_DIR), "chain-runs");

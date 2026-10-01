@@ -17,7 +17,7 @@ import { opencodeSessionHeaders } from "../../shared/opencode-session-headers.ts
  * failure to a pass; every error, timeout, or non-read-only verdict keeps the
  * guard's original behavior.
  *
- * Enabled by default; set PI_SUBAGENTS_LLM_INTENT_ARBITER=0 to disable.
+ * Enabled by default; set PI_CCIOTTI_LLM_INTENT_ARBITER=0 to disable.
  */
 
 const COMPLETION_GUARD_ERROR_PREFIX =
@@ -245,7 +245,7 @@ export function createTaskMutationArbiter(
 	ctx: ArbiterModelContext,
 	options?: TaskMutationArbiterOptions,
 ): TaskMutationArbiter | undefined {
-	if (process.env.PI_SUBAGENTS_LLM_INTENT_ARBITER === "0") return undefined;
+	if (process.env.PI_CCIOTTI_LLM_INTENT_ARBITER === "0") return undefined;
 	const runtime = resolveArbiterRuntime(ctx, options);
 	if (!runtime) return undefined;
 	const cache = new Map<string, TaskMutationVerdict>();

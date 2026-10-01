@@ -86,7 +86,7 @@ const piPackageRoot = resolveAsyncPiPackageRoot();
 /**
  * The detached runner resolves the same host package the foreground
  * `resolvePiCliScript` path resolves, so an explicit
- * `PI_SUBAGENTS_PI_CODING_AGENT_PACKAGE_ROOT` override must be honored here
+ * `PI_CCIOTTI_PI_CODING_AGENT_PACKAGE_ROOT` override must be honored here
  * too. Precedence mirrors the foreground resolver: argv-based discovery wins
  * first (the foreground returns the argv script before any candidate), the
  * environment override is consulted when that discovery cannot identify the
@@ -744,7 +744,7 @@ function spawnRunner(cfg: object, suffix: string, cwd: string, initialStatus: Om
 		closeFd(stdoutFd);
 		closeFd(stderrFd);
 		proc.on("error", (error) => {
-			console.error(`[pi-subagents] async spawn failed: ${error.message}`);
+			console.error(`[pi-cciotti] async spawn failed: ${error.message}`);
 		});
 		proc.once("close", (exitCode, signal) => {
 			const finalize = () => {
@@ -867,7 +867,7 @@ function formatAsyncStartError(mode: SubagentRunMode, message: string): AsyncExe
 	};
 }
 
-const UNAVAILABLE_SUBAGENT_SKILL_ERROR = "Skills not found: pi-subagents";
+const UNAVAILABLE_SUBAGENT_SKILL_ERROR = "Skills not found: pi-cciotti";
 
 class UnavailableSubagentSkillError extends Error {}
 class AsyncStartValidationError extends Error {}
@@ -1005,7 +1005,7 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 			a.skillPath,
 			a.filePath ? path.dirname(a.filePath) : stepCwd,
 		);
-		if (missingSkills.includes("pi-subagents")) throw new UnavailableSubagentSkillError(UNAVAILABLE_SUBAGENT_SKILL_ERROR);
+		if (missingSkills.includes("pi-cciotti")) throw new UnavailableSubagentSkillError(UNAVAILABLE_SUBAGENT_SKILL_ERROR);
 
 		// A namespaced parallel output is injected by the runner, not the prompt.
 		const systemPrompt = buildEffectiveSystemPrompt({ agent: a, resolvedSkills, cwd: stepCwd, ...(!namespaceOutputPath && outputPath ? { outputPath } : {}) });
@@ -1703,7 +1703,7 @@ export function executeAsyncSingle(
 		agentConfig.skillPath,
 		agentConfig.filePath ? path.dirname(agentConfig.filePath) : runnerCwd,
 	);
-	if (missingSkills.includes("pi-subagents")) return formatAsyncStartError("single", UNAVAILABLE_SUBAGENT_SKILL_ERROR);
+	if (missingSkills.includes("pi-cciotti")) return formatAsyncStartError("single", UNAVAILABLE_SUBAGENT_SKILL_ERROR);
 
 	const inheritedNestedRoute = inheritedNestedRouteOf(ctx.childRuntime);
 	const nestedAddress = inheritedNestedRoute ? inheritedNestedParentAddressOf(ctx.childRuntime) : undefined;

@@ -308,7 +308,7 @@ describe("workflow chat progress rendering", () => {
 				mode: "workflow",
 				runId: "wf_8f3a123456",
 				results: [],
-				chatProgress: { mode: "live-card", repoRelation: "same", repoLabel: "pi-subagents" },
+				chatProgress: { mode: "live-card", repoRelation: "same", repoLabel: "pi-cciotti" },
 				workflow: {
 					trace: [
 						{ operation: "run", key: "scout", state: "completed", runId: "run-scout", phase: "Validation", label: "Found renderer seam", durationMs: 12 },
@@ -323,7 +323,7 @@ describe("workflow chat progress rendering", () => {
 		}, { expanded: false }, theme as any));
 
 		assert.match(text, /workflow wf_8f3a12345 .* same repo .* failed/);
-		assert.match(text, /Repo   pi-subagents/);
+		assert.match(text, /Repo   pi-cciotti/);
 		assert.match(text, /Phase  Validation/);
 		assert.match(text, /complete\s+scout Found renderer seam/);
 		assert.match(text, /running\s+tests focused integration suite/);
@@ -351,7 +351,7 @@ describe("workflow chat progress rendering", () => {
 				mode: "workflow",
 				runId: "wf_detached_123456",
 				results: [],
-				chatProgress: { mode: "live-card", repoRelation: "same", repoLabel: "pi-subagents" },
+				chatProgress: { mode: "live-card", repoRelation: "same", repoLabel: "pi-cciotti" },
 				workflow: { trace, emits: [], console: [] },
 			},
 		}, { expanded: false }, theme as any));
@@ -380,7 +380,7 @@ describe("workflow chat progress rendering", () => {
 				runId: "wf_planned",
 				results: [],
 				preflight,
-				chatProgress: { mode: "live-card" as const, repoRelation: "same" as const, repoLabel: "pi-subagents" },
+				chatProgress: { mode: "live-card" as const, repoRelation: "same" as const, repoLabel: "pi-cciotti" },
 				workflow: { trace: [], emits: [], console: [] },
 			},
 		};
@@ -454,7 +454,7 @@ describe("workflow chat progress rendering", () => {
 				runId: "wf_warning_rows",
 				results: [],
 				preflight: { version: 1 as const, coverage: "complete" as const, lanes: [{ key: "writer", mode: "mutation" as const }] },
-				chatProgress: { mode: "live-card" as const, repoRelation: "same" as const, repoLabel: "pi-subagents" },
+				chatProgress: { mode: "live-card" as const, repoRelation: "same" as const, repoLabel: "pi-cciotti" },
 				workflow: {
 					trace: [{ operation: "run" as const, key: "writer", state: "started" as const }],
 					emits: [],
@@ -494,7 +494,7 @@ describe("workflow chat progress rendering", () => {
 				mode: "workflow",
 				runId: "wf_mixed_failure",
 				results: [],
-				chatProgress: { mode: "live-card", repoRelation: "same", repoLabel: "pi-subagents" },
+				chatProgress: { mode: "live-card", repoRelation: "same", repoLabel: "pi-cciotti" },
 				workflow: {
 					trace: [
 						{ operation: "run", key: "handoff", state: "detached", runId: "child-detached", error: "Detached before task completion." },
@@ -525,19 +525,19 @@ describe("workflow chat progress rendering", () => {
 				mode: "workflow" as const,
 				runId: "wf_density",
 				results: [],
-				chatProgress: { mode: "live-card" as const, repoRelation: "same" as const, repoLabel: "pi-subagents" },
+				chatProgress: { mode: "live-card" as const, repoRelation: "same" as const, repoLabel: "pi-cciotti" },
 				workflow: { trace, emits: [], console: [] },
 			},
 		};
 
 		const compact = renderSubagentResult(result, { expanded: false }, theme as any, undefined, { horizontalSpacing: 0, compactResultMaxLines: 3 }).render(120);
 		assert.equal(compact.length, 3);
-		assert.match(compact[1]!, /^Repo   pi-subagents\s*$/);
+		assert.match(compact[1]!, /^Repo   pi-cciotti\s*$/);
 		assert.match(compact[2]!, /rows hidden/);
 
 		const expanded = renderSubagentResult(result, { expanded: true }, theme as any, undefined, { horizontalSpacing: 0, compactResultMaxLines: 3 }).render(120);
 		assert.ok(expanded.length > 3);
-		assert.match(expanded[1]!, /^  Repo   pi-subagents\s*$/);
+		assert.match(expanded[1]!, /^  Repo   pi-cciotti\s*$/);
 		assert.match(expanded.join("\n"), /phase-9 1 active/);
 		assert.doesNotMatch(expanded.join("\n"), /rows hidden · .* expands/);
 	});
@@ -556,7 +556,7 @@ describe("workflow chat progress rendering", () => {
 				mode: "workflow",
 				runId: "wf_noisy",
 				results: [],
-				chatProgress: { mode: "live-card", repoRelation: "same", repoLabel: "pi-subagents" },
+				chatProgress: { mode: "live-card", repoRelation: "same", repoLabel: "pi-cciotti" },
 				workflow: { trace, emits: [], console: [] },
 			},
 		}, { expanded: false }, theme as any));
@@ -575,7 +575,7 @@ describe("workflow chat progress rendering", () => {
 				mode: "workflow",
 				runId: "wf_mixed_error",
 				results: [],
-				chatProgress: { mode: "live-card", repoRelation: "same", repoLabel: "pi-subagents" },
+				chatProgress: { mode: "live-card", repoRelation: "same", repoLabel: "pi-cciotti" },
 				workflow: {
 					trace: [{
 						operation: "run",
@@ -602,7 +602,7 @@ describe("workflow chat progress rendering", () => {
 				mode: "workflow",
 				runId: "wf_done",
 				results: [],
-				chatProgress: { mode: "live-card", repoRelation: "same", repoLabel: "pi-subagents" },
+				chatProgress: { mode: "live-card", repoRelation: "same", repoLabel: "pi-cciotti" },
 				workflow: {
 					value: "final answer",
 					trace: [{ operation: "run", key: "scout", state: "completed", runId: "run-scout" }],

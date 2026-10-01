@@ -110,7 +110,7 @@ describe("worktree", () => {
 			assert.equal(setup.cwd, git(repoDir, ["rev-parse", "--show-toplevel"]));
 			for (let i = 0; i < setup.worktrees.length; i++) {
 				const worktree = setup.worktrees[i]!;
-				assert.equal(worktree.branch, `pi-subagents/task-structure-s0-t${i}`);
+				assert.equal(worktree.branch, `pi-cciotti/task-structure-s0-t${i}`);
 				assert.equal(worktree.index, i);
 				assert.equal(worktree.agentCwd, worktree.path);
 				assert.equal(worktree.nodeModulesLinked, false);
@@ -137,7 +137,7 @@ describe("worktree", () => {
 						attemptedPath = attempt.path;
 						assert.ok(attemptedPath);
 						assert.equal(fs.existsSync(attemptedPath), false);
-						assert.equal(attempt.branch, "pi-subagents/task-before-creat-s0-t0");
+						assert.equal(attempt.branch, "pi-cciotti/task-before-creat-s0-t0");
 						assert.deepEqual(snapshot.setup.worktrees, []);
 					}
 					if (snapshot.setup.worktrees.length) {
@@ -250,17 +250,17 @@ console.log(JSON.stringify({ action: "created", branch, path: repo, created_bran
 					assert.ok(error.snapshot.unknown);
 					assert.deepEqual(error.snapshot.setup.worktrees, []);
 					assert.equal(error.snapshot.attempts[0]?.validated, false);
-					assert.equal(error.snapshot.attempts[0]?.branch, "pi-subagents/task-source-path-s0-t0");
+					assert.equal(error.snapshot.attempts[0]?.branch, "pi-cciotti/task-source-path-s0-t0");
 					assert.equal(error.snapshot.cleanup?.pruned, false);
 					return true;
 				},
 			);
 			// Invalid output grants no authority to restore or delete source state.
-			assert.equal(git(repoDir, ["branch", "--show-current"]), "pi-subagents/task-source-path-s0-t0");
+			assert.equal(git(repoDir, ["branch", "--show-current"]), "pi-cciotti/task-source-path-s0-t0");
 			assert.equal(git(repoDir, ["rev-parse", "HEAD"]), originalHead);
 			assert.equal(fs.readFileSync(path.join(repoDir, "tracked.txt"), "utf-8"), "initial\n");
 			await assert.rejects(() => createWorktrees(repoDir, "after-unknown", 1, { provider: "native" }), /unknown|manual reconciliation/i);
-			assert.equal(git(repoDir, ["branch", "--list", "pi-subagents/task-after-unknow-s0-t0"]), "");
+			assert.equal(git(repoDir, ["branch", "--list", "pi-cciotti/task-after-unknow-s0-t0"]), "");
 		} finally {
 			if (previousPath === undefined) delete process.env.PATH;
 			else process.env.PATH = previousPath;
@@ -593,13 +593,13 @@ console.log(JSON.stringify({ action: "created", branch, path: repo, created_bran
 		}
 	});
 
-	it("uses PI_SUBAGENTS_WORKTREE_DIR when no base directory is configured", async () => {
+	it("uses PI_CCIOTTI_WORKTREE_DIR when no base directory is configured", async () => {
 		const repoDir = createRepo("pi-worktree-env-base-dir-");
-		const previous = process.env.PI_SUBAGENTS_WORKTREE_DIR;
+		const previous = process.env.PI_CCIOTTI_WORKTREE_DIR;
 		const baseDir = path.join(os.tmpdir(), `pi-worktree-env-base-${Date.now().toString(36)}`);
 		let setup: WorktreeSetup | undefined;
 		try {
-			process.env.PI_SUBAGENTS_WORKTREE_DIR = baseDir;
+			process.env.PI_CCIOTTI_WORKTREE_DIR = baseDir;
 			setup = await createWorktrees(repoDir, "env-base-dir", 1);
 			assert.equal(
 				setup.worktrees[0]!.path,
@@ -608,9 +608,9 @@ console.log(JSON.stringify({ action: "created", branch, path: repo, created_bran
 		} finally {
 			if (setup) cleanupWorktrees(setup);
 			if (previous === undefined) {
-				delete process.env.PI_SUBAGENTS_WORKTREE_DIR;
+				delete process.env.PI_CCIOTTI_WORKTREE_DIR;
 			} else {
-				process.env.PI_SUBAGENTS_WORKTREE_DIR = previous;
+				process.env.PI_CCIOTTI_WORKTREE_DIR = previous;
 			}
 			cleanupRepo(repoDir, baseDir);
 		}
@@ -768,7 +768,7 @@ process.stdout.write(JSON.stringify({ syntheticPaths: [".base-commit"] }));
 		}
 	});
 
-	it("createWorktrees ignores pi-subagents runtime artifacts in the source checkout", async () => {
+	it("createWorktrees ignores pi-cciotti runtime artifacts in the source checkout", async () => {
 		const repoDir = createRepo("pi-worktree-runtime-artifacts-");
 		let setup: WorktreeSetup | undefined;
 		try {

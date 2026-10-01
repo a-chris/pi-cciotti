@@ -31,8 +31,8 @@ function writeUserAgent(home: string, name: string, body: string): void {
 
 describe("builtin agent overrides", () => {
 	beforeEach(() => {
-		tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-home-"));
-		tempProject = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-project-"));
+		tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-home-"));
+		tempProject = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-project-"));
 		process.env.HOME = tempHome;
 		process.env.USERPROFILE = tempHome;
 		delete process.env.PI_CODING_AGENT_DIR;
@@ -1070,7 +1070,7 @@ describe("builtin agent overrides", () => {
 	it("applies output and defaultReads overrides to bundled and package agents and supports false clears", () => {
 		const packageRoot = path.join(tempProject, "package-agents");
 		fs.mkdirSync(path.join(packageRoot, "agents"), { recursive: true });
-		writeJson(path.join(packageRoot, "package.json"), { "pi-subagents": { agents: ["agents"] } });
+		writeJson(path.join(packageRoot, "package.json"), { "pi-cciotti": { agents: ["agents"] } });
 		fs.writeFileSync(path.join(packageRoot, "agents", "package-scout.md"), `---\nname: package-scout\ndescription: Package scout\noutput: package-frontmatter.md\ndefaultReads: PACKAGE-FRONTMATTER.md\n---\n\nScout the package.\n`, "utf-8");
 		writeJson(path.join(tempProject, ".pi", "settings.json"), {
 			packages: [packageRoot],

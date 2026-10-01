@@ -16,7 +16,7 @@ import {
 import { createMissionWorkflowState, MISSION_STATE_MAX_BYTES, missionStatePath } from "../../src/missions/workflow-state.ts";
 
 function fixture() {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-missions-"));
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-missions-"));
 	const projectRoot = path.join(root, "project");
 	const agentDir = path.join(root, "agent");
 	fs.mkdirSync(projectRoot, { recursive: true });

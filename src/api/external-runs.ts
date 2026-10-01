@@ -1,7 +1,7 @@
 import { sanitizeDisplayText, truncateDisplayText } from "../shared/display-text.ts";
 
 export const EXTERNAL_RUN_REGISTRY_VERSION = 2;
-export const EXTERNAL_RUN_REGISTRY_KEY = "pi-subagents.external-runs.v2";
+export const EXTERNAL_RUN_REGISTRY_KEY = "pi-cciotti.external-runs.v2";
 
 export const EXTERNAL_RUN_LIMITS = {
 	maxCachedRuns: 100,
@@ -203,7 +203,7 @@ function normalizeCachedRecord(current: ExternalRunRegistry, cacheKey: string, v
 	return run;
 }
 
-/** Register one current-session external job. pi-subagents never controls the job. */
+/** Register one current-session external job. pi-cciotti never controls the job. */
 export function registerExternalRun(input: ExternalRun): ExternalRun {
 	const run = validateRun(input);
 	const current = registry();

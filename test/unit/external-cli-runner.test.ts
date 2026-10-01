@@ -12,7 +12,7 @@ import { writeNodeCommand } from "../support/node-command.ts";
 
 const tempDirs: string[] = [];
 function tempDir(): string {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-external-cli-"));
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-external-cli-"));
 	tempDirs.push(dir);
 	return dir;
 }

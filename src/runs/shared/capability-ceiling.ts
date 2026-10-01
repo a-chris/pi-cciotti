@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 
 export const SUBAGENT_CAPABILITY_CEILING_VERSION = 1 as const;
-export const SUBAGENT_CAPABILITY_CEILING_REGISTRY_KEY = "pi-subagents.capability-ceiling.v1";
+export const SUBAGENT_CAPABILITY_CEILING_REGISTRY_KEY = "pi-cciotti.capability-ceiling.v1";
 
 export type SubagentCapabilityCeiling =
 	| { allowedTools: readonly string[]; allowedAgents?: readonly string[]; denyExtensions?: boolean }

@@ -14,7 +14,7 @@ function writeSessionJsonl(filePath: string, entries: unknown[]): void {
 }
 
 function tempDir(prefix: string): string {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `pi-subagents-${prefix}-`));
+	return fs.mkdtempSync(path.join(os.tmpdir(), `pi-cciotti-${prefix}-`));
 }
 
 interface SessionEntryFixture {

@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerRuntimeAgent, type RuntimeAgentDefinition, type RuntimeAgentRegistration } from "./runtime-agent-registry.ts";
 
-export const RUNTIME_AGENT_REGISTER_EVENT = "pi-subagents:runtime-agent-register:v1";
+export const RUNTIME_AGENT_REGISTER_EVENT = "pi-cciotti:runtime-agent-register:v1";
 export const RUNTIME_AGENT_REGISTER_VERSION = 1;
 
 export type RuntimeAgentRegistrationResult =
@@ -25,7 +25,7 @@ function errorFrom(value: unknown): Error {
 	return value instanceof Error ? value : new Error(String(value));
 }
 
-/** Register through the installed pi-subagents owner in this Pi process. */
+/** Register through the installed pi-cciotti owner in this Pi process. */
 export function registerAgentViaEvents(input: RegisterRuntimeAgentViaEventsInput): RuntimeAgentRegistration {
 	const request: RuntimeAgentRegistrationRequest = {
 		version: RUNTIME_AGENT_REGISTER_VERSION,
@@ -35,7 +35,7 @@ export function registerAgentViaEvents(input: RegisterRuntimeAgentViaEventsInput
 	input.pi.events.emit(RUNTIME_AGENT_REGISTER_EVENT, request);
 	const result = request.result as unknown;
 	if (result === undefined) {
-		throw new Error("pi-subagents is not installed, not ready, or does not support runtime agent event registration.");
+		throw new Error("pi-cciotti is not installed, not ready, or does not support runtime agent event registration.");
 	}
 	if (result && typeof result === "object" && !Array.isArray(result)) {
 		const candidate = result as Record<string, unknown>;
@@ -44,10 +44,10 @@ export function registerAgentViaEvents(input: RegisterRuntimeAgentViaEventsInput
 		}
 		if (candidate.ok === false && candidate.error instanceof Error) throw candidate.error;
 	}
-	throw new Error("pi-subagents returned a malformed runtime agent registration result.");
+	throw new Error("pi-cciotti returned a malformed runtime agent registration result.");
 }
 
-/** Install the process-local registration listener for the owning pi-subagents runtime. */
+/** Install the process-local registration listener for the owning pi-cciotti runtime. */
 export function registerRuntimeAgentEventListener(pi: ExtensionAPI): () => void {
 	return pi.events.on(RUNTIME_AGENT_REGISTER_EVENT, (rawRequest) => {
 		if (!rawRequest || typeof rawRequest !== "object" || Array.isArray(rawRequest)) return;

@@ -67,7 +67,7 @@ async function waitForFileCount(dir: string, count: number): Promise<void> {
 
 describe("Orca progress-tab observer", () => {
 	it("mirrors an in-process Pi child without replacing its execution path", { skip: process.platform === "win32" ? "Orca progress tabs are not supported on Windows" : undefined }, async () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-orca-native-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-orca-native-"));
 		tempDirs.push(dir);
 		const asyncDir = path.join(dir, "async");
 		const agentDir = path.join(dir, "agent-dir");
@@ -133,7 +133,7 @@ describe("Orca progress-tab observer", () => {
 	});
 
 	it("uses one observer tab for a background parallel run", { skip: process.platform === "win32" ? "Orca progress tabs are not supported on Windows" : undefined }, async () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-orca-parallel-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-orca-parallel-"));
 		tempDirs.push(dir);
 		const asyncDir = path.join(dir, "async");
 		const agentDir = path.join(dir, "agent-dir");
@@ -195,7 +195,7 @@ describe("Orca progress-tab observer", () => {
 	});
 
 	it("allocates unique worktree-wide numbers across concurrent processes and nested cwd values", { skip: process.platform === "win32" ? "Orca progress tabs are not supported on Windows" : undefined }, async () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-orca-counter-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-orca-counter-"));
 		tempDirs.push(dir);
 		fs.mkdirSync(path.join(dir, ".git"));
 		const nested = path.join(dir, "packages", "app");

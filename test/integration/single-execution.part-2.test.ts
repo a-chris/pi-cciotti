@@ -2947,23 +2947,23 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 	});
 
 
-	it("fails foreground runs on explicit unavailable pi-subagents skill requests without spawning", async () => {
+	it("fails foreground runs on explicit unavailable pi-cciotti skill requests without spawning", async () => {
 		const agents = [makeAgent("worker")];
 
-		const result = await runSync(tempDir, agents, "worker", "Task", { skills: ["pi-subagents"] });
+		const result = await runSync(tempDir, agents, "worker", "Task", { skills: ["pi-cciotti"] });
 
 		assert.equal(result.exitCode, 1);
-		assert.equal(result.error, "Skills not found: pi-subagents");
+		assert.equal(result.error, "Skills not found: pi-cciotti");
 		assert.equal(mockPi.callCount(), 0);
 	});
 
-	it("fails foreground runs when an agent default requests pi-subagents skill", async () => {
-		const agents = [makeAgent("worker", { skills: ["pi-subagents"] })];
+	it("fails foreground runs when an agent default requests pi-cciotti skill", async () => {
+		const agents = [makeAgent("worker", { skills: ["pi-cciotti"] })];
 
 		const result = await runSync(tempDir, agents, "worker", "Task", {});
 
 		assert.equal(result.exitCode, 1);
-		assert.equal(result.error, "Skills not found: pi-subagents");
+		assert.equal(result.error, "Skills not found: pi-cciotti");
 		assert.equal(mockPi.callCount(), 0);
 	});
 
@@ -3751,7 +3751,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 
 		assert.equal(result.exitCode, 0);
 		const call = readCall();
-		assert.ok(call.launch?.hooks.includes("pi-subagents:prompt-runtime"));
+		assert.ok(call.launch?.hooks.includes("pi-cciotti:prompt-runtime"));
 		const extensionPaths = call.launch?.extensionPaths ?? [];
 		assert.ok(extensionPaths.some((entry) => entry.replace(/\\/g, "/").endsWith("custom-tool.ts")));
 		assert.ok(extensionPaths.some((entry) => entry.replace(/\\/g, "/").endsWith("allowed-ext.ts")));
@@ -3771,7 +3771,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 
 		assert.equal(result.exitCode, 0);
 		const call = readCall();
-		assert.ok(call.launch?.hooks.includes("pi-subagents:prompt-runtime"));
+		assert.ok(call.launch?.hooks.includes("pi-cciotti:prompt-runtime"));
 		assert.ok((call.launch?.extensionPaths ?? []).some((entry) => entry.replace(/\\/g, "/").endsWith("child-only-tool.ts")));
 	});
 	it("treats forced drain after final assistant output as cleanup success", async () => {

@@ -8,7 +8,7 @@ const readProjectFile = (file: string): string => readFileSync(join(process.cwd(
 describe("writer budget guidance", () => {
 	it("keeps hard tool and usage caps off mutation-capable workers", () => {
 		const toolReference = readProjectFile("docs/tool-reference.md");
-		const skill = readProjectFile("skills/pi-subagents/SKILL.md");
+		const skill = readProjectFile("skills/pi-cciotti/SKILL.md");
 		const reviewLoop = readProjectFile("prompts/review-loop.md");
 
 		for (const text of [toolReference, skill, reviewLoop]) {

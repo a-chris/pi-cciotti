@@ -146,7 +146,7 @@ export interface WorkflowRecoveryAction {
 }
 
 /**
- * Bounded, host-generated identity for a resolved pi-subagents workflow resource.
+ * Bounded, host-generated identity for a resolved pi-cciotti workflow resource.
  * Permission/policy extensions can use it to distinguish resolved content from
  * raw workflow scripts. This audit projection never grants execution authority.
  */
@@ -2427,7 +2427,7 @@ export interface ExtensionConfig {
 	worktree?: boolean;
 	/** Worktree allocator selection. Defaults to auto. */
 	worktreeProvider?: WorktreeProvider;
-	/** Namespace used by managed worktree branches. Defaults to pi-subagents/. */
+	/** Namespace used by managed worktree branches. Defaults to pi-cciotti/. */
 	worktreeBranchPrefix?: string;
 	/** Where to store subagent artifact files. Defaults to "session" (the pi session directory, or OS temp when unavailable). Set to "project" for cwd/.pi/subagents. */
 	artifactDir?: ArtifactDirPreference;
@@ -2522,10 +2522,10 @@ export function resolveTempScopeId(options?: {
 
 const MAX_PARALLEL = 8;
 export const MAX_CONCURRENCY = 4;
-const configuredTempRoot = process.env.PI_SUBAGENTS_TEMP_ROOT?.trim();
+const configuredTempRoot = process.env.PI_CCIOTTI_TEMP_ROOT?.trim();
 export const TEMP_ROOT_DIR = configuredTempRoot
 	? path.resolve(configuredTempRoot)
-	: path.join(os.tmpdir(), `pi-subagents-${resolveTempScopeId()}`);
+	: path.join(os.tmpdir(), `pi-cciotti-${resolveTempScopeId()}`);
 export const RESULTS_DIR = path.join(TEMP_ROOT_DIR, "async-subagent-results");
 export const ASYNC_DIR = path.join(TEMP_ROOT_DIR, "async-subagent-runs");
 export const CHAIN_RUNS_DIR = path.join(TEMP_ROOT_DIR, "chain-runs");

@@ -23,7 +23,7 @@ describe("M4 config-enriched keys: validated and wired", () => {
 
 	beforeEach(() => {
 		previousAgentDirEnv = process.env.PI_CODING_AGENT_DIR;
-		agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-config-enrichment-"));
+		agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-config-enrichment-"));
 		process.env.PI_CODING_AGENT_DIR = agentDir;
 		fs.mkdirSync(path.dirname(getConfigPath()), { recursive: true });
 	});

@@ -11,7 +11,7 @@ import { reconcileAsyncRun, reconcileNestedAsyncDescendants } from "./stale-run-
 
 /** On-demand inspection of current-session async children. Re-reads canonical artifacts after the same reconciliation as status; nothing is persisted or broadcast. */
 
-export const INSPECT_REPLY_KIND = "pi-subagents.inspect-reply";
+export const INSPECT_REPLY_KIND = "pi-cciotti.inspect-reply";
 export const INSPECT_REPLY_VERSION = 1;
 export const INSPECT_WIDGET_KEY = "subagent-inspect";
 export const INSPECT_WIDGET_PREFIX = "PI_SUBAGENT_INSPECT_JSON:";

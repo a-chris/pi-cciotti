@@ -25,7 +25,7 @@ function readText(result: { content: Array<{ type: string; text?: string }> }): 
 
 describe("agent management config parsing", () => {
 	beforeEach(() => {
-		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-management-"));
+		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-management-"));
 		// Anchor project discovery here. On Windows, os.tmpdir() is below the
 		// physical user home, so an unanchored test can climb into ~/.pi and
 		// write fixture agents into the operator's real configuration.
@@ -394,7 +394,7 @@ Remote.
 		fs.mkdirSync(path.join(packageDir, "agents"), { recursive: true });
 		fs.writeFileSync(path.join(projectAgentsDir, "worker.md"), "---\nname: worker\ndescription: Project worker override\n---\n\nProject worker.\n");
 		fs.writeFileSync(path.join(userAgentsDir, "worker.md"), "---\nname: worker\ndescription: User worker override\n---\n\nUser worker.\n");
-		fs.writeFileSync(path.join(packageDir, "package.json"), JSON.stringify({ "pi-subagents": { agents: ["agents"] } }));
+		fs.writeFileSync(path.join(packageDir, "package.json"), JSON.stringify({ "pi-cciotti": { agents: ["agents"] } }));
 		fs.writeFileSync(path.join(packageDir, "agents", "worker.md"), "---\nname: worker\ndescription: Package worker override\n---\n\nPackage worker.\n");
 		const ctx = { cwd: tempDir, modelRegistry: { getAvailable: () => [] } };
 
@@ -527,7 +527,7 @@ Advise only.
 		const lowPackage = path.join(tempDir, "low-package");
 		for (const packageRoot of [highPackage, lowPackage]) {
 			fs.mkdirSync(path.join(packageRoot, "agents"), { recursive: true });
-			fs.writeFileSync(path.join(packageRoot, "package.json"), JSON.stringify({ "pi-subagents": { agents: ["agents"] } }));
+			fs.writeFileSync(path.join(packageRoot, "package.json"), JSON.stringify({ "pi-cciotti": { agents: ["agents"] } }));
 		}
 		fs.writeFileSync(path.join(highPackage, "agents", "foo.md"), "---\nname: foo\npackage: acme\ndescription: Broken high package foo\nrunner:\n  type: unknown\n---\nBroken foo.\n");
 		fs.writeFileSync(path.join(lowPackage, "agents", "foo.md"), "---\nname: foo\npackage: acme\ndescription: Valid low package foo\n---\nValid foo.\n");
@@ -545,7 +545,7 @@ Advise only.
 	it("reports a malformed project agent before lower-priority ambiguity", () => {
 		const packageRoot = path.join(tempDir, "package");
 		fs.mkdirSync(path.join(packageRoot, "agents"), { recursive: true });
-		fs.writeFileSync(path.join(packageRoot, "package.json"), JSON.stringify({ "pi-subagents": { agents: ["agents"] } }));
+		fs.writeFileSync(path.join(packageRoot, "package.json"), JSON.stringify({ "pi-cciotti": { agents: ["agents"] } }));
 		fs.writeFileSync(path.join(packageRoot, "agents", "foo.md"), "---\nname: foo\npackage: acme\ndescription: Package foo\n---\nPackage foo.\n");
 		fs.mkdirSync(path.join(tempDir, ".pi", "agents"), { recursive: true });
 		fs.writeFileSync(path.join(tempDir, ".pi", "settings.json"), JSON.stringify({ packages: [packageRoot] }));

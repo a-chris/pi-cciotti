@@ -23,7 +23,7 @@ function splitNul(output: string): string[] {
 }
 
 function hashLargeDiff(cwd: string, relativePath: string): string {
-	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-tracked-diff-"));
+	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-tracked-diff-"));
 	const diffPath = path.join(tempDir, "diff.patch");
 	try {
 		execFileSync("git", gitArguments(["diff", "--no-ext-diff", "--binary", `--output=${diffPath}`, "HEAD", "--", relativePath]), { cwd, stdio: "ignore", windowsHide: true });

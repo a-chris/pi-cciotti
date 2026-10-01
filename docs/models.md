@@ -162,7 +162,7 @@ A non-array value, an array containing a non-string entry, or an empty/whitespac
 
 ## Inspecting the live mapping
 
-To see what `pi-subagents` has actually loaded right now:
+To see what `pi-cciotti` has actually loaded right now:
 
 ```text
 /subagents-models
@@ -225,13 +225,13 @@ Profiles let you generate and save role-to-model assignments from a provider's l
 Profiles are stored under:
 
 ```text
-~/.pi/agent/profiles/pi-subagents/
+~/.pi/agent/profiles/pi-cciotti/
 ```
 
 Provider model catalogs are cached under:
 
 ```text
-~/.pi/agent/profiles/pi-subagents/providers/
+~/.pi/agent/profiles/pi-cciotti/providers/
 ```
 
 The workflow:

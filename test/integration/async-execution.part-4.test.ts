@@ -637,7 +637,7 @@ setTimeout(() => process.exit(90), 15000).unref();
 
 	it("reports terminal abort before a missing file-only handoff after mutation", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
 		const partialOutput = "I’ll inspect the retained candidate before changing it.";
-		const repo = createRepo("pi-subagents-missing-handoff-partial-");
+		const repo = createRepo("pi-cciotti-missing-handoff-partial-");
 		const outputPath = path.join(repo, "missing-challenge-report.md");
 		mockPi.onCall({
 			jsonl: [
@@ -869,7 +869,7 @@ setTimeout(() => process.exit(90), 15000).unref();
 	});
 
 	it("keeps concrete sibling failures above partial mutation evidence", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
-		const repo = createRepo("pi-subagents-partial-sibling-failure-");
+		const repo = createRepo("pi-cciotti-partial-sibling-failure-");
 		const outputPath = path.join(repo, "missing-report.md");
 		mockPi.onCall({
 			matchArgIncludes: "Write required report",

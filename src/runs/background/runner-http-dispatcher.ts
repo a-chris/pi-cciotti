@@ -107,13 +107,13 @@ export function installRunnerHttpDispatcher(options: { agentDir: string; cwd: st
 		// SAFETY: require loads the pinned direct dependency described by these types.
 		const undici = createRequire(import.meta.url)("undici") as typeof import("undici");
 		const idle = resolveHttpIdleTimeoutMs(options);
-		if (idle.warning) console.error(`[pi-subagents] httpIdleTimeoutMs: ${idle.warning}; using ${idle.timeoutMs}ms`);
+		if (idle.warning) console.error(`[pi-cciotti] httpIdleTimeoutMs: ${idle.warning}; using ${idle.timeoutMs}ms`);
 		const dispatcher = new undici.EnvHttpProxyAgent(runnerHttpDispatcherOptions(idle.timeoutMs));
 		// Fetch rejects stream errors; the listener prevents an unhandled EventEmitter error.
 		EventEmitter.prototype.on.call(dispatcher, "error", () => {});
 		undici.setGlobalDispatcher(dispatcher);
 		undici.install();
 	} catch (error) {
-		console.error(`[pi-subagents] proxy-aware HTTP dispatcher not installed: ${error instanceof Error ? error.message : String(error)}`);
+		console.error(`[pi-cciotti] proxy-aware HTTP dispatcher not installed: ${error instanceof Error ? error.message : String(error)}`);
 	}
 }

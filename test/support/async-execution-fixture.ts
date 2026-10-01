@@ -430,7 +430,7 @@ export function observeSharedCwdRunner(id: string) {
 			try { text = JSON.stringify({ ...this.summary(), snapshot: this.snapshot() }); }
 			catch { diagnostic("#1906 failure snapshot unavailable (contents withheld)"); return; }
 			diagnostic(`#1906 ${text}`);
-			const directory = process.env.PI_SUBAGENTS_TERMINAL_EVIDENCE_DIR;
+			const directory = process.env.PI_CCIOTTI_TERMINAL_EVIDENCE_DIR;
 			if (!directory) return;
 			try {
 				// Persist only the existing allowlisted projection, never copy run files.

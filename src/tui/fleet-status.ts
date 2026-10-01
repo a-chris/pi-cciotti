@@ -482,7 +482,7 @@ export function collectFleetStatusEntries(state: SubagentState): FleetStatusEntr
 
 	if (state.currentSessionId) {
 		try {
-			for (const run of snapshotExternalRuns(state.currentSessionId, { ignoreMalformed: true, onMalformedRecord: (message) => console.warn(`[pi-subagents] Removed ${message}`) })) {
+			for (const run of snapshotExternalRuns(state.currentSessionId, { ignoreMalformed: true, onMalformedRecord: (message) => console.warn(`[pi-cciotti] Removed ${message}`) })) {
 				if (!isActiveState(run.state)) continue;
 				entries.push({
 					key: `external:${run.id}`,
@@ -495,7 +495,7 @@ export function collectFleetStatusEntries(state: SubagentState): FleetStatusEntr
 				});
 			}
 		} catch (cause) {
-			console.warn(`[pi-subagents] Failed to inspect external jobs: ${cause instanceof Error ? cause.message : String(cause)}`);
+			console.warn(`[pi-cciotti] Failed to inspect external jobs: ${cause instanceof Error ? cause.message : String(cause)}`);
 		}
 	}
 

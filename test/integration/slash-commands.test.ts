@@ -1064,7 +1064,7 @@ Inspect
 			const lowPackage = path.join(root, "low-package");
 			for (const packageRoot of [highPackage, lowPackage]) {
 				fs.mkdirSync(path.join(packageRoot, "agents"), { recursive: true });
-				fs.writeFileSync(path.join(packageRoot, "package.json"), JSON.stringify({ "pi-subagents": { agents: ["agents"] } }));
+				fs.writeFileSync(path.join(packageRoot, "package.json"), JSON.stringify({ "pi-cciotti": { agents: ["agents"] } }));
 			}
 			fs.writeFileSync(path.join(highPackage, "agents", "foo.md"), `---
 name: foo
@@ -1174,7 +1174,7 @@ describe("subagents-inspect-rpc command", { skip: !available ? "slash-commands.t
 		assert.equal(lines.length, 1);
 		assert.ok(lines[0]!.startsWith("PI_SUBAGENT_INSPECT_JSON:"));
 		const reply = JSON.parse(lines[0]!.slice("PI_SUBAGENT_INSPECT_JSON:".length));
-		assert.equal(reply.kind, "pi-subagents.inspect-reply");
+		assert.equal(reply.kind, "pi-cciotti.inspect-reply");
 		assert.equal(reply.version, 1);
 		assert.equal(reply.requestId, "req-itest");
 		assert.equal(reply.status, "complete");

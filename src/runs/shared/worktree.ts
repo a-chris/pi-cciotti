@@ -11,9 +11,9 @@ import type { ManagedWorktreeProvider, WorktreeNaming, WorktreeProvider } from "
 
 export const DEFAULT_WORKTREE_PROVIDER: WorktreeProvider = "auto";
 export const DEFAULT_WORKTREE_BASE_REF = "HEAD";
-export const DEFAULT_WORKTREE_BRANCH_PREFIX = "pi-subagents/";
+export const DEFAULT_WORKTREE_BRANCH_PREFIX = "pi-cciotti/";
 /** Internal marker used to defer Worktrunk-dependent instruction paths to launch time. */
-export const WORKTREE_AGENT_CWD_PLACEHOLDER = path.join(path.parse(process.cwd()).root, "__pi_subagents_worktree_cwd__");
+export const WORKTREE_AGENT_CWD_PLACEHOLDER = path.join(path.parse(process.cwd()).root, "__pi_cciotti_worktree_cwd__");
 const WORKTREE_NAMING_COMPONENT_MAX_BYTES = 96;
 const WORKTREE_NAMING_LABEL_MAX_BYTES = 256;
 const WORKTREE_NAMING_BRANCH_MAX_BYTES = 256;
@@ -134,7 +134,7 @@ export interface CreateWorktreesOptions {
 	provider?: WorktreeProvider;
 	/** Git ref used as the worktree base; defaults to `HEAD`. */
 	baseRef?: string;
-	/** Branch namespace; defaults to `pi-subagents/`. */
+	/** Branch namespace; defaults to `pi-cciotti/`. */
 	branchPrefix?: string;
 	setupHook?: WorktreeSetupHookConfig;
 	baseDir?: string;
@@ -346,7 +346,7 @@ async function probeWorktreeSource(tx: Pick<SetupTransaction, "git" | "gitChecke
 	if (repoCheck.status !== 0 || repoCheck.stdout.trim() !== "true") throw new Error("worktree isolation requires a git repository");
 	const toplevel = (await tx.gitChecked(cwd, ["rev-parse", "--show-toplevel"])).trim();
 
-	// pi-subagents writes durable runtime state under .pi/subagents/ by default;
+	// pi-cciotti writes durable runtime state under .pi/subagents/ by default;
 	// that state must not make managed isolation unusable for later runs.
 	const status = await tx.gitChecked(toplevel, ["status", "--porcelain", "--", `:!${PROJECT_SUBAGENTS_RELATIVE_DIR}`]);
 	if (status.trim().length > 0) {
@@ -543,7 +543,7 @@ export function buildWorktreeNaming(input: WorktreeNamingInput): WorktreeNaming 
 function hasConfiguredWorktreeBaseDir(baseDir: string | undefined): boolean {
 	return baseDir !== undefined
 		? true
-		: (process.env.PI_SUBAGENTS_WORKTREE_DIR?.trim().length ?? 0) > 0;
+		: (process.env.PI_CCIOTTI_WORKTREE_DIR?.trim().length ?? 0) > 0;
 }
 
 function isInsidePiExtensionsDirectory(targetPath: string): boolean {
@@ -594,7 +594,7 @@ export function resolveWorktreeProvider(requested: WorktreeProvider | undefined,
 	if (selection !== "auto" && selection !== "native" && selection !== "worktrunk") throw new Error(`worktree provider must be "auto", "native", or "worktrunk"`);
 	if (selection === "native") return "native";
 	if (hasConfiguredWorktreeBaseDir(baseDir)) {
-		if (selection === "worktrunk") throw new Error("worktreeProvider='worktrunk' cannot be combined with worktreeBaseDir or PI_SUBAGENTS_WORKTREE_DIR");
+		if (selection === "worktrunk") throw new Error("worktreeProvider='worktrunk' cannot be combined with worktreeBaseDir or PI_CCIOTTI_WORKTREE_DIR");
 		return "native";
 	}
 	const capability = probeWorktrunk();
@@ -608,7 +608,7 @@ async function resolveSetupProvider(tx: SetupTransaction, requested: WorktreePro
 	if (selection !== "auto" && selection !== "native" && selection !== "worktrunk") throw new Error('worktree provider must be "auto", "native", or "worktrunk"');
 	if (selection === "native") return "native";
 	if (hasConfiguredWorktreeBaseDir(baseDir)) {
-		if (selection === "worktrunk") throw new Error("worktreeProvider='worktrunk' cannot be combined with worktreeBaseDir or PI_SUBAGENTS_WORKTREE_DIR");
+		if (selection === "worktrunk") throw new Error("worktreeProvider='worktrunk' cannot be combined with worktreeBaseDir or PI_CCIOTTI_WORKTREE_DIR");
 		return "native";
 	}
 	if (selection === "auto" && isInsidePiExtensionsDirectory(repoRoot)) return "native";
@@ -638,12 +638,12 @@ export function shouldDeferWorktreeCwd(requested: WorktreeProvider | undefined, 
 
 /**
  * Resolves the dedicated worktree root: the configured base directory or
- * PI_SUBAGENTS_WORKTREE_DIR when set, otherwise a `worktrees` folder sibling
+ * PI_CCIOTTI_WORKTREE_DIR when set, otherwise a `worktrees` folder sibling
  * to the repository. Managed leaves always nest one level deeper under the
  * project folder (`basename(repoRoot)`).
  */
 function resolveWorktreeDedicatedRoot(configuredBaseDir: string | undefined, repoRoot: string, relocateExtensionRepo = true): string {
-	const rawBaseDir = configuredBaseDir ?? process.env.PI_SUBAGENTS_WORKTREE_DIR;
+	const rawBaseDir = configuredBaseDir ?? process.env.PI_CCIOTTI_WORKTREE_DIR;
 	let expanded: string;
 	if (rawBaseDir === undefined || (configuredBaseDir === undefined && !rawBaseDir.trim())) {
 		expanded = relocateExtensionRepo && isInsidePiExtensionsDirectory(repoRoot)

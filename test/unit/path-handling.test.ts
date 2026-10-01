@@ -13,8 +13,8 @@ describe("path.isAbsolute vs startsWith('/')", () => {
 	// On Windows, absolute paths look like "C:\\..." or "C:/..." — neither starts with "/".
 
 	it("startsWith('/') misses Windows absolute paths", () => {
-		const windowsAbsolute = "C:\\dev\\pi-subagents\\output.md";
-		const windowsAbsoluteForward = "C:/dev/pi-subagents/output.md";
+		const windowsAbsolute = "C:\\dev\\pi-cciotti\\output.md";
+		const windowsAbsoluteForward = "C:/dev/pi-cciotti/output.md";
 
 		// A startsWith check is not portable:
 		assert.equal(windowsAbsolute.startsWith("/"), false,

@@ -26,7 +26,7 @@ function writeAgent(filePath: string, body: string): void {
 }
 
 function createNestedLinkedWorktree(): { repo: string; worktree: string } {
-	const repo = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-linked-worktree-"));
+	const repo = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-linked-worktree-"));
 	tempDirs.push(repo);
 	execFileSync("git", ["init"], { cwd: repo, stdio: "ignore" });
 	execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: repo });
@@ -56,7 +56,7 @@ function writeLinkedWorktreePackage(repo: string): { packageAgentName: string; p
 	});
 	writeJson(path.join(packageRoot, "package.json"), {
 		name: "issue950-workflow",
-		"pi-subagents": { agents: ["./agents"] },
+		"pi-cciotti": { agents: ["./agents"] },
 	});
 	writeAgent(packageAgentPath, `---
 name: reviewer
@@ -70,7 +70,7 @@ Review the linked worktree.
 }
 
 function withTempHome<T>(fn: (home: string) => T): T {
-	const home = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-package-home-"));
+	const home = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-package-home-"));
 	tempDirs.push(home);
 	const oldHome = process.env.HOME;
 	const oldUserProfile = process.env.USERPROFILE;
@@ -104,7 +104,7 @@ afterEach(() => {
 
 describe("agent outputSchema frontmatter", () => {
 	it("parses and serializes an inline object schema", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-output-schema-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-output-schema-"));
 		tempDirs.push(project);
 		writeAgent(path.join(project, ".pi", "agents", "typed.md"), `---\nname: typed\ndescription: Typed agent\noutputSchema: {"type":"object","required":["ok"],"properties":{"ok":{"type":"boolean"}}}\n---\n\nReturn data.\n`);
 		const discovered = discoverAgents(project, "project");
@@ -115,7 +115,7 @@ describe("agent outputSchema frontmatter", () => {
 	}));
 
 	it("rejects malformed, null, and array output schemas", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-output-schema-invalid-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-output-schema-invalid-"));
 		tempDirs.push(project);
 		for (const [name, value] of [["malformed", "{"], ["null", "null"], ["array", "[]"]]) {
 			writeAgent(path.join(project, ".pi", "agents", `${name}.md`), `---\nname: ${name}\ndescription: Invalid schema\noutputSchema: ${value}\n---\nBody\n`);
@@ -130,7 +130,7 @@ describe("agent outputSchema frontmatter", () => {
 
 describe("agent definition directory inspection", () => {
 	it("distinguishes absent, empty, candidates, unreadable, and non-directory paths", () => {
-		const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-inspection-"));
+		const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-inspection-"));
 		tempDirs.push(root);
 		const empty = path.join(root, "empty");
 		const candidates = path.join(root, "candidates");
@@ -151,7 +151,7 @@ describe("agent definition directory inspection", () => {
 	});
 
 	it("reports cached builtin and configured project definition paths without synthesizing a root", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-report-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-report-"));
 		tempDirs.push(project);
 		writeJson(path.join(project, ".pi", "settings.json"), { subagents: { projectRootResolution: "nearest" } });
 		const discovered = discoverAgents(project, "project");
@@ -254,7 +254,7 @@ body`);
 
 describe("agent runner frontmatter", () => {
 	it("parses and serializes an external-cli runner", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-runner-agent-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-runner-agent-"));
 		tempDirs.push(project);
 		writeAgent(path.join(project, ".pi", "agents", "external.md"), `---
 name: external
@@ -275,7 +275,7 @@ Review carefully.`.replace(" description:", "description:"));
 	}));
 
 	it("keeps external-cli caps fixed while refusing capability widening", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-runner-capabilities-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-runner-capabilities-"));
 		tempDirs.push(project);
 		const agentPath = path.join(project, ".pi", "agents", "external.md");
 		writeAgent(agentPath, `---\nname: external\ndescription: External runner\nrunner:\n  type: external-cli\n  command: node\n  capabilities:\n    steer: false\n---\nReview.`);
@@ -297,7 +297,7 @@ Review carefully.`.replace(" description:", "description:"));
 	}));
 
 	it("parses and serializes an external-job runner", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-external-job-agent-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-external-job-agent-"));
 		tempDirs.push(project);
 		writeAgent(path.join(project, ".pi", "agents", "gpt-pro.md"), `---
 name: gpt-pro
@@ -327,21 +327,21 @@ Review carefully.`);
 			"type: external-job\n  provider: surf-oracle\n  options: []",
 		];
 		for (const [index, runner] of invalidCases.entries()) {
-			const project = fs.mkdtempSync(path.join(os.tmpdir(), `pi-subagents-invalid-runner-${index}-`));
+			const project = fs.mkdtempSync(path.join(os.tmpdir(), `pi-cciotti-invalid-runner-${index}-`));
 			tempDirs.push(project);
 			writeAgent(path.join(project, ".pi", "agents", "external.md"), `---\nname: external\ndescription: External\nrunner:\n  ${runner}\n---\nBody`);
 			const discovered = discoverAgents(project, "project");
 			assert.equal(discovered.agents.some((agent) => agent.name === "external"), false);
 			assert.match(discovered.agentDiagnostics?.[0]?.error ?? "", /invalid runner\.type|non-empty command|args must be an array of strings|promptDelivery must be 'stdin'|provider string|options must be a JSON-serializable object/);
 		}
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-runner-pi-only-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-runner-pi-only-"));
 		tempDirs.push(project);
 		writeAgent(path.join(project, ".pi", "agents", "external.md"), `---\nname: external\ndescription: External\nrunner:\n  type: external-cli\n  command: node\nmodel: provider/model\n---\nBody`);
 		assert.match(discoverAgents(project, "project").agentDiagnostics?.[0]?.error ?? "", /unsupported Pi-only fields: model/);
 	}));
 
 	it("keeps valid agents executable when another agent is malformed", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-invalid-agent-isolation-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-invalid-agent-isolation-"));
 		tempDirs.push(project);
 		writeAgent(path.join(project, ".pi", "agents", "broken.md"), "---\nname: broken\ndescription: Broken\nrunner:\n  type: unknown\n---\nBody");
 		writeAgent(path.join(project, ".pi", "agents", "working.md"), "---\nname: working\ndescription: Working\n---\nBody");
@@ -352,7 +352,7 @@ Review carefully.`);
 	}));
 
 	it("follows symlinked agent directories once without hiding diagnostics", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-symlinked-agent-dir-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-symlinked-agent-dir-"));
 		tempDirs.push(project);
 		const legacyAgentsRoot = path.join(project, ".agents");
 		const sharedAgents = path.join(project, "shared-agents");
@@ -371,7 +371,7 @@ Review carefully.`);
 	}));
 
 	it("keeps a lower-priority agent available when a project override is malformed", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-invalid-agent-shadow-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-invalid-agent-shadow-"));
 		tempDirs.push(project);
 		writeAgent(path.join(project, ".pi", "agents", "reviewer.md"), "---\nname: reviewer\ndescription: Broken reviewer\nrunner:\n  type: unknown\n---\nBody");
 
@@ -381,7 +381,7 @@ Review carefully.`);
 	}));
 
 	it("records the runtime name for malformed packaged agents", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-invalid-packaged-agent-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-invalid-packaged-agent-"));
 		tempDirs.push(project);
 		writeAgent(path.join(project, ".pi", "agents", "code-analysis.zeta-worker.md"), "---\nname: zeta-worker\npackage: code-analysis\ndescription: Broken packaged worker\nrunner:\n  type: unknown\n---\nBody");
 
@@ -396,7 +396,7 @@ Review carefully.`);
 
 describe("agent skillPath frontmatter", () => {
 	it("parses and serializes comma-separated paths", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-skill-path-agent-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-skill-path-agent-"));
 		tempDirs.push(project);
 		writeAgent(path.join(project, ".pi", "agents", "worker.md"), `---
 name: worker
@@ -413,7 +413,7 @@ body`);
 
 describe("agent advertise frontmatter", () => {
 	it("parses and serializes explicit prompt advertisement", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-advertised-agent-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-advertised-agent-"));
 		tempDirs.push(project);
 		writeAgent(path.join(project, ".pi", "agents", "worker.md"), `---
 name: worker
@@ -431,7 +431,7 @@ body`);
 		// serializeAgent used to write the key only for `true`. With the default flipped,
 		// that would drop `advertise: false` on the next management write and silently
 		// put the agent back in the parent prompt.
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-unadvertised-agent-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-unadvertised-agent-"));
 		tempDirs.push(project);
 		writeAgent(path.join(project, ".pi", "agents", "quiet.md"), "---\nname: quiet\ndescription: Quiet\nadvertise: false\n---\nbody");
 		writeAgent(path.join(project, ".pi", "agents", "plain.md"), "---\nname: plain\ndescription: Plain\n---\nbody");
@@ -447,7 +447,7 @@ body`);
 	}));
 
 	it("rejects non-boolean advertise values", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-invalid-advertise-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-invalid-advertise-"));
 		tempDirs.push(project);
 		writeAgent(path.join(project, ".pi", "agents", "worker.md"), "---\nname: worker\ndescription: Worker\nadvertise: yes\n---\nbody");
 
@@ -457,7 +457,7 @@ body`);
 
 describe("agent aliases", () => {
 	it("parses and serializes agent aliases", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-alias-agent-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-alias-agent-"));
 		tempDirs.push(project);
 		writeAgent(path.join(project, ".pi", "agents", "worker.md"), `---
 name: worker
@@ -476,7 +476,7 @@ body`);
 	}));
 
 	it("reports management alias collisions as ambiguous", () => withTempHome(() => {
-		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-alias-collision-"));
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-alias-collision-"));
 		tempDirs.push(project);
 		writeAgent(path.join(project, ".pi", "agents", "review-agent.md"), `---
 name: review-agent
@@ -498,7 +498,7 @@ body`);
 
 describe("agent simple-scalar list frontmatter", () => {
 	it("discovers newline block lists for all list fields and routes MCP tools", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-block-list-frontmatter-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-block-list-frontmatter-"));
 		tempDirs.push(dir);
 		writeAgent(path.join(dir, ".pi", "agents", "worker.md"), `---
 name: worker
@@ -537,7 +537,7 @@ Do work
 	});
 
 	it("preserves MCP-only tools as an explicit empty builtin allowlist", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-mcp-only-frontmatter-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-mcp-only-frontmatter-"));
 		tempDirs.push(dir);
 		writeAgent(path.join(dir, ".pi", "agents", "mcp-only.md"), `---
 name: mcp-only
@@ -555,7 +555,7 @@ Do MCP work
 	});
 
 	it("preserves comma-separated syntax across all list fields", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-comma-list-frontmatter-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-comma-list-frontmatter-"));
 		tempDirs.push(dir);
 		writeAgent(path.join(dir, ".pi", "agents", "worker.md"), `---
 name: worker
@@ -582,7 +582,7 @@ Do work
 	});
 
 	it("discovers and serializes excludeTools without validating names", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-exclude-tools-frontmatter-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-exclude-tools-frontmatter-"));
 		tempDirs.push(dir);
 		const agentPath = path.join(dir, ".pi", "agents", "worker.md");
 		writeAgent(agentPath, `---
@@ -604,7 +604,7 @@ Do work
 
 describe("agent permission frontmatter", () => {
 	it("parses and preserves explicit non-bash permission rules", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-permission-frontmatter-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-permission-frontmatter-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -628,7 +628,7 @@ Do work
 	});
 
 	it("rejects bash permission rules and conflicting aliases", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-permission-invalid-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-permission-invalid-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -659,7 +659,7 @@ describe("agent frontmatter defaultContext", () => {
 	});
 
 	it("parses defaultContext from discovered agent frontmatter", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-default-context-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-default-context-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -678,7 +678,7 @@ Do work
 	});
 
 	it("loads packaged worker and oracle with their declared defaultContext and advisor alias", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-builtin-default-context-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-builtin-default-context-"));
 		tempDirs.push(dir);
 		const agents = discoverAgentsAll(dir).builtin;
 
@@ -705,7 +705,7 @@ Do work
 	});
 
 	it("keeps bundled agent definitions from module load during package file updates", () => {
-		const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-builtin-hot-update-"));
+		const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-builtin-hot-update-"));
 		tempDirs.push(fixture);
 		fs.cpSync(path.join(process.cwd(), "src"), path.join(fixture, "src"), { recursive: true });
 		fs.cpSync(path.join(process.cwd(), "agents"), path.join(fixture, "agents"), { recursive: true });
@@ -741,7 +741,7 @@ const scout = discovered.builtin.find((candidate) => candidate.name === "scout")
 
 describe("agent frontmatter launch defaults", () => {
 	it("parses, serializes, and validates outputMode defaults", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-output-mode-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-output-mode-"));
 		tempDirs.push(dir);
 		const filePath = path.join(dir, ".pi", "agents", "worker.md");
 		writeAgent(filePath, `---
@@ -769,7 +769,7 @@ Do work
 	});
 
 	it("serializes and discovers single-agent launch defaults", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-launch-defaults-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-launch-defaults-"));
 		tempDirs.push(dir);
 		const filePath = path.join(dir, ".pi", "agents", "worker.md");
 		const agent: AgentConfig = {
@@ -802,7 +802,7 @@ Do work
 	});
 
 	it("parses scalar acceptance defaults and rejects invalid policies", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-acceptance-defaults-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-acceptance-defaults-"));
 		tempDirs.push(dir);
 		const filePath = path.join(dir, ".pi", "agents", "worker.md");
 		writeAgent(filePath, `---
@@ -840,7 +840,7 @@ Do work
 	});
 
 	it("parses, serializes, and validates acceptance roles", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-acceptance-role-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-acceptance-role-"));
 		tempDirs.push(dir);
 		const filePath = path.join(dir, ".pi", "agents", "explorer.md");
 		writeAgent(filePath, `---
@@ -869,7 +869,7 @@ Explore the codebase
 	});
 
 	it("rejects invalid launch defaults instead of silently ignoring them", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-invalid-launch-defaults-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-invalid-launch-defaults-"));
 		tempDirs.push(dir);
 		writeAgent(path.join(dir, ".pi", "agents", "worker.md"), `---
 name: worker
@@ -884,7 +884,7 @@ Do work
 	});
 
 	it("rejects oversized toolTimeoutMs frontmatter at discovery", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-oversized-tool-timeout-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-oversized-tool-timeout-"));
 		tempDirs.push(dir);
 		writeAgent(path.join(dir, ".pi", "agents", "worker.md"), `---
 name: worker
@@ -901,7 +901,7 @@ Do work
 
 describe("chain discovery", () => {
 	it("prefers same-scope .chain.json over .chain.md for the same runtime name", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-chain-format-precedence-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-chain-format-precedence-"));
 		tempDirs.push(dir);
 		const chainsDir = path.join(dir, ".pi", "chains");
 		fs.mkdirSync(chainsDir, { recursive: true });
@@ -942,14 +942,14 @@ Run the markdown chain
 
 describe("package-provided agents and chains", () => {
 	it("discovers package agents and chains from installed package manifests", () => withTempHome(() => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-package-discovery-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-package-discovery-"));
 		tempDirs.push(dir);
 		const workflowRoot = path.join(dir, ".pi", "npm", "node_modules", "my-pi-workflow");
 		const chainsRoot = path.join(dir, ".pi", "npm", "node_modules", "@scope", "chain-workflow");
 		writeJson(path.join(workflowRoot, "package.json"), {
 			name: "my-pi-workflow",
 			version: "1.2.3",
-			"pi-subagents": {
+			"pi-cciotti": {
 				agents: ["./agents"],
 			},
 		});
@@ -998,7 +998,7 @@ Review the task.
 	}));
 
 	it("loads packages referenced from Pi settings", () => withTempHome(() => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-settings-package-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-settings-package-"));
 		tempDirs.push(dir);
 		const packageRoot = path.join(dir, ".pi", "vendor", "workflow");
 		writeJson(path.join(dir, ".pi", "settings.json"), {
@@ -1027,7 +1027,7 @@ Plan the work.
 	}));
 
 	it("loads bare HTTPS git packages from project Pi settings", () => withTempHome(() => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-settings-bare-git-package-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-settings-bare-git-package-"));
 		tempDirs.push(dir);
 		const packageRoot = path.join(dir, ".pi", "git", "github.com", "user", "repo");
 		writeJson(path.join(dir, ".pi", "settings.json"), {
@@ -1035,7 +1035,7 @@ Plan the work.
 		});
 		writeJson(path.join(packageRoot, "package.json"), {
 			name: "bare-git-workflow",
-			"pi-subagents": { agents: ["./agents"] },
+			"pi-cciotti": { agents: ["./agents"] },
 		});
 		writeAgent(path.join(packageRoot, "agents", "planner.md"), `---
 name: planner
@@ -1053,7 +1053,7 @@ Plan the work.
 	}));
 
 	it("loads bare HTTP git packages from user Pi settings", () => withTempHome((home) => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-user-settings-bare-git-package-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-user-settings-bare-git-package-"));
 		tempDirs.push(dir);
 		const agentDir = path.join(home, ".pi", "agent");
 		const packageRoot = path.join(agentDir, "git", "git.example.com", "team", "repo");
@@ -1062,7 +1062,7 @@ Plan the work.
 		});
 		writeJson(path.join(packageRoot, "package.json"), {
 			name: "user-bare-git-workflow",
-			"pi-subagents": { agents: ["./agents"] },
+			"pi-cciotti": { agents: ["./agents"] },
 		});
 		writeAgent(path.join(packageRoot, "agents", "reviewer.md"), `---
 name: reviewer
@@ -1080,14 +1080,14 @@ Review the work.
 	}));
 
 	it("discovers project package agents when cwd is nested below the project root", () => withTempHome(() => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-nested-package-discovery-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-nested-package-discovery-"));
 		tempDirs.push(dir);
 		const nested = path.join(dir, "packages", "app", "src");
 		const packageRoot = path.join(dir, ".pi", "npm", "node_modules", "nested-workflow");
 		fs.mkdirSync(nested, { recursive: true });
 		writeJson(path.join(packageRoot, "package.json"), {
 			name: "nested-workflow",
-			"pi-subagents": {
+			"pi-cciotti": {
 				agents: ["./agents"],
 			},
 		});
@@ -1107,7 +1107,7 @@ Review nested project work.
 	}));
 
 	it("keeps nearest project root discovery by default when a nested .pi exists", () => withTempHome(() => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-nearest-root-default-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-nearest-root-default-"));
 		tempDirs.push(dir);
 		const nested = path.join(dir, "packages", "app", "src");
 		const nestedConfigDir = path.join(dir, "packages", "app", ".pi");
@@ -1117,7 +1117,7 @@ Review nested project work.
 		fs.mkdirSync(path.join(dir, ".git"), { recursive: true });
 		writeJson(path.join(packageRoot, "package.json"), {
 			name: "outer-workflow",
-			"pi-subagents": { agents: ["./agents"] },
+			"pi-cciotti": { agents: ["./agents"] },
 		});
 		writeAgent(path.join(packageRoot, "agents", "planner.md"), `---
 name: planner
@@ -1133,7 +1133,7 @@ Plan outer project work.
 	}));
 
 	it("can resolve project packages and overrides from the git root", () => withTempHome(() => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-git-root-resolution-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-git-root-resolution-"));
 		tempDirs.push(dir);
 		const nested = path.join(dir, "packages", "app", "src");
 		const nestedConfigDir = path.join(dir, "packages", "app", ".pi");
@@ -1151,7 +1151,7 @@ Plan outer project work.
 		});
 		writeJson(path.join(packageRoot, "package.json"), {
 			name: "outer-workflow",
-			"pi-subagents": { agents: ["./agents"] },
+			"pi-cciotti": { agents: ["./agents"] },
 		});
 		writeAgent(path.join(packageRoot, "agents", "planner.md"), `---
 name: planner
@@ -1218,12 +1218,12 @@ Plan outer project work.
 	}));
 
 	it("does not register legacy skill files from broad package agent roots", () => withTempHome(() => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-broad-package-skills-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-broad-package-skills-"));
 		tempDirs.push(dir);
 		const packageRoot = path.join(dir, ".pi", "npm", "node_modules", "broad-workflow");
 		writeJson(path.join(packageRoot, "package.json"), {
 			name: "broad-workflow",
-			"pi-subagents": {
+			"pi-cciotti": {
 				agents: ["."],
 			},
 		});
@@ -1257,7 +1257,7 @@ Agent prompt
 	}));
 
 	it("prunes repo internals and nested project roots from broad package discovery", () => withTempHome(() => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-broad-package-prune-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-broad-package-prune-"));
 		tempDirs.push(dir);
 		writeJson(path.join(dir, "package.json"), {
 			name: "repo-root-workflow",
@@ -1334,12 +1334,12 @@ Ignored
 	}));
 
 	it("keeps package definitions below user and project overrides", () => withTempHome((home) => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-package-precedence-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-package-precedence-"));
 		tempDirs.push(dir);
 		const packageRoot = path.join(dir, ".pi", "npm", "node_modules", "override-workflow");
 		writeJson(path.join(packageRoot, "package.json"), {
 			name: "override-workflow",
-			"pi-subagents": {
+			"pi-cciotti": {
 				agents: ["./agents"],
 				chains: ["./chains"],
 			},
@@ -1400,12 +1400,12 @@ Project chain.
 	}));
 
 	it("does not allow management updates to package agents", () => withTempHome(() => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-package-readonly-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-package-readonly-"));
 		tempDirs.push(dir);
 		const packageRoot = path.join(dir, ".pi", "npm", "node_modules", "readonly-workflow");
 		writeJson(path.join(packageRoot, "package.json"), {
 			name: "readonly-workflow",
-			"pi-subagents": {
+			"pi-cciotti": {
 				agents: ["./agents"],
 			},
 		});
@@ -1467,7 +1467,7 @@ describe("agent frontmatter completionGuard", () => {
 	});
 
 	it("parses completionGuard from discovered agent frontmatter", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-completion-guard-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-completion-guard-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -1489,7 +1489,7 @@ Validate changes
 
 describe("agent frontmatter maxSubagentDepth", () => {
 	it("rejects the removed maxSubagentDepth field", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-frontmatter-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-frontmatter-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -1523,7 +1523,7 @@ Inspect code
 
 describe("agent frontmatter thinking", () => {
 	it("coerces frontmatter false strings to disabled thinking", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-thinking-false-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-thinking-false-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -1563,7 +1563,7 @@ Do work
 	});
 
 	it("preserves supported frontmatter thinking strings", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-thinking-levels-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-thinking-levels-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -1590,7 +1590,7 @@ Do work
 
 describe("removed agent frontmatter", () => {
 	it("rejects fallbackModels clearly", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-fallback-frontmatter-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-fallback-frontmatter-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -1626,7 +1626,7 @@ describe("agent frontmatter systemPromptMode", () => {
 	});
 
 	it("parses systemPromptMode from discovered agent frontmatter", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-prompt-mode-frontmatter-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-prompt-mode-frontmatter-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -1666,7 +1666,7 @@ describe("agent frontmatter prompt inheritance flags", () => {
 	});
 
 	it("parses inheritProjectContext and inheritSkills from discovered agent frontmatter", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-prompt-inheritance-frontmatter-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-prompt-inheritance-frontmatter-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -1689,7 +1689,7 @@ Do work
 	});
 
 	it("defaults inheritGlobalContext to false when frontmatter omits it", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-prompt-inheritance-frontmatter-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-prompt-inheritance-frontmatter-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -1726,7 +1726,7 @@ describe("agent frontmatter subagentOnlyExtensions", () => {
 	});
 
 	it("parses subagentOnlyExtensions from discovered agent frontmatter", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-child-ext-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-child-ext-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -1762,7 +1762,7 @@ describe("agent frontmatter fast mode", () => {
 		const serialized = serializeAgent(agent);
 		assert.match(serialized, /fast: true/);
 
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-fast-mode-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-fast-mode-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -1797,14 +1797,14 @@ Do work
 		const allowed = buildInProcessChildLaunch({ ...launch, model: "openai-codex/gpt-5.6-luna:low" });
 
 		assert.ok(allowed.toolPlan.runtimeExtensions.some((extensionPath) => extensionPath.endsWith("fast-mode-extension.ts")));
-		assert.deepEqual(allowed.session.hooks.map((hook) => hook.name), ["pi-subagents:prompt-runtime", "pi-subagents:fast-mode"]);
+		assert.deepEqual(allowed.session.hooks.map((hook) => hook.name), ["pi-cciotti:prompt-runtime", "pi-cciotti:fast-mode"]);
 		assert.throws(() => buildInProcessChildLaunch({ ...launch, model: "anthropic/claude-sonnet-4" }), /fast mode supports only/);
 	});
 });
 
 describe("agent frontmatter prompt assembly defaults", () => {
 	it("defaults ordinary agents to replace mode with no inherited context or skills", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-default-prompt-settings-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-default-prompt-settings-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -1824,8 +1824,8 @@ Do work
 	});
 
 	it("builtin agents inherit project context by default", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-builtin-default-prompt-settings-"));
-		const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-builtin-default-home-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-builtin-default-prompt-settings-"));
+		const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-builtin-default-home-"));
 		tempDirs.push(dir);
 		tempDirs.push(homeDir);
 		const previousHome = process.env.HOME;
@@ -1851,8 +1851,8 @@ Do work
 	});
 
 	it("bundled agents all have explicit tool allowlists", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-builtin-tools-"));
-		const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-builtin-tools-home-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-builtin-tools-"));
+		const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-builtin-tools-home-"));
 		tempDirs.push(dir);
 		tempDirs.push(homeDir);
 		const previousHome = process.env.HOME;
@@ -1876,8 +1876,8 @@ Do work
 	});
 
 	it("bundled standard agents keep bounded tool allowlists", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-builtin-supervisor-tool-"));
-		const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-builtin-supervisor-tool-home-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-builtin-supervisor-tool-"));
+		const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-builtin-supervisor-tool-home-"));
 		tempDirs.push(dir);
 		tempDirs.push(homeDir);
 		const previousHome = process.env.HOME;
@@ -1923,7 +1923,7 @@ Do work
 	});
 
 	it("defaults delegate to append mode with inherited project context", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-delegate-default-prompt-settings-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-delegate-default-prompt-settings-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -1945,7 +1945,7 @@ Do work
 
 describe("packaged agent and chain discovery", () => {
 	it("recursively discovers nested project agents while keeping chain files separate", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-recursive-agent-discovery-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-recursive-agent-discovery-"));
 		tempDirs.push(dir);
 		const nestedDir = path.join(dir, ".pi", "agents", "code-analysis", "deep");
 		const nestedChainDir = path.join(dir, ".pi", "chains", "code-analysis", "deep");
@@ -1975,7 +1975,7 @@ Review
 	});
 
 	it("registers packaged agents by runtime name and serializes local name plus package", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-packaged-agent-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-packaged-agent-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		fs.mkdirSync(agentsDir, { recursive: true });
@@ -1999,7 +1999,7 @@ Inspect code
 	});
 
 	it("recursively discovers packaged chains by runtime name and preserves package on serialize", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-packaged-chain-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-packaged-chain-"));
 		tempDirs.push(dir);
 		const nestedDir = path.join(dir, ".pi", "chains", "flows");
 		fs.mkdirSync(nestedDir, { recursive: true });
@@ -2028,7 +2028,7 @@ Inspect {task}
 	});
 
 	it("keeps packaged and un-packaged runtime names distinct while preserving un-packaged precedence", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-packaged-collisions-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-packaged-collisions-"));
 		tempDirs.push(dir);
 		fs.mkdirSync(path.join(dir, ".agents"), { recursive: true });
 		fs.mkdirSync(path.join(dir, ".pi", "agents"), { recursive: true });
@@ -2082,7 +2082,7 @@ Inspect
 	});
 
 	it("normalizes package frontmatter consistently for agents and chains", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-package-normalize-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-package-normalize-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		const chainsDir = path.join(dir, ".pi", "chains");
@@ -2113,7 +2113,7 @@ Review
 	});
 
 	it("skips invalid package frontmatter that cannot be normalized", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-invalid-package-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-invalid-package-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
 		const chainsDir = path.join(dir, ".pi", "chains");
@@ -2147,7 +2147,7 @@ Review
 
 describe("project agent directory discovery", () => {
 	it("discovers project agents from both .agents and .pi/agents", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-project-agent-dirs-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-project-agent-dirs-"));
 		tempDirs.push(dir);
 		fs.mkdirSync(path.join(dir, ".agents", "skills"), { recursive: true });
 		fs.mkdirSync(path.join(dir, ".pi", "agents"), { recursive: true });
@@ -2181,7 +2181,7 @@ Skill-named agent prompt
 	});
 
 	it("does not register legacy project skill files as agents", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-project-skills-not-agents-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-project-skills-not-agents-"));
 		tempDirs.push(dir);
 		writeAgent(path.join(dir, ".agents", "legacy.md"), `---
 name: legacy
@@ -2213,7 +2213,7 @@ Skill prompt
 	});
 
 	it("does not register user SKILL.md files as agents", () => withTempHome((home) => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-user-skills-not-agents-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-user-skills-not-agents-"));
 		tempDirs.push(dir);
 		writeAgent(path.join(home, ".agents", "user-agent.md"), `---
 name: user-agent
@@ -2237,7 +2237,7 @@ Skill prompt
 	}));
 
 	it("prefers .pi/agents over .agents on project agent name collisions", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-project-agent-collision-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-project-agent-collision-"));
 		tempDirs.push(dir);
 		fs.mkdirSync(path.join(dir, ".agents"), { recursive: true });
 		fs.mkdirSync(path.join(dir, ".pi", "agents"), { recursive: true });
@@ -2264,7 +2264,7 @@ Canonical prompt
 	});
 
 	it("uses the project root for the canonical project agent dir even when only .agents exists", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-project-agent-root-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-project-agent-root-"));
 		tempDirs.push(dir);
 		const nested = path.join(dir, "packages", "app");
 		fs.mkdirSync(path.join(dir, ".agents", "skills"), { recursive: true });
@@ -2275,7 +2275,7 @@ Canonical prompt
 	});
 
 	it("discovers project chains from .pi/chains", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-project-chain-dirs-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-project-chain-dirs-"));
 		tempDirs.push(dir);
 		fs.mkdirSync(path.join(dir, ".pi", "agents"), { recursive: true });
 		fs.mkdirSync(path.join(dir, ".pi", "chains", "flows"), { recursive: true });
@@ -2306,8 +2306,8 @@ Inspect canonical
 	});
 
 	it("prefers project .pi/chains over user chains on name collisions", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-project-chain-collision-"));
-		const home = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-user-chain-home-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-project-chain-collision-"));
+		const home = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-user-chain-home-"));
 		tempDirs.push(dir, home);
 		const oldHome = process.env.HOME;
 		const oldUserProfile = process.env.USERPROFILE;

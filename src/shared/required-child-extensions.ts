@@ -52,7 +52,7 @@ export function snapshotRequiredChildExtensions(value: unknown, label = "Require
 interface Registry { version: 1; bySession: Map<string, RequiredChildExtensionSnapshot> }
 
 function registry(): Registry {
-	const key = Symbol.for("pi-subagents.required-child-extensions.v1");
+	const key = Symbol.for("pi-cciotti.required-child-extensions.v1");
 	const root = globalThis as Record<PropertyKey, unknown>;
 	const existing = root[key];
 	if (existing === undefined) {

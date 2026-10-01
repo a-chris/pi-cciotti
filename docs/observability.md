@@ -149,7 +149,7 @@ command:
 Extension commands execute inline over Pi RPC without a model turn. The reply
 arrives as a single emit-then-retract update on the dedicated `subagent-inspect`
 widget key: the first (and only) line is `PI_SUBAGENT_INSPECT_JSON:<JSON>` with a
-versioned `pi-subagents.inspect-reply` payload correlated by `requestId`. Hosts
+versioned `pi-cciotti.inspect-reply` payload correlated by `requestId`. Hosts
 must not render this widget; they should buffer the payload by `requestId` and
 drop unmatched replies.
 
@@ -176,7 +176,7 @@ In TUI mode the command only points at the interactive `/subagents` inspector.
 Async runs write machine-readable lifecycle artifacts for observability and workflow gates:
 
 ```text
-<tmpdir>/pi-subagents-<scope>/async-subagent-runs/<id>/
+<tmpdir>/pi-cciotti-<scope>/async-subagent-runs/<id>/
   status.json
   events.jsonl
   output-<n>.log
@@ -247,10 +247,10 @@ Both launch paths subscribe to the child session's event stream directly; there 
 For an instrumented parent session, enable Node's opt-in debug sink **before starting Pi**:
 
 ```sh
-NODE_DEBUG=pi-subagents-notify pi 2>notification-debug.log
+NODE_DEBUG=pi-cciotti-notify pi 2>notification-debug.log
 ```
 
-This writes bounded JSON records prefixed `PI-SUBAGENTS-NOTIFY <pid>:` to stderr, not run artifacts or chat. The capture also contains other stderr output; review it before sharing. Records contain only `reason`, sanitized `id`/`runId` (up to 128 characters each), and `source`; task/output text, paths, credentials, and exception bodies are not included.
+This writes bounded JSON records prefixed `PI-CCIOTTI-NOTIFY <pid>:` to stderr, not run artifacts or chat. The capture also contains other stderr output; review it before sharing. Records contain only `reason`, sanitized `id`/`runId` (up to 128 characters each), and `source`; task/output text, paths, credentials, and exception bodies are not included.
 
 - `disposed`, `missing_session`, `foreground_session_mismatch`, `not_owned`: delivery rejected by an existing guard.
 - `emit_foreground_session_mismatch`, `emit_not_owned`: ownership/session recheck rejected emission.
@@ -267,7 +267,7 @@ Without `NODE_DEBUG`, tracing only checks the debug-enabled flag: no identity sa
 Each scripted workflow stores runtime artifacts under a workflow artifact directory. The on-disk directory is still named `chain-runs` for compatibility. With the default `artifactDir: "session"` or with `"temp"`, it is user-scoped temp storage. With `artifactDir: "project"`, the root is `<cwd>/.pi/subagents/chain-runs/`:
 
 ```text
-<tmpdir>/pi-subagents-<scope>/chain-runs/{runId}/
+<tmpdir>/pi-cciotti-<scope>/chain-runs/{runId}/
 ```
 
 A run directory may contain files such as `context.md`, `plan.md`, `progress.md`, and `parallel-{stepIndex}/.../output.md`. User-scoped temp workflow artifact directories older than 24 hours are cleaned up on extension startup; project-local and explicit persistent roots are not age-scanned.
@@ -281,7 +281,7 @@ Debug artifacts live under `{sessionDir}/subagent-artifacts/`, `.pi/subagents/ar
 
 Metadata records timing, usage, exit code, the resolved model, and the resolved acceptance ledger with its parsed child report. A strictly guarded retained-session recovery after a verified compaction abort may continue once on that same model; it never selects another model.
 
-For npm package projects, project-scoped artifacts need a `.npmignore` rule (or `.gitignore` when no `.npmignore` exists) or a `files` allowlist that does not include `.pi/subagents/`. pi-subagents warns at launch when these package settings can include the artifacts. Use `artifactDir: "session"` or `"temp"` to keep them outside the package worktree.
+For npm package projects, project-scoped artifacts need a `.npmignore` rule (or `.gitignore` when no `.npmignore` exists) or a `files` allowlist that does not include `.pi/subagents/`. pi-cciotti warns at launch when these package settings can include the artifacts. Use `artifactDir: "session"` or `"temp"` to keep them outside the package worktree.
 
 ## Sessions
 

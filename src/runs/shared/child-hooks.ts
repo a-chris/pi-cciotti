@@ -104,7 +104,7 @@ export function captureReadonlyChildDrain(hooks: ChildHookExtension[]): (() => b
 }
 
 /**
- * The child-side hooks pi-subagents installs in every child, keyed off the
+ * The child-side hooks pi-cciotti installs in every child, keyed off the
  * launch config. The registrations live in `subagent-prompt-runtime.ts`,
  * `fast-mode-extension.ts`.
  */
@@ -125,7 +125,7 @@ export function createCapturedChildHooks(config: ChildRuntimeConfig, runner = fa
 	Object.assign(config, capture);
 	const hooks = childHooks(config, capture, (held) => { finalDrainHeld = held; });
 	if (runner) {
-		hooks.push({ name: "pi-subagents:completion-intent", factory: (pi) => pi.on("session_start", (_event, childCtx) => {
+		hooks.push({ name: "pi-cciotti:completion-intent", factory: (pi) => pi.on("session_start", (_event, childCtx) => {
 			// Retain only attempt model services and the session id string, not the live child session.
 			completionIntentContext = {
 				model: childCtx.model,
@@ -153,7 +153,7 @@ function childHooks(config: ChildRuntimeConfig, capture?: OwnedCapture, holdFina
 		Object.defineProperty(runtime, "holdFinalDrain", { configurable: true, enumerable: true, writable: true, value: holdFinalDrain });
 	}
 	const hooks: ChildHookExtension[] = [
-		{ name: "pi-subagents:prompt-runtime", factory: function promptRuntime(pi) {
+		{ name: "pi-cciotti:prompt-runtime", factory: function promptRuntime(pi) {
 			if (!proof?.observeNext) return registerSubagentPromptRuntime(pi, runtime);
 			proof.observation = proof.observeNext;
 			proof.observeNext = undefined;
@@ -164,6 +164,6 @@ function childHooks(config: ChildRuntimeConfig, capture?: OwnedCapture, holdFina
 		proof.factories = hooks.map((hook) => hook.factory);
 		promptProofs.set(hooks[0]!.factory, proof);
 	}
-	if (config.fast) hooks.push({ name: "pi-subagents:fast-mode", factory: (pi) => registerSubagentFastModeExtension(pi) });
+	if (config.fast) hooks.push({ name: "pi-cciotti:fast-mode", factory: (pi) => registerSubagentFastModeExtension(pi) });
 	return hooks;
 }

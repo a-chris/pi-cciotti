@@ -167,11 +167,11 @@ describe("agent discovery snapshots", () => {
 		writeJson(path.join(project, ".pi", "settings.json"), { packages: [projectPackageRoot] });
 		writeJson(path.join(userPackageRoot, "package.json"), {
 			name: "user-package",
-			"pi-subagents": { agents: [path.relative(userPackageRoot, sharedAgentDir)] },
+			"pi-cciotti": { agents: [path.relative(userPackageRoot, sharedAgentDir)] },
 		});
 		writeJson(path.join(projectPackageRoot, "package.json"), {
 			name: "project-package",
-			"pi-subagents": { agents: [path.relative(projectPackageRoot, sharedAgentDir)] },
+			"pi-cciotti": { agents: [path.relative(projectPackageRoot, sharedAgentDir)] },
 		});
 		writeAgent(path.join(sharedAgentDir, "shared.md"), "shared", "Shared package agent");
 

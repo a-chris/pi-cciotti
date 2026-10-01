@@ -1838,7 +1838,7 @@ async function resumeAsyncRun(input: {
 		}
 		if (!isAsyncAvailable()) {
 			return {
-				content: [{ type: "text", text: "Async mode requires upstream jiti for TypeScript execution but it could not be found. Ensure the pi-subagents package dependencies are installed." }],
+				content: [{ type: "text", text: "Async mode requires upstream jiti for TypeScript execution but it could not be found. Ensure the pi-cciotti package dependencies are installed." }],
 				isError: true,
 				details: { mode: "chain", results: [] },
 			};
@@ -2944,7 +2944,7 @@ async function loadSummaryBriefsForLaunch(input: {
 	if (!parentSessionFile || !fs.existsSync(parentSessionFile)) {
 		for (const agentName of new Set(input.agentNames)) {
 			if (shouldSummaryAgent(input.contextPolicy, agentName)) {
-				console.warn(`[pi-subagents] summary context requested for agent '${agentName}' but no persisted parent session is available; launching fresh.`);
+				console.warn(`[pi-cciotti] summary context requested for agent '${agentName}' but no persisted parent session is available; launching fresh.`);
 			}
 		}
 		return briefs;
@@ -2965,7 +2965,7 @@ async function loadSummaryBriefsForLaunch(input: {
 			briefs.set(agentName, brief);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			console.warn(`[pi-subagents] context brief generation failed for agent '${agentName}'; launching fresh: ${message}`);
+			console.warn(`[pi-cciotti] context brief generation failed for agent '${agentName}'; launching fresh: ${message}`);
 		}
 	}
 	return briefs;
@@ -3126,7 +3126,7 @@ async function runAsyncPath(data: ExecutionContextData, deps: ExecutorDeps): Pro
 
 	if (!isAsyncAvailable()) {
 		return {
-			content: [{ type: "text", text: "Async mode requires upstream jiti for TypeScript execution but it could not be found. Ensure the pi-subagents package dependencies are installed." }],
+			content: [{ type: "text", text: "Async mode requires upstream jiti for TypeScript execution but it could not be found. Ensure the pi-cciotti package dependencies are installed." }],
 			isError: true,
 			details: { mode: "single" as const, results: [] },
 		};
@@ -4013,10 +4013,10 @@ function recordMissionWorkflowChild(
 	} catch (error) {
 		if (error instanceof MissionNotFoundError) {
 			missionsMissingFromStore.add(binding.missionId);
-			console.warn(`[pi-subagents] Mission '${binding.missionId}' is no longer in the mission store; stopped recording its workflow children. Terminal-mission retention can prune a mission while its run is still active.`);
+			console.warn(`[pi-cciotti] Mission '${binding.missionId}' is no longer in the mission store; stopped recording its workflow children. Terminal-mission retention can prune a mission while its run is still active.`);
 			return;
 		}
-		console.warn(`[pi-subagents] Failed to record mission workflow child '${key}': ${error instanceof Error ? error.message : String(error)}`);
+		console.warn(`[pi-cciotti] Failed to record mission workflow child '${key}': ${error instanceof Error ? error.message : String(error)}`);
 	}
 }
 
@@ -4681,7 +4681,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			if (spawnBudgetErrors.length > 0) {
 				return buildRequestedModeError(requestParams, `workflowScript validation failed before child launch; no children launched. ${spawnBudgetErrors.map((error) => error.message).join(" ")}`);
 			}
-			for (const warning of spawnBudgetValidation.warnings ?? []) console.warn(`[pi-subagents] ${warning.message}`);
+			for (const warning of spawnBudgetValidation.warnings ?? []) console.warn(`[pi-cciotti] ${warning.message}`);
 			const acceptanceErrors = validateAcceptanceInput(requestParams.acceptance);
 			if (acceptanceErrors.length > 0) return buildRequestedModeError(requestParams, acceptanceErrors.join(" "));
 			const foregroundWorkflowRunId = encodeIndexSegment(_id);
@@ -4719,7 +4719,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			if (workflowArtifactConfig.dir === "project" && !warnedArtifactPackageDirs.has(workflowCwd)) {
 				warnedArtifactPackageDirs.add(workflowCwd);
 				const warning = getProjectArtifactPackagingWarning(workflowCwd);
-				if (warning) console.warn(`[pi-subagents] ${warning}`);
+				if (warning) console.warn(`[pi-cciotti] ${warning}`);
 			}
 			const chatProgress = resolveWorkflowChatProgress({ parentCwd, workflowCwd, background: requestParams.async !== false });
 			const explicitMission = requestParams.missionId !== undefined || requestParams.mission !== undefined;
@@ -6411,7 +6411,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 				};
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				console.warn(`[pi-subagents] summary context unavailable; launching fresh: ${message}`);
+				console.warn(`[pi-cciotti] summary context unavailable; launching fresh: ${message}`);
 			}
 		}
 		const selectedAgentNames = hasSingle
@@ -6486,7 +6486,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 		if (artifactConfig.dir === "project" && !warnedArtifactPackageDirs.has(effectiveCwd)) {
 			warnedArtifactPackageDirs.add(effectiveCwd);
 			const warning = getProjectArtifactPackagingWarning(effectiveCwd);
-			if (warning) console.warn(`[pi-subagents] ${warning}`);
+			if (warning) console.warn(`[pi-cciotti] ${warning}`);
 		}
 
 		let sessionRoot: string;
@@ -6687,9 +6687,9 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 				const replacement = deps.state.foregroundControls.get(newRunId);
 				if (replacement) replacement.sourceRunId = foregroundControl.runId;
 				void launch.then((result) => {
-					if (result.isError) console.warn(`[pi-subagents] Prompt redo ${newRunId} failed: ${result.content.find((item) => item.type === "text")?.text ?? "unknown error"}`);
+					if (result.isError) console.warn(`[pi-cciotti] Prompt redo ${newRunId} failed: ${result.content.find((item) => item.type === "text")?.text ?? "unknown error"}`);
 				}).catch((error) => {
-					console.warn(`[pi-subagents] Prompt redo ${newRunId} failed: ${error instanceof Error ? error.message : String(error)}`);
+					console.warn(`[pi-cciotti] Prompt redo ${newRunId} failed: ${error instanceof Error ? error.message : String(error)}`);
 				});
 				return { text: `Prompt redo started ${newRunId}.` };
 			};

@@ -1,6 +1,6 @@
 .pi/todos/
 .pi/subagents/
-.pi-subagents/
+.pi-cciotti/
 .DS_Store
 node_modules/
 dist-pkg/

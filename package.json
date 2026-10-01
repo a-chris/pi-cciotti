@@ -1,5 +1,5 @@
 {
-  "name": "pi-subagents",
+  "name": "pi-cciotti",
   "version": "0.69.0",
   "description": "Pi extension for single-agent delegation and scripted multi-agent workflows",
   "author": "Nico Bailon",
@@ -22,11 +22,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nicobailon/pi-subagents.git"
+    "url": "git+https://github.com/a-chris/pi-cciotti.git"
   },
-  "homepage": "https://github.com/nicobailon/pi-subagents#readme",
+  "homepage": "https://github.com/a-chris/pi-cciotti#readme",
   "bugs": {
-    "url": "https://github.com/nicobailon/pi-subagents/issues"
+    "url": "https://github.com/a-chris/pi-cciotti/issues"
   },
   "keywords": [
     "pi-package",
@@ -38,7 +38,7 @@
     "cli"
   ],
   "bin": {
-    "pi-subagents": "install.mjs"
+    "pi-cciotti": "install.mjs"
   },
   "files": [
     "index.ts",

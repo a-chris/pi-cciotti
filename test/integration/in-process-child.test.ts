@@ -282,7 +282,7 @@ describe("default child session factory", () => {
 		const agentPrompt = '<active_agent name="remotion-editor"/>\n\neditor instructions';
 		const globalPath = path.join(process.env.HOME ?? process.env.USERPROFILE ?? process.cwd(), ".pi", "agent", "AGENTS.md");
 		const projectPath = path.join(process.cwd(), "AGENTS.md");
-		const orchestrationSkill = '<skill><name>pi-subagents</name><location>/skills/pi-subagents/SKILL.md</location></skill>';
+		const orchestrationSkill = '<skill><name>pi-cciotti</name><location>/skills/pi-cciotti/SKILL.md</location></skill>';
 		const assemble = (extra: string) => `${agentPrompt}${extra}`;
 		const destructivePrompt = assemble([
 			"", "<project_context>",
@@ -306,8 +306,8 @@ describe("default child session factory", () => {
 						{ path: "/ambient/first.ts" },
 						{ path: "/ambient/claude-bridge.ts" },
 						{ path: "/ambient/last.ts" },
-						{ path: "<inline:pi-subagents:prompt-runtime>" },
-						{ path: "<inline:pi-subagents:completion-intent>" },
+						{ path: "<inline:pi-cciotti:prompt-runtime>" },
+						{ path: "<inline:pi-cciotti:completion-intent>" },
 					],
 					errors: [] as unknown[],
 					runtime: {},
@@ -318,7 +318,7 @@ describe("default child session factory", () => {
 					let prompt = original;
 					let captured: string | undefined;
 					for (const { path: extensionPath } of this.result.extensions) {
-						if (extensionPath === "<inline:pi-subagents:prompt-runtime>") {
+						if (extensionPath === "<inline:pi-cciotti:prompt-runtime>") {
 							prompt = rewriteSubagentPrompt(prompt, { inheritProjectContext: true, inheritGlobalContext: false, inheritSkills: true });
 						}
 						if (extensionPath === "/ambient/claude-bridge.ts") captured = prompt;
@@ -335,23 +335,23 @@ describe("default child session factory", () => {
 			...stubLaunch,
 			ambientExtensions: true,
 			hooks: [
-				{ name: "pi-subagents:prompt-runtime", factory() {} },
-				{ name: "pi-subagents:completion-intent", factory() {} },
+				{ name: "pi-cciotti:prompt-runtime", factory() {} },
+				{ name: "pi-cciotti:completion-intent", factory() {} },
 			],
 		});
 
 		assert.deepEqual(orderedPaths[0], [
-			"<inline:pi-subagents:prompt-runtime>",
+			"<inline:pi-cciotti:prompt-runtime>",
 			"/ambient/first.ts",
 			"/ambient/claude-bridge.ts",
 			"/ambient/last.ts",
-			"<inline:pi-subagents:completion-intent>",
+			"<inline:pi-cciotti:completion-intent>",
 		]);
 		assert.deepEqual(captureResults, [true, true], "bridge-style capture must resolve both wrapping and destructive filtering");
 		assert.match(forwardedPrompts[1]!, /editor instructions/);
 		assert.match(forwardedPrompts[1]!, /project instructions/);
 		assert.doesNotMatch(forwardedPrompts[1]!, /global parent-only instructions/);
-		assert.doesNotMatch(forwardedPrompts[1]!, /<name>pi-subagents<\/name>/);
+		assert.doesNotMatch(forwardedPrompts[1]!, /<name>pi-cciotti<\/name>/);
 	});
 
 	it("resolves models from providers queued during child extension loading", async () => {

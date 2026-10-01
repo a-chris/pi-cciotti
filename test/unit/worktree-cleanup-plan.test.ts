@@ -407,8 +407,8 @@ describe("worktree cleanup plan", () => {
 
 	it("uses git toplevel parent as default cleanup root when input.repo is a subdirectory", async () => {
 		const repo = createRepo("pi-cleanup-plan-subdir-root-");
-		const previous = process.env.PI_SUBAGENTS_WORKTREE_DIR;
-		delete process.env.PI_SUBAGENTS_WORKTREE_DIR;
+		const previous = process.env.PI_CCIOTTI_WORKTREE_DIR;
+		delete process.env.PI_CCIOTTI_WORKTREE_DIR;
 		let setup: WorktreeSetup | undefined;
 		try {
 			fs.mkdirSync(path.join(repo, "packages", "app"), { recursive: true });
@@ -422,8 +422,8 @@ describe("worktree cleanup plan", () => {
 			assert.equal(entry?.decision, "remove");
 			assert.equal(entry?.state, "safe");
 		} finally {
-			if (previous === undefined) delete process.env.PI_SUBAGENTS_WORKTREE_DIR;
-			else process.env.PI_SUBAGENTS_WORKTREE_DIR = previous;
+			if (previous === undefined) delete process.env.PI_CCIOTTI_WORKTREE_DIR;
+			else process.env.PI_CCIOTTI_WORKTREE_DIR = previous;
 			removeGeneratedWorktrees(repo, setup);
 			fs.rmSync(repo, { recursive: true, force: true });
 		}

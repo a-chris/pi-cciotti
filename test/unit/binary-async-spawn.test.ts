@@ -25,7 +25,7 @@ for (const [entry, missingBootstrap] of [
 		process.argv[1] = entry;
 		process.env.PI_SUBAGENT_PI_BINARY = path.join(root, "pi-native");
 		process.env.PI_PACKAGE_DIR = path.join(root, "release-assets");
-		process.env.PI_SUBAGENTS_PI_CODING_AGENT_PACKAGE_ROOT = "/stale/npm-root";
+		process.env.PI_CCIOTTI_PI_CODING_AGENT_PACKAGE_ROOT = "/stale/npm-root";
 		process.env.JITI_ALIAS = '{"stale":"alias"}';
 		const spawn = t.mock.method(childProcess, "spawn", () => { throw new Error("captured binary spawn"); });
 		if (missingBootstrap) {
@@ -52,7 +52,7 @@ for (const [entry, missingBootstrap] of [
 				assert.deepEqual(args.slice(0, -1), ["--no-extensions", "--no-skills", "--no-prompt-templates", "--no-session", "--mode", "rpc", "--extension"]);
 				assert.ok(args.at(-1).endsWith("binary-bootstrap.ts"));
 				assert.equal(options.env.JITI_ALIAS, undefined);
-				assert.equal(options.env.PI_SUBAGENTS_PI_CODING_AGENT_PACKAGE_ROOT, undefined);
+				assert.equal(options.env.PI_CCIOTTI_PI_CODING_AGENT_PACKAGE_ROOT, undefined);
 				assert.equal(options.env.PI_PACKAGE_DIR, process.env.PI_PACKAGE_DIR);
 				assert.ok(path.isAbsolute(options.env.PI_SUBAGENT_RUNNER_CONFIG));
 				assert.equal(options.cwd, root);

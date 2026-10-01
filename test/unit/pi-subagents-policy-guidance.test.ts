@@ -5,11 +5,11 @@ import { describe, it } from "node:test";
 
 const readProjectFile = (file: string): string => readFileSync(join(process.cwd(), file), "utf-8");
 
-describe("pi-subagents delegation policy guidance", () => {
+describe("pi-cciotti delegation policy guidance", () => {
 	it("keeps delegation operator-authorized and cost-bounded", () => {
-		const skill = readProjectFile("skills/pi-subagents/SKILL.md");
-		const prompting = readProjectFile("skills/pi-subagents/references/prompting-and-roles.md");
-		const recipes = readProjectFile("skills/pi-subagents/references/constraints-and-recipes.md");
+		const skill = readProjectFile("skills/pi-cciotti/SKILL.md");
+		const prompting = readProjectFile("skills/pi-cciotti/references/prompting-and-roles.md");
+		const recipes = readProjectFile("skills/pi-cciotti/references/constraints-and-recipes.md");
 		const guidance = [skill, prompting, recipes].join("\n");
 
 		assert.match(skill, /parent works directly by default/i);

@@ -58,7 +58,7 @@ describe("proactive skill subagent recommendations", () => {
 	it("filters unavailable orchestration skills and honors config bounds", () => {
 		const recommendations = recommendProactiveSkillSubagents({
 			agents: [
-				agent("delegate", ["pi-subagents", "alpha", "beta"]),
+				agent("delegate", ["pi-cciotti", "alpha", "beta"]),
 				agent("one", ["alpha", "beta"]),
 				agent("two", ["gamma"]),
 				agent("three", ["gamma"]),

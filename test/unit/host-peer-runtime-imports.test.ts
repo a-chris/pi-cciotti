@@ -99,7 +99,7 @@ test("every host peer package the detached async runner imports is aliased to th
 });
 
 test("resolves pi-agent-core/node to its exact package export instead of appending to the root alias", () => {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-agent-core-node-alias-"));
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-core-node-alias-"));
 	const packageDir = path.join(root, "node_modules", "@earendil-works", "pi-agent-core");
 	const distDir = path.join(packageDir, "dist");
 	try {
@@ -134,7 +134,7 @@ function writeFakeTypeboxPackage(typeboxDir: string): void {
 }
 
 test("resolveCompileFromPackageRoot loads typebox/compile from a fake Pi host package root", async () => {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-host-root-"));
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-host-root-"));
 	try {
 		fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "fake-pi-coding-agent", version: "0.0.0" }));
 		writeFakeTypeboxPackage(path.join(root, "node_modules", "typebox"));
@@ -149,7 +149,7 @@ test("resolveCompileFromPackageRoot loads typebox/compile from a fake Pi host pa
 		fs.rmSync(root, { recursive: true, force: true });
 	}
 
-	const emptyRoot = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-empty-root-"));
+	const emptyRoot = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-empty-root-"));
 	try {
 		await assert.rejects(resolveCompileFromPackageRoot(emptyRoot));
 	} finally {
@@ -158,7 +158,7 @@ test("resolveCompileFromPackageRoot loads typebox/compile from a fake Pi host pa
 });
 
 test("resolveCompileFromPackageRoot resolves typebox hoisted to an ancestor node_modules", async () => {
-	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-hoisted-root-"));
+	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-hoisted-root-"));
 	try {
 		writeFakeTypeboxPackage(path.join(tmp, "node_modules", "typebox"));
 		const packageRoot = path.join(tmp, "apps", "pi", "node_modules", "@earendil-works", "pi-coding-agent");
@@ -191,7 +191,7 @@ test("validateStructuredOutputValue validates values against a JSON Schema", asy
 });
 
 test("chord is omitted before 0.85, but required host-first on chord-era and unknown hosts (#2026)", () => {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-chord-alias-"));
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-chord-alias-"));
 	const host = path.join(root, "host");
 	const extension = path.join(root, "extension");
 	const chord = "@earendil-works/chord";

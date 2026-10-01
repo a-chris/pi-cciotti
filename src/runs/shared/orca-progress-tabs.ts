@@ -369,7 +369,7 @@ export function createOrcaProgressTab(input: {
 		logPath,
 	});
 	try {
-		fs.writeFileSync(logPath, `pi-subagents / ${agent}\nrun ${runId} · ${stepCount === 1 ? "1 child" : `${stepCount} children`}\n${"─".repeat(48)}\n`, { encoding: "utf-8", mode: 0o600 });
+		fs.writeFileSync(logPath, `pi-cciotti / ${agent}\nrun ${runId} · ${stepCount === 1 ? "1 child" : `${stepCount} children`}\n${"─".repeat(48)}\n`, { encoding: "utf-8", mode: 0o600 });
 		fs.rmSync(donePath, { force: true });
 	} catch {
 		markCreateReady();

@@ -524,9 +524,9 @@ function extractSubagentPathsFromPackageRoot(packageRoot: string, scope: Set<Pac
 	const metadata = packageMetadata(pkgRecord, packageRoot);
 
 	const roots: Record<string, unknown>[] = [];
-	const piSubagents = pkgRecord["pi-subagents"];
-	if (piSubagents && typeof piSubagents === "object" && !Array.isArray(piSubagents)) {
-		roots.push(piSubagents as Record<string, unknown>);
+	const piCciotti = pkgRecord["pi-cciotti"];
+	if (piCciotti && typeof piCciotti === "object" && !Array.isArray(piCciotti)) {
+		roots.push(piCciotti as Record<string, unknown>);
 	}
 
 	const pi = pkgRecord.pi;

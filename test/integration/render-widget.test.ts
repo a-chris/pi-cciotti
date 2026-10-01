@@ -975,7 +975,7 @@ describe("subagent async widget rendering", () => {
 		const [line] = widget as string[];
 		assert.ok(line?.startsWith("PI_SUBAGENT_ASYNC_JSON:"));
 		const snapshot = JSON.parse(line.slice("PI_SUBAGENT_ASYNC_JSON:".length));
-		assert.equal(snapshot.kind, "pi-subagents.async-status-snapshot");
+		assert.equal(snapshot.kind, "pi-cciotti.async-status-snapshot");
 		assert.equal(snapshot.version, 1);
 		assert.equal(snapshot.runs[0].id, "run-rpc");
 		assert.equal(JSON.stringify(snapshot).includes("/tmp/private-run-rpc"), false);
@@ -988,7 +988,7 @@ describe("subagent async widget rendering", () => {
 			const ui = createUiContext();
 			renderWidget(ui.ctx as never, [{
 				asyncId: "run-narrow",
-				asyncDir: "/tmp/pi-subagents-uid-1000/async-subagent-runs/call_with_a_long_identifier",
+				asyncDir: "/tmp/pi-cciotti-uid-1000/async-subagent-runs/call_with_a_long_identifier",
 				status: "running",
 				mode: "parallel",
 				agents: ["correctness", "tests-maintainability"],
@@ -1589,7 +1589,7 @@ describe("subagent async widget rendering", () => {
 						"reviewer · running · 11 tool uses · 3m44s",
 						"repo=nicobailon/pi-subagents",
 						"sha=d61aca... | 2m32s",
-						"output: /var/folders/x/T/pi-subagents-uid-501/async-subagent-runs/run-status-snapshots/output.log",
+						"output: /var/folders/x/T/pi-cciotti-uid-501/async-subagent-runs/run-status-snapshots/output.log",
 					],
 				},
 			],
@@ -1597,7 +1597,7 @@ describe("subagent async widget rendering", () => {
 
 		const expandedText = buildWidgetLines([job], theme, 180, true).join("\n");
 		assert.match(expandedText, /↻ 11 progress updates/);
-		assert.match(expandedText, /latest: output: \/var\/folders\/x\/T\/pi-subagents-uid-501\/async-subagent-runs\/run-status-snapshots\/output.log/);
+		assert.match(expandedText, /latest: output: \/var\/folders\/x\/T\/pi-cciotti-uid-501\/async-subagent-runs\/run-status-snapshots\/output.log/);
 		assert.match(expandedText, /repo=nicobailon\/pi-subagents/);
 		assert.match(expandedText, /sha=d61aca\.\.\. \| 2m32s/);
 		assert.doesNotMatch(expandedText, /3m27s/);

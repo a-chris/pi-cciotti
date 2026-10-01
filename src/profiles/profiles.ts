@@ -434,7 +434,7 @@ function resolveProfilePath(name: string): string {
 }
 
 export function getSubagentProfilesRootDir(): string {
-	return path.join(getAgentDir(), "profiles", "pi-subagents");
+	return path.join(getAgentDir(), "profiles", "pi-cciotti");
 }
 
 export function getSubagentProfilesDir(): string {

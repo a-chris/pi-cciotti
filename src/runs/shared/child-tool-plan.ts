@@ -45,7 +45,7 @@ const SUBAGENT_RUNTIME_EXTENSION_PATHS = new Set([
 	FAST_MODE_EXTENSION_PATH,
 ].map((extensionPath) => path.normalize(extensionPath)));
 
-/** True for the extension files pi-subagents itself installs in child sessions. */
+/** True for the extension files pi-cciotti itself installs in child sessions. */
 export function isSubagentRuntimeExtensionPath(extensionPath: string): boolean {
 	return SUBAGENT_RUNTIME_EXTENSION_PATHS.has(path.normalize(extensionPath));
 }

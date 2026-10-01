@@ -314,10 +314,10 @@ Optionally caps the total number of child subagent launches during one parent se
 ## `maxSubagentSpawnsPerRun`
 
 ```json
-{ "maxSubagentSpawnsPerRun": 64 }
+{ "maxSubagentSpawnsPerRun": 6 }
 ```
 
-Caps cumulative logical child admissions in one top-level run tree. The default is `64`. `PI_SUBAGENT_MAX_SPAWNS_PER_RUN` overrides the config when it is a positive integer. Invalid, zero, or missing values fall back to the configured positive value or `64`.
+Caps cumulative logical child admissions in one top-level run tree. The default is `6`. `PI_SUBAGENT_MAX_SPAWNS_PER_RUN` overrides the config when it is a positive integer. Invalid, zero, or missing values fall back to the configured positive value or `6`.
 
 Inline or file-backed top-level workflow calls may set a positive safe-integer `maxSubagentSpawnsPerRun`; it overrides the environment and config for that workflow. Inherited nested budgets remain authoritative, and the override is not forwarded to child calls.
 

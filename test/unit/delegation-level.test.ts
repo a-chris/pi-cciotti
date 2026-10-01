@@ -59,12 +59,14 @@ describe("delegation level policy", () => {
 		}
 	});
 
-	it("keeps the shipped gate verbatim at the default level", () => {
-		// An install that never sets the key must read the rule it read before the
-		// setting existed, so adding the setting cannot silently widen authority.
-		assert.match(
+	it("pins the default level's authority sentence verbatim", () => {
+		// The default guideline is the authority every unset install runs with, so it
+		// is pinned verbatim. `standard` was deliberately loosened from the shipped
+		// "do not invoke unless requested" gate, so a future change to the default's
+		// authority must show up as this test's diff, not as silent drift.
+		assert.equal(
 			delegationLevelGuideline("standard"),
-			/do not invoke subagents unless the operator requested delegation directly or through applicable instructions/,
+			"Delegation level 'standard': be willing to invoke subagents for moderate or complex work when it materially helps while keeping decisions and final acceptance.",
 		);
 	});
 

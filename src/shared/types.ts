@@ -2604,7 +2604,7 @@ export function resolveMaxSubagentSpawnsPerSession(configMaxSpawns?: number): nu
 	return configuredMaxSpawns === 0 ? undefined : configuredMaxSpawns;
 }
 
-export const DEFAULT_MAX_SUBAGENT_SPAWNS_PER_RUN = 64;
+export const DEFAULT_MAX_SUBAGENT_SPAWNS_PER_RUN = 6;
 
 export function normalizeMaxSubagentSpawnsPerRun(value: unknown): number | undefined {
 	const normalized = normalizeNonNegativeInteger(value);

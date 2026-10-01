@@ -187,7 +187,13 @@ describe("named workflow resources", () => {
 			async status(key) { return { key, ok: true, output: "unused", artifactPaths: [] }; },
 		});
 		assert.equal(hostCalls.length, 1);
-		assert.deepEqual(calls, [{ key: "planner", agent: "planner", task: "Add prequel passthrough to workflow children", prequel: "Decisions: use pass-through, not a whitelist", cwd: worktree }]);
+		assert.equal(calls.length, 1);
+		assert.equal(calls[0].key, "planner");
+		assert.equal(calls[0].agent, "planner");
+		assert.ok(String(calls[0].task).startsWith("Add prequel passthrough to workflow children"));
+		assert.match(String(calls[0].task), /Working in git worktree \/tmp\/perl-fixtures\/.pi-perl-fixtures on branch perl\/work\./);
+		assert.equal(calls[0].prequel, "Decisions: use pass-through, not a whitelist");
+		assert.equal(calls[0].cwd, worktree);
 		assert.deepEqual(execution.value, { phase: "plan", plan: "plan.md", worktree, summary: "Planned: three steps" });
 	});
 

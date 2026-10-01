@@ -250,10 +250,17 @@ function resolvePerl(args: Readonly<Record<string, unknown>>): ReturnType<Workfl
 	const task = args.task;
 	if (task !== undefined) {
 		if (typeof task !== "string" || !task.trim()) return { error: "workflow 'perl' args.task must be a non-empty string." };
-		const launch: Record<string, unknown> = { agent: "planner", task: task.trim(), async: false, output: true, worktree: false };
+		const launch: Record<string, unknown> = { agent: "planner", async: false, output: true, worktree: false };
 		if (prequel !== undefined) launch.prequel = prequel.trim();
+		// The planner is pinned into the worktree (cwd) but is not otherwise told where it
+		// is, so it would invent a branch name in plan.md. The task is assembled in the
+		// generated script (where the runtime worktree path is known) so plan.md references
+		// the real path and branch.
+		const launchLiteral = JSON.stringify(launch);
+		const taskLiteral = JSON.stringify(task.trim());
+		const branchLiteral = JSON.stringify(branch);
 		return {
-			script: `${perlWorktreePreamble(setupCommand)}return { phase: "plan", plan: "plan.md", worktree: worktree || null, summary: (await runs.run("planner", withWt(${JSON.stringify(launch)}))).output };`,
+			script: `${perlWorktreePreamble(setupCommand)}const launch = ${launchLiteral}; launch.task = ${taskLiteral} + (worktree ? " (Working in git worktree " + worktree + " on branch " + ${branchLiteral} + ". Use these exact paths and branch name in plan.md.)" : ""); return { phase: "plan", plan: "plan.md", worktree: worktree || null, summary: (await runs.run("planner", withWt(launch))).output };`,
 			hostCommands,
 		};
 	}

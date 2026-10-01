@@ -4,9 +4,31 @@
 
 # pi-cciotti
 
-`pi-cciotti` lets Pi delegate work to focused child agents. Use it for code review, scouting, implementation, parallel audits, saved workflows, background jobs, and anything else that benefits from a second or third set of model eyes.
+`pi-cciotti` lets one Pi session delegate focused work to child agents. You ask in plain language, Pi hands the job to a specialist, and the result comes back into the conversation. Code review, scouting, implementation, parallel audits, background jobs: anything that benefits from a second or third set of model eyes.
 
 <https://github.com/user-attachments/assets/702554ec-faaf-4635-80aa-fb5d6e292fd1>
+
+Most subagent setups burn context on giant schemas before the agent does any work. `pi-cciotti` keeps the model-facing surface small and predictable, cutting it from 17.4K to about 5.3K characters.
+
+## Why use it
+
+`pi-cciotti` is a fork of [nicobailon/pi-subagents](https://github.com/nicobailon/pi-subagents) with a narrower contract focused on predictable delegation.
+
+**Clear handoffs.** Each child takes one task and returns a result. If it cannot finish safely, it returns `BLOCKED: <reason>` so the parent can decide what to do next.
+
+**Plan before you build.** `/perl` gives you a written plan to review before implementation starts, then coordinates the work and review in an isolated worktree. You stay in control without having to supervise every step.
+
+**Delegation on your terms.** Choose how often Pi delegates once in config, from `never` to `aggressive`, instead of repeating the rule in every prompt. `never` removes about 2.8KB from each parent turn on a 16-agent setup while keeping agents available when you ask for them.
+
+**A small surface.** The model gets separate tools for launching a child, composing workflows, and managing runs, each with one clear job. Their combined descriptions are 408 characters, down from 890, while deeper guidance stays in the docs.
+
+**The right context for each job.** A child can start fresh, use the parent session, or receive a focused summary shaped for its role. Reviewers get decisions and diffs; scouts get entry points, without either receiving more context than the job needs.
+
+**Documentation you can trust.** The README, guides, and skills are checked against live tool schemas, so examples do not teach calls the tools reject. The contract test fails when the model-facing docs drift.
+
+**Failures are explicit.** Invalid or removed configuration keys stop loading with a clear error instead of silently restoring defaults.
+
+**Focused orchestration.** The parent coordinates the work, and children cannot create more children. A top-level run allows six cumulative child spawns by default, which stops accidental fan-out early.
 
 ## Install
 
@@ -22,31 +44,13 @@ This tracks the default branch. To pin a tag for a reproducible install, add it 
 pi install /path/to/pi-cciotti
 ```
 
-> **Install from this repository, not npm.** `pi-cciotti` is not published to the npm registry. The registry name `pi-subagents` belongs to the upstream project this fork is based on: `pi install npm:pi-subagents` would install upstream's newest release (currently 0.74.0), which does not contain this fork's changes and whose version numbers no longer line up with the tags in this repository.
+> **Not on npm.** The registry name `pi-subagents` belongs to the upstream project this fork is based on: `pi install npm:pi-subagents` would install upstream's newest release, which does not contain this fork's changes and whose version numbers no longer line up with the tags in this repository.
 
 That is the only required step. Background children use the host's SDK: npm Pi keeps its detached Node runner; the official Pi 0.85.1 Linux x64 standalone release loads the same runner through Pi's embedded SDK, without a separate SDK install. See [Standalone background execution](docs/standalone-background.md) for the supported boundary and validation gate. To try the extension in a single session without installing it, use `pi -e /path/to/pi-cciotti`.
 
-## This fork
-
-This repository is a fork of [nicobailon/pi-subagents](https://github.com/nicobailon/pi-subagents). It installs and runs on its own, but the contract is deliberately different:
-
-**Delegation is one-shot report-back.** There is no parent↔child messaging channel. A child runs its task and returns a result. A child that cannot safely or legitimately finish returns `BLOCKED: <reason>` as a terminal completion status, and the parent decides what happens next.
-
-**The tool surface is three small facades.** `subagent` launches one child, `subagent_workflow` runs scripted orchestration, `subagent_control` reports status, steers runs, and serves the packaged guides. Policy rides on the agent definition — context mode, model, recurring reads — and cannot be overridden per call.
-
-**Context is agent-owned.** An agent declares `defaultContext` (`fresh`, `fork`, or `summary`) and an optional `contextBrief`. With `summary`, a role-directed brief is distilled from the parent session and prepended to the child's task, instead of forking the whole session or starting cold.
-
-**Children cannot launch subagents.** The fan-out child subsystem and the `maxSubagentDepth` cap are gone — nesting is removed, not gated. Only the parent orchestrates.
-
-**The machinery is leaner.** The watchdog subsystem, durable schedules (cron and OS scheduling are the first-class path), multi-lane orchestration, mission patch actions (missions keep durable records and `mission.create`), the Herdr integration and project panes, and the vendored `claude-code`/`codex-exec`/`cursor-agent` executor profiles are removed. Any agent can still declare a generic `external-cli` runner.
-
-**Config fails loud.** A config file that sets a removed key or a hand-edited value that fails validation refuses to load with an explicit error, instead of silently degrading to defaults.
-
-**The docs and skills stay honest.** A docs-contract test checks the packaged guides, README, and skill references against the live tool schemas, so nothing the model reads teaches a call the tools do not accept.
-
 ## Try this first
 
-You do not need to create agents, write config, or learn slash commands. After installing, ask Pi in plain language:
+No agent files to write, no config, no slash commands to learn. After installing, ask Pi in plain language:
 
 ```text
 Use reviewer to review this diff.
@@ -70,7 +74,7 @@ That is enough to start. Pi decides whether to call the `subagent` tool, which a
 
 Pi is the parent session. A subagent is a focused child Pi session with its own job.
 
-When you ask for a subagent, Pi starts the child, gives it the task, and brings the result back. Foreground children run as sessions inside the parent Pi process and stream in the conversation. Background children run as sessions inside a detached runner process that keeps working and can be checked later.
+When you ask for a subagent, Pi starts the child, gives it the task, and brings the result back. Foreground children run as sessions inside the parent Pi process and stream in the conversation. Background children run as sessions inside a detached runner process that keeps working after control returns to you (an omitted `async` backgrounds the run; that is the default).
 
 Installing the extension does not start an automatic reviewer in the background. It gives Pi a delegation tool. If you want every implementation reviewed, say so in your prompt or project instructions:
 
@@ -89,7 +93,7 @@ The extension ships with agents you can use immediately:
 | `scout` | Fast local codebase recon: relevant files, entry points, data flow, risks. |
 | `researcher` | Web/docs research with sources and a concise research brief. Requires [pi-web-access in the child](docs/agents.md#web-research-prerequisites). |
 | `evidence-auditor` | Independently checks whether important research claims are supported by their sources. Requires [pi-web-access in the child](docs/agents.md#web-research-prerequisites). |
-| `planner` | Writes an executable `plan.md` from the brainstormed direction. Plans only; the manual review gate before `perl` executes. |
+| `planner` | Writes an executable `plan.md` from the brainstormed direction. The internal role of the `/perl` workflow; plans only, and it is `advertise: false` so it costs nothing in the per-turn catalog. |
 | `worker` | Implementation work. Edits files, validates, escalates unapproved decisions instead of guessing. |
 | `reviewer` | Code review and small fixes against the task/plan, tests, edge cases, and simplicity. |
 | `oracle` | A second opinion before acting. Challenges assumptions without editing. |
@@ -99,8 +103,7 @@ Rule of thumb: `scout` before you understand the code, `planner` to settle the p
 
 ## Common workflows
 
-The package includes `/council` and `council-mode`, plus documented model-based
-`council-*` profile examples that you add in your own agent directory.
+The package includes `/council` and `council-mode`; the model-based `council-*` agents are documented profiles you add in your own agent directory.
 
 | Want | Ask naturally |
 |------|---------------|
@@ -111,7 +114,7 @@ The package includes `/council` and `council-mode`, plus documented model-based
 | Debate a material decision | "Use `/council` with model-based advisors to compare this decision." |
 | Implement then review | "Implement this, then review it." |
 | Review until clean | "Run a review loop on this change with a max of 3 rounds." |
-| Plan, review, then execute | "`/perl <task>` writes `plan.md` for my review; bare `/perl` executes it with a review loop. All steps run in one worktree on `perl/work` (`.pi-perl-<repo>`), and a `slug` arg gives a concurrent task its own lane (`.pi-perl-<repo>-<slug>`)" |
+| Plan, review, then execute | "`/perl <task>` writes `plan.md` for your review; a second `/perl` call executes it (scout, worker, reviewer loop) in a shared worktree on `perl/work`. A `slug` arg gives a concurrent task its own lane." |
 | Execute a plan carefully | "Have worker implement this approved plan, then run reviewers and apply the feedback." |
 | Scout before planning | "Use scout to inspect the auth flow before planning." |
 | Run in the background | "Run this in the background." |
@@ -124,7 +127,7 @@ For implementation work, the recommended loop is `clarify → scout → worker �
 
 ## Where running work shows up
 
-Foreground runs stream progress in the conversation. Background runs keep working after control returns to you.
+Foreground runs stream progress in the conversation. Background runs keep going in a detached runner process.
 
 In the TUI, a persistent FleetView below the editor keeps active work visible. `/subagents-fleet` opens a live inspector where you can browse children, read transcripts, steer a running child, or stop a run. You can also just ask: "Show me the current async runs."
 

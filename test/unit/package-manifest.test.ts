@@ -211,13 +211,15 @@ test("host-owned packages are optional peers with supported ranges, not producti
 		assert.deepEqual(packageJson.peerDependenciesMeta?.[name], { optional: true }, `${name} should be an optional peer`);
 	}
 });
-test("typebox is a bundled runtime dependency", () => {
+test("typebox is a host-provided optional peer, not a bundled runtime dependency", () => {
 	const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, "package.json"), "utf-8"));
 
-	assert.equal(packageJson.dependencies?.typebox, "1.1.38");
-	assert.equal(packageJson.peerDependencies?.typebox, undefined);
-	assert.equal(packageJson.peerDependenciesMeta?.typebox, undefined);
-	assert.equal(packageJson.devDependencies?.typebox, undefined);
+	// Pi ships typebox itself and refuses a manifest that bundles it: an installed copy can resolve
+	// ahead of the loader's alias and give the extension a second schema module identity.
+	assert.equal(packageJson.peerDependencies?.typebox, "*", "typebox should use the wildcard peer range pi requires");
+	assert.deepEqual(packageJson.peerDependenciesMeta?.typebox, { optional: true }, "typebox should be an optional peer");
+	assert.equal(packageJson.dependencies?.typebox, undefined, "typebox should not be a production dependency");
+	assert.equal(packageJson.devDependencies?.typebox, "1.1.38", "typebox should stay pinned to the dev SDK baseline");
 });
 
 test("host-owned development packages use the supported SDK baseline", () => {

@@ -41,12 +41,13 @@ Builtins load at the lowest priority, so a user or project agent with the same n
 | `scout` | Fast local codebase recon: relevant files, entry points, data flow, risks, and where another agent should start. |
 | `researcher` | Web/docs research with sources: official docs, specs, benchmarks, recent changes, and a concise research brief. |
 | `evidence-auditor` | Independent evidence review of important claims in an existing research brief. |
+| `planner` | An executable `plan.md` for the brainstormed direction: scoped steps with verification commands. It plans, never implements. |
 | `worker` | Implementation work, including approved oracle handoffs. It edits files, validates, and escalates unapproved decisions instead of guessing. |
 | `reviewer` | Code review and small fixes. It checks the implementation against the task/plan, tests, edge cases, and simplicity. |
 | `oracle` | A second opinion before acting. It challenges assumptions, catches drift, and recommends the safest next move without editing. |
 | `delegate` | A lightweight general delegate when you want a child agent that behaves close to the parent session. |
 
-Rule of thumb: `scout` before you understand the code, `researcher` before you trust external facts, `evidence-auditor` before you rely on important research, `worker` to implement, `reviewer` to check, and `oracle` when the decision itself feels risky.
+Rule of thumb: `scout` before you understand the code, `planner` to settle the plan before implementing, `researcher` before you trust external facts, `evidence-auditor` before you rely on important research, `worker` to implement, `reviewer` to check, and `oracle` when the decision itself feels risky.
 
 `oracle` is an advisory reviewer that critiques direction and proposes an execution prompt without editing files. `advisor` is the same bundled role under the Claude Code-compatible name.
 

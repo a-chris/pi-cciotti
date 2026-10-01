@@ -173,7 +173,132 @@ function resolveReview(args: Readonly<Record<string, unknown>>): ReturnType<Work
 	};
 }
 
+const PERL_MAX_REVIEW_ROUNDS = 10;
+const PERL_DEFAULT_REVIEW_ROUNDS = 3;
+const PERL_WORKTREE_BRANCH = "perl/work";
+const PERL_WORKTREE_SETUP_TIMEOUT_MS = 30_000;
+const PERL_SLUG_MAX_LENGTH = 40;
+
+/**
+ * Sanitize a perl worktree slug: lowercase, keep only [a-z0-9-], collapse
+ * dashes, strip leading/trailing dashes, bound the length. The result is safe
+ * to embed in the granted shell command and in a branch name.
+ */
+export function sanitizePerlSlug(raw: string): string {
+	return raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-{2,}/g, "-").replace(/^-+|-+$/g, "").slice(0, PERL_SLUG_MAX_LENGTH).replace(/-+$/g, "");
+}
+
+/**
+ * Idempotent POSIX shell setup for the perl worktree, run through the granted
+ * `wt-setup` host command. Resolves the repo root from the workflow cwd,
+ * reuses or creates a sibling `.pi-perl-<repo>[-<slug>]` worktree on the
+ * `perl/work[-<slug>]` branch, and prints its path. Fails cleanly (exit 1)
+ * outside a git repository so the generated script falls back to the plain
+ * cwd. The slug is sanitized before it reaches this string, so it cannot
+ * inject shell.
+ */
+function perlWorktreeCommand(slug?: string): string {
+	const suffix = slug ? `-${slug}` : "";
+	const branch = slug ? `perl/work-${slug}` : PERL_WORKTREE_BRANCH;
+	return `R=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1; P="$(dirname "$R")/.pi-perl-$(basename "$R")${suffix}"; git worktree prune 2>/dev/null; if [ -e "$P" ] && [ ! -e "$P/.git" ]; then echo "refusing to replace existing non-worktree path: $P" >&2; exit 1; fi; if [ ! -e "$P/.git" ]; then git worktree add "$P" -b ${branch} 2>/dev/null || git worktree add "$P" ${branch} || exit 1; fi; test -d "$P" || exit 1; echo "$P"`;
+}
+
+/**
+ * Generated-script preamble that creates the worktree through the granted
+ * `wt-setup` host command (falling back to the plain cwd when setup fails)
+ * and returns a `withWt` wrapper that pins every child launch into it.
+ */
+function perlWorktreePreamble(setupCommand: string): string {
+	return `let worktree = "";
+try {
+	const wtSetup = await runs.host("wt-setup", { kind: "command", command: ${JSON.stringify(setupCommand)}, timeoutMs: ${PERL_WORKTREE_SETUP_TIMEOUT_MS} });
+	worktree = wtSetup.stdout.trim().split("\\n").pop() || "";
+} catch { worktree = ""; }
+const withWt = (launch) => (worktree ? { ...launch, cwd: worktree } : launch);
+`;
+}
+
+/**
+ * perl: plan ↦ execute ↦ review ↦ loop. The manual review gate is the file on disk:
+ * `task` runs the plan phase only (planner writes plan.md); without `task` the
+ * resource executes the existing plan.md through scout, worker, and a bounded
+ * review/fix loop. The operator reviews plan.md between the two calls. All
+ * children share one sibling worktree (`.pi-perl-<repo>[-<slug>]` on
+ * `perl/work[-<slug>]`) when the workflow cwd is a git repository, otherwise
+ * they share the plain cwd. The optional `slug` names a lane so concurrent
+ * perl runs in the same repo get distinct worktrees; the slug is the stable
+ * identity that makes the execute call find the worktree the plan call made.
+ */
+function resolvePerl(args: Readonly<Record<string, unknown>>): ReturnType<WorkflowResourceDefinition["resolve"]> {
+	const unsupported = Object.keys(args).filter((key) => key !== "task" && key !== "prequel" && key !== "maxRounds" && key !== "slug");
+	if (unsupported.length > 0) return { error: `workflow 'perl' args contain unsupported fields: ${unsupported.join(", ")}.` };
+	const prequel = args.prequel;
+	if (prequel !== undefined && (typeof prequel !== "string" || !prequel.trim())) return { error: "workflow 'perl' args.prequel must be a non-empty string." };
+	const maxRounds = args.maxRounds;
+	if (maxRounds !== undefined && (typeof maxRounds !== "number" || !Number.isInteger(maxRounds) || maxRounds < 1 || maxRounds > PERL_MAX_REVIEW_ROUNDS)) return { error: `workflow 'perl' args.maxRounds must be an integer from 1 to ${PERL_MAX_REVIEW_ROUNDS}.` };
+	const rounds = maxRounds === undefined ? PERL_DEFAULT_REVIEW_ROUNDS : maxRounds;
+	let slug: string | undefined;
+	if (args.slug !== undefined) {
+		if (typeof args.slug !== "string") return { error: "workflow 'perl' args.slug must be a string." };
+		slug = sanitizePerlSlug(args.slug);
+		if (!slug) return { error: "workflow 'perl' args.slug must contain at least one alphanumeric character." };
+	}
+	const setupCommand = perlWorktreeCommand(slug);
+	const branch = slug ? `perl/work-${slug}` : PERL_WORKTREE_BRANCH;
+	const hostCommands: readonly WorkflowResourceHostAuthority[] = [{ key: "wt-setup", command: setupCommand }];
+
+	const task = args.task;
+	if (task !== undefined) {
+		if (typeof task !== "string" || !task.trim()) return { error: "workflow 'perl' args.task must be a non-empty string." };
+		const launch: Record<string, unknown> = { agent: "planner", task: task.trim(), async: false, output: true, worktree: false };
+		if (prequel !== undefined) launch.prequel = prequel.trim();
+		return {
+			script: `${perlWorktreePreamble(setupCommand)}return { phase: "plan", plan: "plan.md", worktree: worktree || null, summary: (await runs.run("planner", withWt(${JSON.stringify(launch)}))).output };`,
+			hostCommands,
+		};
+	}
+
+	const reviewSchema = {
+		type: "object",
+		additionalProperties: false,
+		required: ["verdict"],
+		properties: {
+			verdict: { type: "string", enum: ["BLOCK", "OK", "OK with notes"] },
+			findings: { type: "array", items: { type: "string" } },
+		},
+	};
+	const implementLaunch: Record<string, unknown> = {
+		agent: "worker",
+		task: "Implement plan.md, guided by context.md. Follow the plan's steps and scope bounds (Now only). Verify with the plan's verification commands and report what you changed, what you verified with which results, and anything BLOCKED.",
+		async: false,
+		worktree: false,
+	};
+	if (prequel !== undefined) implementLaunch.prequel = prequel.trim();
+	return {
+		script: `${perlWorktreePreamble(setupCommand)}const reviewSchema = ${JSON.stringify(reviewSchema)};
+const recon = await runs.run("recon", withWt({ agent: "scout", task: "Read plan.md and write context.md for the worker that will implement it: the exact files and seams to touch, existing conventions, and the verification commands that already exist. Do not implement anything.", async: false, output: true, worktree: false }));
+const implementation = await runs.run("implement", withWt(${JSON.stringify(implementLaunch)}));
+let verdict = "BLOCK";
+let findings = [];
+let fixRounds = 0;
+for (let round = 1; round <= ${rounds}; round++) {
+	const review = await runs.run("review-" + round, withWt({ agent: "reviewer", task: "Review the implementation of plan.md. Read plan.md and inspect the files it names, plus their immediate callers, directly against the plan's steps and scope bounds. Report only concrete findings (file, issue, why it matters) and end with a merge verdict.", async: false, worktree: false, outputSchema: reviewSchema }));
+	verdict = review.structuredOutput?.verdict ?? "BLOCK";
+	findings = Array.isArray(review.structuredOutput?.findings) ? review.structuredOutput.findings : [];
+	if (verdict === "OK" || verdict === "OK with notes") break;
+	if (round < ${rounds}) {
+		fixRounds = round;
+		const detail = findings.length > 0 ? "- " + findings.join("\\n- ") : String(review.output).slice(0, 2000);
+		await runs.run("fix-" + round, withWt({ agent: "worker", task: "Fix these review findings from the implementation of plan.md:\\n\\n" + detail + "\\n\\nRe-check each finding against the code before applying it, re-run the plan's verification commands, and report what you changed plus the results.", async: false, worktree: false }));
+	}
+}
+return { phase: "executed", plan: "plan.md", worktree: worktree || null, branch: worktree ? ${JSON.stringify(branch)} : null, verdict, fixRounds, findings, implementation: implementation.output };`,
+		hostCommands,
+	};
+}
+
 const WORKFLOW_RESOURCES: readonly WorkflowResourceDefinition[] = [
+	{ name: "perl", version: 1, resolve: resolvePerl },
 	{ name: "review", version: 1, resolve: resolveReview },
 	{ name: "run-ci", version: 1, resolve: resolveRunCi },
 ];

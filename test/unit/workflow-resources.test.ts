@@ -5,8 +5,8 @@ import {
 	authorizeWorkflowResourceHost,
 	consumeWorkflowResourcePermit,
 } from "../../src/shared/workflow-child-permit.ts";
-import { resolveWorkflowResource } from "../../src/workflows/workflow-resources.ts";
-import { runWorkflowScript, WorkflowScriptError } from "../../src/workflows/scripted-workflow.ts";
+import { resolveWorkflowResource, sanitizePerlSlug } from "../../src/workflows/workflow-resources.ts";
+import { runWorkflowScript, validateWorkflowScript, WorkflowScriptError } from "../../src/workflows/scripted-workflow.ts";
 
 describe("named workflow resources", () => {
 	it("scopes registrations by session and snapshots definitions, args and issued grants", () => {
@@ -84,6 +84,7 @@ describe("named workflow resources", () => {
 		for (const input of [
 			{ ...valid, sessionId: " " },
 			{ ...valid, trusted: true },
+			{ ...valid, definition: { ...valid.definition, name: "perl" } },
 			{ ...valid, definition: { ...valid.definition, name: "run-ci" } },
 			{ ...valid, definition: { ...valid.definition, name: "review" } },
 			{ ...valid, definition: { ...valid.definition, name: "bad name" } },
@@ -161,6 +162,160 @@ describe("named workflow resources", () => {
 		assert.equal((execution.value as { ok?: boolean }).ok, true);
 	});
 
+	it("resolves and executes the perl plan phase as a single planner child inside the shared worktree", async () => {
+		const resolved = resolveWorkflowResource("perl", { task: "Add prequel passthrough to workflow children", prequel: "Decisions: use pass-through, not a whitelist" });
+		assert.equal(resolved.ok, true);
+		if (!resolved.ok) return;
+		assert.equal(validateWorkflowScript(resolved.resource.script).ok, true);
+		assert.match(resolved.resource.script, /runs\.host\("wt-setup"/);
+		assert.match(resolved.resource.script, /runs\.run\("planner"/);
+		assert.equal(resolved.resource.provenance.name, "perl");
+		const worktree = "/tmp/perl-fixtures/.pi-perl-fixtures";
+		const hostCalls: string[] = [];
+		const calls: Array<{ key: string; agent?: unknown; task?: unknown; prequel?: unknown; cwd?: unknown }> = [];
+		const execution = await runWorkflowScript({
+			script: resolved.resource.script,
+			async host(key, params) {
+				hostCalls.push(`${key}:${params.command.length}`);
+				assert.equal(key, "wt-setup");
+				return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: `created\n${worktree}\n`, stderr: "", outputPath: "wt.log", durationMs: 1 };
+			},
+			async launch(key, params) {
+				calls.push({ key, agent: params.agent, task: params.task, prequel: params.prequel, cwd: params.cwd });
+				return { key, ok: true, output: "Planned: three steps", artifactPaths: [] };
+			},
+			async status(key) { return { key, ok: true, output: "unused", artifactPaths: [] }; },
+		});
+		assert.equal(hostCalls.length, 1);
+		assert.deepEqual(calls, [{ key: "planner", agent: "planner", task: "Add prequel passthrough to workflow children", prequel: "Decisions: use pass-through, not a whitelist", cwd: worktree }]);
+		assert.deepEqual(execution.value, { phase: "plan", plan: "plan.md", worktree, summary: "Planned: three steps" });
+	});
+
+	it("runs the perl plan phase in the plain cwd when worktree setup fails", async () => {
+		const resolved = resolveWorkflowResource("perl", { task: "Do the thing" });
+		assert.equal(resolved.ok, true);
+		if (!resolved.ok) return;
+		const calls: Array<{ key: string; cwd?: unknown }> = [];
+		const execution = await runWorkflowScript({
+			script: resolved.resource.script,
+			async host(key) { return { key, kind: "command", ok: false, state: "failed", exitCode: 1, stdout: "", stderr: "not a git repository", outputPath: "wt.log", durationMs: 1, error: "Command exited with code 1." }; },
+			async launch(key, params) {
+				calls.push({ key, cwd: params.cwd ?? null });
+				return { key, ok: true, output: "planned", artifactPaths: [] };
+			},
+			async status(key) { return { key, ok: true, output: "unused", artifactPaths: [] }; },
+		});
+		assert.deepEqual(calls, [{ key: "planner", cwd: null }]);
+		assert.deepEqual(execution.value, { phase: "plan", plan: "plan.md", worktree: null, summary: "planned" });
+	});
+
+	it("resolves and executes the perl execution phase with a bounded review/fix loop in the shared worktree", async () => {
+		const resolved = resolveWorkflowResource("perl", {});
+		assert.equal(resolved.ok, true);
+		if (!resolved.ok) return;
+		assert.equal(validateWorkflowScript(resolved.resource.script).ok, true);
+		assert.match(resolved.resource.script, /runs\.host\("wt-setup"/);
+		assert.match(resolved.resource.script, /runs\.run\("recon"/);
+		assert.match(resolved.resource.script, /runs\.run\("implement"/);
+		const worktree = "/tmp/perl-fixtures/.pi-perl-fixtures";
+		const calls: Array<{ key: string; cwd?: unknown }> = [];
+		const execution = await runWorkflowScript({
+			script: resolved.resource.script,
+			async host(key) { return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: worktree, stderr: "", outputPath: "wt.log", durationMs: 1 }; },
+			async launch(key, params) {
+				calls.push({ key, cwd: params.cwd });
+				if (key.startsWith("review-")) assert.deepEqual(params.outputSchema?.properties?.verdict?.enum, ["BLOCK", "OK", "OK with notes"]);
+				if (key === "review-1") return { key, ok: true, output: "review one", artifactPaths: [], structuredOutput: { verdict: "BLOCK", findings: ["src/x.ts: missing case"] } };
+				if (key === "review-2") return { key, ok: true, output: "review two", artifactPaths: [], structuredOutput: { verdict: "OK", findings: [] } };
+				return { key, ok: true, output: "done", artifactPaths: [] };
+			},
+			async status(key) { return { key, ok: true, output: "unused", artifactPaths: [] }; },
+		});
+		assert.deepEqual(calls.map(({ key }) => key), ["recon", "implement", "review-1", "fix-1", "review-2"]);
+		assert.ok(calls.every(({ cwd }) => cwd === worktree));
+		const value = execution.value as { phase: string; plan: string; worktree: string | null; branch: string | null; verdict: string; fixRounds: number; findings: string[] };
+		assert.equal(value.phase, "executed");
+		assert.equal(value.plan, "plan.md");
+		assert.equal(value.worktree, worktree);
+		assert.equal(value.branch, "perl/work");
+		assert.equal(value.verdict, "OK");
+		assert.equal(value.fixRounds, 1);
+		assert.deepEqual(value.findings, []);
+	});
+
+	it("caps the perl review loop at maxRounds and reports the remaining findings", async () => {
+		const resolved = resolveWorkflowResource("perl", { maxRounds: 2 });
+		assert.equal(resolved.ok, true);
+		if (!resolved.ok) return;
+		const calls: string[] = [];
+		const execution = await runWorkflowScript({
+			script: resolved.resource.script,
+			async host(key) { return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: "/tmp/perl-fixtures/.pi-perl-fixtures", stderr: "", outputPath: "wt.log", durationMs: 1 }; },
+			async launch(key) {
+				calls.push(key);
+				if (key.startsWith("review-")) return { key, ok: true, output: "blocked", artifactPaths: [], structuredOutput: { verdict: "BLOCK", findings: ["still broken"] } };
+				return { key, ok: true, output: "done", artifactPaths: [] };
+			},
+			async status(key) { return { key, ok: true, output: "unused", artifactPaths: [] }; },
+		});
+		assert.deepEqual(calls, ["recon", "implement", "review-1", "fix-1", "review-2"]);
+		const value = execution.value as { phase: string; verdict: string; fixRounds: number; findings: string[] };
+		assert.equal(value.phase, "executed");
+		assert.equal(value.verdict, "BLOCK");
+		assert.equal(value.fixRounds, 1);
+		assert.deepEqual(value.findings, ["still broken"]);
+	});
+
+	it("sanitizes perl worktree slugs into safe lane names", () => {
+		assert.equal(sanitizePerlSlug("Auth Fix!!"), "auth-fix");
+		assert.equal(sanitizePerlSlug("  a--b__c  "), "a-b-c");
+		assert.equal(sanitizePerlSlug("-leading"), "leading");
+		assert.equal(sanitizePerlSlug("trailing-"), "trailing");
+		assert.equal(sanitizePerlSlug("42"), "42");
+		assert.equal(sanitizePerlSlug("-"), "");
+		assert.equal(sanitizePerlSlug("x".repeat(60)).length, 40);
+		assert.ok(!sanitizePerlSlug("x".repeat(60)).endsWith("-"));
+	});
+
+	it("runs a slugged perl lane in its own worktree and branch", async () => {
+		for (const args of [{ task: "Fix auth", slug: "Auth Fix!!" }, { slug: "Auth Fix!!" }] as const) {
+			const resolved = resolveWorkflowResource("perl", { ...args });
+			assert.equal(resolved.ok, true);
+			if (!resolved.ok) return;
+			const commands: string[] = [];
+			const execution = await runWorkflowScript({
+				script: resolved.resource.script,
+				async host(key, params) {
+					commands.push(params.command);
+					return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix", stderr: "", outputPath: "wt.log", durationMs: 1 };
+				},
+				async launch(key, params) {
+					assert.equal(params.cwd, "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix");
+					if (key.startsWith("review-")) return { key, ok: true, output: "ok", artifactPaths: [], structuredOutput: { verdict: "OK", findings: [] } };
+				return { key, ok: true, output: "done", artifactPaths: [] };
+			},
+				async status(key) { return { key, ok: true, output: "unused", artifactPaths: [] }; },
+			});
+			assert.equal(commands.length, 1);
+			assert.match(commands[0], /\.pi-perl-\$\(basename \"\$R\"\)-auth-fix\"/);
+			assert.match(commands[0], /git worktree add "\$P" -b perl\/work-auth-fix/);
+			if ("task" in args && args.task) assert.deepEqual(execution.value, { phase: "plan", plan: "plan.md", worktree: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix", summary: "done" });
+			else assert.equal((execution.value as { branch: string }).branch, "perl/work-auth-fix");
+		}
+	});
+
+	it("authorizes only the exact perl wt-setup host command", () => {
+		for (const args of [{ task: "plan" }, {}]) {
+			const resolved = resolveWorkflowResource("perl", args);
+			assert.equal(resolved.ok, true);
+			if (!resolved.ok) return;
+			assert.match(resolved.resource.script, /runs\.host\("wt-setup"/);
+			assert.equal(typeof consumeWorkflowResourcePermit(resolved.resource.permit, resolved.resource.script), "object");
+			assert.equal(authorizeWorkflowResourceHost(resolved.resource.permit, "wt-setup", "git worktree add /tmp/x"), "The command for runs.host('wt-setup') is not allowed for workflow resource 'perl'.");
+			assert.match(authorizeWorkflowResourceHost(resolved.resource.permit, "other", "git status") ?? "", /not allowed/);
+		}
+	});
+
 	it("does not authorize raw equivalent scripts or unconsumed/forged permits", () => {
 		const forged = { __workflowResourcePermit: Symbol("forged") } as never;
 		assert.equal(authorizeWorkflowResourceHost(forged, "ci", "npm test"), "Workflow resource authority is unavailable.");
@@ -202,6 +357,14 @@ describe("named workflow resources", () => {
 			["review", { task: "" }],
 			["review", { task: "Review", extra: true }],
 			["review", { task: "x".repeat(16 * 1024 + 1) }],
+			["perl", { task: 42 }],
+			["perl", { task: "plan", prequel: 7 }],
+			["perl", { task: "plan", extra: true }],
+			["perl", { maxRounds: 0 }],
+			["perl", { maxRounds: 11 }],
+			["perl", { maxRounds: 1.5 }],
+			["perl", { slug: 7 }],
+			["perl", { slug: "!!" }],
 		] as const) {
 			const result = resolveWorkflowResource(name, args);
 			assert.equal(result.ok, false, `${name}: ${JSON.stringify(args)}`);

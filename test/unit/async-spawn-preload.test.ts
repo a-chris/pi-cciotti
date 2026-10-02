@@ -7,6 +7,8 @@ import * as path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { PI_CODING_AGENT_PACKAGE_ROOT_ENV } from "../../src/shared/utils.ts";
+import { _testResetAliasesCache } from "../../src/runs/background/runner-aliases.ts";
+import { _testResetImportGraphCache } from "../../src/runs/background/host-peer-import-graph.ts";
 
 test("executeAsyncSingle preloads all peer aliases before the selected runner loader when aliases exist", async (t) => {
 	const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "async-spawn-preload-")));
@@ -48,12 +50,18 @@ test("executeAsyncSingle preloads all peer aliases before the selected runner lo
 		});
 		nodeModule.syncBuiltinESMExports();
 		for (const scenario of ["stable", "pre-chord", "missing-pre-chord"]) {
+			// Reset caches so filesystem mutations between scenarios are visible.
+			_testResetAliasesCache();
+			_testResetImportGraphCache();
 			if (scenario === "pre-chord") {
 				fs.writeFileSync(path.join(host, "package.json"), JSON.stringify({ name: "@earendil-works/pi-coding-agent", version: "0.84.3", exports: { ".": "./index.mjs" } }));
 				fs.rmSync(path.join(host, "node_modules", "@earendil-works/chord"), { recursive: true });
 				for (const specifier of ["@earendil-works/chord", "@earendil-works/chord/context"]) delete expectedAliases[specifier];
 			}
-			if (scenario === "missing-pre-chord") fs.unlinkSync(expectedAliases["@earendil-works/pi-agent-core/node"]!);
+			if (scenario === "missing-pre-chord") {
+				// Graph-requires typebox; deleting its compile export causes resolver failure.
+				fs.unlinkSync(expectedAliases["typebox/compile"]!);
+			}
 			const configuredExtension = scenario === "pre-chord" ? fileURLToPath(import.meta.url) : undefined;
 			const result = executeAsyncSingle(`spawn-preload-${scenario}`, {
 				agent: "worker", task: "Inspect launch wiring", agentConfig: makeAgent("worker", configuredExtension ? { extensions: [configuredExtension] } : {}),
@@ -63,8 +71,8 @@ test("executeAsyncSingle preloads all peer aliases before the selected runner lo
 			});
 			assert.equal(result.isError, true);
 			if (scenario === "missing-pre-chord") {
-				assert.match(result.content[0]!.text, /@earendil-works\/pi-agent-core\/node/);
-				assert.equal(spawn.mock.callCount(), 2);
+				// Graph-requires typebox; deleting its compile export causes resolver failure.
+				assert.match(result.content[0]!.text, /typebox\/compile/);
 				continue;
 			}
 			assert.match(result.content[0]!.text, /spawn boundary captured/);

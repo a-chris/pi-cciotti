@@ -11,6 +11,7 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { collectHostPeerImports } from "./host-peer-import-graph.ts";
 
 export const JITI_ALIAS_ENV = "JITI_ALIAS";
 
@@ -29,11 +30,24 @@ export const HOST_PEER_ALIASES: ReadonlyArray<{ specifier: string; pkg: string; 
 	{ specifier: "typebox/value", pkg: "typebox", subpath: "./value" },
 ];
 
-/** Public Pi manifests introduce chord in 0.85.0 (absent through 0.84.4). */
-const CHORD_PEER_ALIASES = [
+/** All candidate alias specifiers (HOST_PEER_ALIASES + chord entries), exported for test fixtures. */
+export const HOST_PEER_ALIAS_CANDIDATES: ReadonlyArray<{ specifier: string; pkg: string; subpath: string }> = [
+	...HOST_PEER_ALIASES,
 	{ specifier: "@earendil-works/chord", pkg: "@earendil-works/chord", subpath: "." },
 	{ specifier: "@earendil-works/chord/context", pkg: "@earendil-works/chord", subpath: "./context" },
 ];
+
+/** Package names used by `collectHostPeerImports` to identify host-peer imports. */
+const HOST_PEER_PACKAGE_NAMES: readonly string[] = [
+	"@earendil-works/pi-agent-core",
+	"@earendil-works/pi-ai",
+	"@earendil-works/pi-coding-agent",
+	"@earendil-works/pi-tui",
+	"@earendil-works/chord",
+	"typebox",
+];
+
+
 
 interface PackageManifest {
 	name?: unknown;
@@ -122,21 +136,67 @@ function findPeerPackageDir(piPackageRoot: string, pkg: string, hostName: unknow
 	return candidates.find((candidate) => readManifest(candidate)?.name === pkg);
 }
 
-/** The alias map the runner needs, or the specifiers that could not be resolved. */
-export function resolveHostPeerAliases(piPackageRoot: string): { aliases: Record<string, string>; missing: string[] } {
+interface AliasesResult {
+	aliases: Record<string, string>;
+	missing: string[];
+}
+
+interface AliasesCache extends AliasesResult {
+	_piPackageRoot: string;
+}
+
+// Per-process cache keyed by piPackageRoot for repeated calls.
+let resolvedAliasesCache: AliasesCache | undefined;
+
+/** Exposed for tests that mutate the host filesystem between invocations. */
+export function _testResetAliasesCache(): void {
+	resolvedAliasesCache = undefined;
+}
+
+/** Default runner entry derived from this module's location. */
+let defaultRunnerEntry: string | undefined;
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+function getDefaultRunnerEntry(): string {
+	if (!defaultRunnerEntry) {
+		defaultRunnerEntry = path.join(__dirname, "subagent-runner.ts");
+	}
+	return defaultRunnerEntry;
+}
+
+/**
+ * Data-driven alias resolution over candidate specifiers, gated by what the
+ * runner's static import graph actually requires.
+ *
+ * For each candidate alias specifier:
+ *  - If the host provides the target → add to `aliases`.
+ *  - If not provided and the owning package is graph-required → fail-closed via `missing`.
+ *  - Otherwise → skip silently (no failure).
+ *
+ * @param piPackageRoot     The installed pi package root (e.g. node_modules/@earendil-works/pi-coding-agent).
+ * @param runnerEntryPath   Optional explicit entry file for the import-graph walk. Defaults to the bundled subagent-runner.
+ */
+export function resolveHostPeerAliases(piPackageRoot: string, runnerEntryPath?: string): AliasesResult {
+	const cached = resolvedAliasesCache;
+	if (cached && cached._piPackageRoot === piPackageRoot) return cached;
+
+	const entry = runnerEntryPath ?? getDefaultRunnerEntry();
+	const graphRequiredPkgs = collectHostPeerImports(entry, HOST_PEER_PACKAGE_NAMES);
+
 	const aliases: Record<string, string> = {};
 	const missing: string[] = [];
 	const hostManifest = readManifest(piPackageRoot);
-	// Only known stable pre-chord versions may omit it. Unknown/prerelease
-	// hosts retain the required aliases, rather than hiding a broken install.
-	const stableVersion = typeof hostManifest?.version === "string" ? /^0\.(\d+)\.\d+$/.exec(hostManifest.version) : null;
-	const isPreChord = stableVersion !== null && Number(stableVersion[1]) < 85;
-	const required = [...HOST_PEER_ALIASES, ...(isPreChord ? [] : CHORD_PEER_ALIASES)];
-	for (const { specifier, pkg, subpath } of required) {
+
+	for (const { specifier, pkg, subpath } of HOST_PEER_ALIAS_CANDIDATES) {
 		const packageDir = findPeerPackageDir(piPackageRoot, pkg, hostManifest?.name);
 		const target = packageDir ? resolvePackageSubpath(packageDir, subpath) : undefined;
-		if (target && fs.existsSync(target)) aliases[specifier] = target;
-		else missing.push(specifier);
+		if (target && fs.existsSync(target)) {
+			aliases[specifier] = target;
+		} else if (graphRequiredPkgs.has(pkg)) {
+			missing.push(specifier);
+		}
+		// else: not graph-required and not available ⇒ skip silently
 	}
-	return { aliases, missing };
+
+	resolvedAliasesCache = { aliases, missing, _piPackageRoot: piPackageRoot };
+	return resolvedAliasesCache;
 }

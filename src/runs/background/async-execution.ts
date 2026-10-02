@@ -383,7 +383,14 @@ export function formatAsyncStartedMessage(headline: string, interactive: boolean
 
 /** Check whether detached async execution has a supported runtime. */
 export function isAsyncAvailable(): boolean {
-	return resolveBunPiExecutable() !== undefined || supportsNativeRunner(resolveNodeExecutable()) || jitiCliPath !== undefined;
+	// Binary hosts bypass the alias preflight entirely.
+	if (resolveBunPiExecutable() !== undefined) return true;
+	// Non-binary paths require native TypeScript support or jiti *and* a successful alias preflight.
+	const binaryHostFallback = supportsNativeRunner(resolveNodeExecutable()) || jitiCliPath !== undefined;
+	if (!binaryHostFallback) return false;
+	if (!piPackageRoot) return false;
+	const aliases = resolveHostPeerAliases(piPackageRoot, asyncRunnerSourcePath);
+	return aliases.missing.length === 0;
 }
 
 export function resolveAsyncRunnerLogPaths(cfg: object): { stdoutPath: string; stderrPath: string } | undefined {
@@ -668,7 +675,7 @@ function spawnRunner(cfg: object, suffix: string, cwd: string, initialStatus: Om
 	if (!binaryHost && !piPackageRoot) {
 		return { error: `Background children require a supported standalone Pi host or the installed npm package (${PI_CODING_AGENT_PACKAGE}); neither is available.` };
 	}
-	const hostPeerAliases = !binaryHost && piPackageRoot ? resolveHostPeerAliases(piPackageRoot) : { aliases: {}, missing: [] };
+	const hostPeerAliases = !binaryHost && piPackageRoot ? resolveHostPeerAliases(piPackageRoot, asyncRunnerSourcePath) : { aliases: {}, missing: [] };
 	if (hostPeerAliases.missing.length > 0) {
 		return { error: `Background children require the host npm package (${PI_CODING_AGENT_PACKAGE}) with its dependencies; ${piPackageRoot} does not provide ${hostPeerAliases.missing.join(", ")}.` };
 	}

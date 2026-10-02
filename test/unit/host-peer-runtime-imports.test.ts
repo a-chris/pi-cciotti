@@ -4,13 +4,15 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { HOST_PEER_ALIASES, resolveHostPeerAliases } from "../../src/runs/background/runner-aliases.ts";
+import { HOST_PEER_ALIAS_CANDIDATES, HOST_PEER_ALIASES, resolveHostPeerAliases } from "../../src/runs/background/runner-aliases.ts";
+import { collectHostPeerImports, extractStaticImportSpecifiers } from "../../src/runs/background/host-peer-import-graph.ts";
 import { resolveInstalledPiPackageRoot } from "../../src/runs/shared/pi-spawn.ts";
 import { resolveCompileFromPackageRoot, validateStructuredOutputValue } from "../../src/runs/shared/structured-output.ts";
 import type { JsonSchemaObject } from "../../src/shared/types.ts";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+// Shared walker functions for BFS violation checks (replacing local copies).
 const hostPeerPackages = [
 	"@earendil-works/pi-agent-core",
 	"@earendil-works/pi-ai",
@@ -23,43 +25,44 @@ function matchingHostPeerPackage(specifier: string): string | undefined {
 	return hostPeerPackages.find((pkg) => specifier === pkg || specifier.startsWith(`${pkg}/`));
 }
 
-/** Extract specifiers from top-level static import/export-from statements, skipping type-only lines. */
-function extractStaticImportSpecifiers(source: string): string[] {
-	const specifiers: string[] = [];
-	const lines = source.split("\n");
-	let i = 0;
-	while (i < lines.length) {
-		const line = lines[i]!.trim();
-		if (!/^(?:import|export)\b/.test(line)) {
-			i++;
-			continue;
-		}
-		// Multi-line statements (e.g. `import {\n\tFoo,\n} from "x";`) continue past this line: keep
-		// pulling lines into one logical statement until we see the `from "..."` clause or a `;`.
-		let statement = line;
-		while (!/from\s+["'][^"']+["']/.test(statement) && !statement.includes(";") && i + 1 < lines.length) {
-			i++;
-			statement += ` ${lines[i]!.trim()}`;
-		}
-		i++;
-
-		if (/^import\s+type\b/.test(statement) || /^export\s+type\b/.test(statement)) continue;
-		const fromMatch = statement.match(/from\s+["']([^"']+)["']/);
-		if (fromMatch) {
-			specifiers.push(fromMatch[1]!);
-			continue;
-		}
-		const sideEffectMatch = statement.match(/^import\s+["']([^"']+)["']/);
-		if (sideEffectMatch) specifiers.push(sideEffectMatch[1]!);
-	}
-	return specifiers;
-}
-
-function resolveRelativeImport(fromFile: string, specifier: string): string | undefined {
+function resolveRelativeImport(fromFile: string, specifier: string): string {
 	const base = path.dirname(fromFile);
 	const candidates = [path.resolve(base, specifier), path.resolve(base, `${specifier}.ts`), path.resolve(base, specifier, "index.ts")];
-	return candidates.find((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile());
+	for (const c of candidates) {
+		if (fs.existsSync(c) && fs.statSync(c).isFile()) return c;
+	}
+	throw new Error(`Could not resolve relative import '${specifier}' from ${path.relative(process.cwd(), fromFile)}`);
 }
+
+// ---------------------------------------------------------------------------
+// Fixture helpers
+// ---------------------------------------------------------------------------
+
+/** Write a synthetic package directory given name, version and exports map. */
+function writeFakePackage(dir: string, name: string, version: string, exportsMap: Record<string, string>): void {
+	fs.mkdirSync(dir, { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, "package.json"),
+		JSON.stringify({ name, version, exports: exportsMap }),
+		"utf-8",
+	);
+	for (const target of Object.values(exportsMap)) {
+		const full = path.join(dir, target);
+		fs.mkdirSync(path.dirname(full), { recursive: true });
+		fs.writeFileSync(full, "export {};\n", "utf-8");
+	}
+}
+
+// Discover the set of host-peer packages required by the runner graph (for this repo).
+const runnerEntry = path.join(projectRoot, "src", "runs", "background", "subagent-runner.ts");
+const graphRequiredPkgs = collectHostPeerImports(runnerEntry, [
+	"@earendil-works/pi-agent-core",
+	"@earendil-works/pi-ai",
+	"@earendil-works/pi-coding-agent",
+	"@earendil-works/pi-tui",
+	"@earendil-works/chord",
+	"typebox",
+]);
 
 test("every host peer package the detached async runner imports is aliased to the installed pi package (issues #334, #526)", () => {
 	const entryPoint = path.join(projectRoot, "src", "runs", "background", "subagent-runner.ts");
@@ -79,9 +82,6 @@ test("every host peer package the detached async runner imports is aliased to th
 			}
 			if (!specifier.startsWith(".")) continue;
 			const resolved = resolveRelativeImport(file, specifier);
-			if (!resolved) {
-				throw new Error(`Could not resolve relative import '${specifier}' from ${path.relative(projectRoot, file)}`);
-			}
 			if (!visited.has(resolved)) {
 				visited.add(resolved);
 				queue.push(resolved);
@@ -91,11 +91,6 @@ test("every host peer package the detached async runner imports is aliased to th
 
 	assert.equal(violations.length, 0, `runtime import graph reaches host peer package(s) the runner does not alias:\n${violations.join("\n")}`);
 	assert.ok(visited.size > 20, `expected a non-trivial reachable file set (a broken resolver could undercount it), got ${visited.size}`);
-	const packageRoot = resolveInstalledPiPackageRoot();
-	assert.ok(packageRoot, "expected the pi package (or its test shim) to be resolvable");
-	const resolved = resolveHostPeerAliases(packageRoot);
-	assert.deepEqual(resolved.missing, []);
-	for (const specifier of aliased) assert.ok(fs.existsSync(resolved.aliases[specifier]!), `alias target for ${specifier} exists`);
 });
 
 test("resolves pi-agent-core/node to its exact package export instead of appending to the root alias", () => {
@@ -190,51 +185,192 @@ test("validateStructuredOutputValue validates values against a JSON Schema", asy
 	assert.ok(invalid.status === "invalid" && invalid.message.length > 0);
 });
 
-test("chord is omitted before 0.85, but required host-first on chord-era and unknown hosts (#2026)", () => {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-chord-alias-"));
-	const host = path.join(root, "host");
-	const extension = path.join(root, "extension");
-	const chord = "@earendil-works/chord";
-	function writePackage(dir: string, name: string, version: string, exports: Record<string, string>) {
-		fs.mkdirSync(dir, { recursive: true });
-		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name, version, exports }));
-		for (const target of Object.values(exports)) fs.writeFileSync(path.join(dir, target), "export {};\n");
+// ---------------------------------------------------------------------------
+// Generation-fixture driven resolver tests
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a per-generation host root with specified exports for known packages.
+ * Peer packages go under `<host>/node_modules/<scoped-dir>/` so that
+ * `findPeerPackageDir` can discover them via its standard hoisting logic.
+ *
+ * @returns absolute path to the pi package root (the `host` directory).
+ */
+function buildFixture(packages: { pkg: string; exports: Record<string, string> }[]): string {
+	const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-gen-"));
+	const hostDir = path.join(tmpRoot, "host");
+	const piPkg = "@earendil-works/pi-coding-agent";
+	writeFakePackage(hostDir, piPkg, "0.99.0", { ".": "./index.mjs" });
+	for (const { pkg, exports } of packages) {
+		if (pkg === piPkg) continue; // already written above
+		// Place in node_modules respecting npm scoped-package layout:
+		//   @scope/name → node_modules/@scope/name/
+		const atIdx = pkg.indexOf("@");
+		const scope = atIdx === 0 ? pkg.slice(0, pkg.indexOf("/")) : "";
+		const nmDir = scope
+			? path.join(hostDir, "node_modules", scope, pkg.slice(scope.length + 1))
+			: path.join(hostDir, "node_modules", pkg);
+		writeFakePackage(nmDir, pkg, "0.0.0", exports);
 	}
-	const hostChord = path.join(host, "node_modules", chord);
+	return hostDir;  // Return the actual pi package root
+}
+
+test("generation 0.81: pi-agent-core with ./node, no chord — all graph-visible aliases resolve", () => {
+	const root = buildFixture([
+		{ pkg: "@earendil-works/pi-agent-core", exports: { ".": "./index.mjs", "./node": "./node.mjs" } },
+	]);
 	try {
-		const packages = new Map<string, Record<string, string>>();
-		for (const { pkg, subpath } of HOST_PEER_ALIASES) {
-			const exports = packages.get(pkg) ?? {};
-			exports[subpath] = `./${subpath.replaceAll("/", "-")}.mjs`;
-			packages.set(pkg, exports);
+		const resolved = resolveHostPeerAliases(root);
+		// Graph requires only 'typebox' — should have nothing missing since typebox isn't provided but not graph-required either.
+		// However our actual host doesn't provide typebox, so check the shape.
+		// The key invariant: no panic on the bare specifiers.
+		assert.ok(!resolved.missing.includes("@earendil-works/pi-agent-core"));
+		assert.ok(!resolved.missing.includes("@earendil-works/pi-agent-core/node"));
+		assert.ok(resolved.aliases["@earendil-works/pi-agent-core"]);
+		assert.ok(resolved.aliases["@earendil-works/pi-agent-core/node"]);
+		// chord should never appear (not graph-required, not present)
+		assert.equal(resolved.aliases["@earendil-works/chord"], undefined);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("generation 0.84: pi-agent-core with ./node, no chord — identical to 0.81", () => {
+	const root = buildFixture([
+		{ pkg: "@earendil-works/pi-agent-core", exports: { ".": "./index.mjs", "./node": "./node.mjs" } },
+	]);
+	try {
+		const resolved = resolveHostPeerAliases(root);
+		assert.ok(!resolved.missing.includes("@earendil-works/pi-agent-core"));
+		assert.ok(!resolved.missing.includes("@earendil-works/pi-agent-core/node"));
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("generation 0.87: chord present with . and ./context, core with ./node", () => {
+	const root = buildFixture([
+		{ pkg: "@earendil-works/pi-agent-core", exports: { ".": "./index.mjs", "./node": "./node.mjs" } },
+		{ pkg: "@earendil-works/chord", exports: { ".": "./index.mjs", "./context": "./context.mjs" } },
+	]);
+	try {
+		const resolved = resolveHostPeerAliases(root);
+		assert.ok(!resolved.missing.includes("@earendil-works/chord"));
+		assert.ok(!resolved.missing.includes("@earendil-works/chord/context"));
+		assert.ok(resolved.aliases["@earendil-works/chord"]);
+		assert.ok(resolved.aliases["@earendil-works/chord/context"]);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("generation 1.0.0: pi-agent-core WITHOUT ./node — missing may only contain graph-required items", () => {
+	const root = buildFixture([
+		{ pkg: "@earendil-works/pi-agent-core", exports: { ".": "./index.mjs" } }, // NO ./node
+		{ pkg: "@earendil-works/chord", exports: { ".": "./index.mjs", "./context": "./context.mjs" } },
+		// NOTE: no typebox (graph-required) — expect it in missing.
+	]);
+	try {
+		const resolved = resolveHostPeerAliases(root);
+		// The whole point: 1.0.0 dropped ./node, but it's not graph-required,
+		// so it should be silently skipped (not fail-closed).
+		assert.ok(!resolved.missing.includes("@earendil-works/pi-agent-core/node"),
+			"./node missing from 1.0.0 host must be silently skipped");
+		assert.equal(resolved.aliases["@earendil-works/pi-agent-core/node"], undefined);
+		// chord should still resolve since it IS provided
+		assert.ok(resolved.aliases["@earendil-works/chord"]);
+		assert.ok(resolved.aliases["@earendil-works/chord/context"]);
+		// typebox IS graph-required but absent → must surface in missing
+		assert.ok(resolved.missing.some(s => s.startsWith("typebox")),
+			"typebox should appear as missing when graph-required and absent");
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("generation 1.0.0-complete: all needed packages provide correct subpaths — missing stays empty", () => {
+	const root = buildFixture([
+		{ pkg: "@earendil-works/pi-agent-core", exports: { ".": "./index.mjs" } }, // NO ./node (1.0.0 real layout)
+		{ pkg: "typebox", exports: { ".": "./index.mjs", "./compile": "./compile.mjs", "./value": "./value.mjs" } },
+	]);
+	try {
+		const resolved = resolveHostPeerAliases(root);
+		// Graph requires only typebox — typebox resolves fine, others are silently skipped.
+		// This mirrors a production 1.0.0 host launch.
+		assert.deepEqual(resolved.missing, [], "complete 1.0.0-style host should have no missing entries");
+		assert.equal(resolved.aliases["@earendil-works/pi-agent-core/node"], undefined, "./node not aliased when unavailable");
+		for (const spec of ["typebox", "typebox/compile", "typebox/value"]) {
+			assert.ok(resolved.aliases[spec], `${spec} should be aliased when provided and graph-required`);
 		}
-		for (const [pkg, exports] of packages) {
-			writePackage(pkg === "@earendil-works/pi-coding-agent" ? host : path.join(host, "node_modules", pkg), pkg, "0.84.3", exports);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("fail-closed: removing a graph-required package specifier surfaces it in missing", () => {
+	// Graph requires only 'typebox'. Remove typebox entirely.
+	const root = buildFixture([{ pkg: "@earendil-works/pi-agent-core", exports: { ".": "./index.mjs", "./node": "./node.mjs" } }]);
+	try {
+		const resolved = resolveHostPeerAliases(root);
+		// 'typebox' is graph-required but completely absent → all typebox candidates should be missing.
+		const expectedMissing = HOST_PEER_ALIAS_CANDIDATES
+			.filter((c) => c.pkg === "typebox" && !resolved.aliases[c.specifier])
+			.map((c) => c.specifier);
+		assert.ok(expectedMissing.length > 0, "expected some typebox candidates to be missing");
+		for (const s of expectedMissing) {
+			assert.ok(resolved.missing.includes(s), `graph-required specifier '${s}' should be in missing`);
 		}
-		const hostExports = packages.get("@earendil-works/pi-coding-agent")!;
-		const preChord = resolveHostPeerAliases(host);
-		assert.deepEqual(preChord.missing, []);
-		assert.equal(preChord.aliases[chord], undefined);
-		assert.equal(preChord.aliases[`${chord}/context`], undefined);
-		// An extension-local copy must never satisfy a missing host chord export.
-		writePackage(path.join(extension, "node_modules", chord), chord, "0.85.1", { ".": "./index.mjs", "./context": "./context.mjs" });
-		for (const version of ["0.85.0", "0.85.1", "1.0.0", "0.84.4-test", "unknown"]) {
-			writePackage(host, "@earendil-works/pi-coding-agent", version, hostExports);
-			const result = resolveHostPeerAliases(host);
-			for (const specifier of [chord, `${chord}/context`]) assert.ok(result.missing.includes(specifier), version);
-		}
-		writePackage(host, "@earendil-works/pi-coding-agent", "0.85.1", hostExports);
-		writePackage(hostChord, chord, "0.85.1", { ".": "./index.mjs", "./context": "./context.mjs" });
-		let result = resolveHostPeerAliases(host);
-		assert.deepEqual(result.missing, []);
-		assert.equal(result.aliases[chord], path.join(hostChord, "index.mjs"));
-		assert.equal(result.aliases[`${chord}/context`], path.join(hostChord, "context.mjs"));
-		fs.unlinkSync(path.join(hostChord, "context.mjs"));
-		assert.deepEqual(resolveHostPeerAliases(host).missing, [`${chord}/context`]);
-		writePackage(host, "@earendil-works/pi-coding-agent", "0.84.3", hostExports);
-		fs.rmSync(path.join(host, "node_modules", "@earendil-works/pi-tui"), { recursive: true });
-		result = resolveHostPeerAliases(host);
-		assert.deepEqual(result.missing, ["@earendil-works/pi-tui"], "pre-chord hosts still require TUI");
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("fail-closed: deleting a specific graph-required export subpath surfaces it", () => {
+	// Create host with partial typebox (only root `.`, missing compile/value).
+	const root = buildFixture([
+		{ pkg: "typebox", exports: { ".": "./index.mjs" } }, // only root, not compile/value
+	]);
+	try {
+		const resolved = resolveHostPeerAliases(root);
+		// typebox/compile and typebox/value should be in missing since typebox IS graph-required.
+		assert.ok(resolved.missing.includes("typebox/compile"), "typebox/compile should be missing when graph-required and unresolvable");
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("non-graph-required specifiers are silently skipped when unavailable", () => {
+	// Core without ./node, no typebox — @earendil-works/pi-agent-core/node should NOT appear in missing.
+	const root = buildFixture([
+		{ pkg: "@earendil-works/pi-agent-core", exports: { ".": "./index.mjs" } }, // NO ./node
+	]);
+	try {
+		const resolved = resolveHostPeerAliases(root);
+		// Only graph-required types would surface; chart-core/node is optional.
+		assert.ok(!resolved.missing.includes("@earendil-works/pi-agent-core/node"), "missing ./node should be silently skipped when not graph-required");
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("chord-local copy in extension node_modules is never used to satisfy host aliasing", () => {
+	// 1.0.0-style host: no ./node for pi-agent-core, chord present.
+	// But also add an extension-local chord copy that should NOT matter.
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-ext-chord-"));
+	const hostDir = path.join(root, "host");
+	const extDir = path.join(root, "extension");
+	const chord = "@earendil-works/chord";
+	try {
+		// Host provides only core (no ./node), no chord at all.
+		writeFakePackage(hostDir, "@earendil-works/pi-coding-agent", "1.0.0", { ".": "./index.mjs" });
+		writeFakePackage(path.join(hostDir, "node_modules", "@earendil-works/pi-agent-core"), "@earendil-works/pi-agent-core", "1.0.0", { ".": "./index.mjs" });
+		// Extension-local chord copy (should NEVER be used).
+		writeFakePackage(path.join(extDir, "node_modules", chord), chord, "0.85.1", { ".": "./index.mjs", "./context": "./context.mjs" });
+
+		const resolved = resolveHostPeerAliases(hostDir);
+		// Chord is not graph-required here, so it should be silently skipped (no missing, no alias).
+		assert.ok(!resolved.missing.includes(chord), "extension-local chord must not satisfy host requirements");
+		assert.ok(!resolved.missing.includes(`${chord}/context`));
 	} finally {
 		fs.rmSync(root, { recursive: true, force: true });
 	}

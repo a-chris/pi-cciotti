@@ -202,20 +202,6 @@ export function readStatus(asyncDir: string): AsyncStatus | null {
 	return status;
 }
 
-export function getLastActivity(outputFile: string | undefined): string {
-	if (!outputFile) return "";
-	try {
-		const stat = fs.statSync(outputFile);
-		const ago = Date.now() - stat.mtimeMs;
-		if (ago < 1000) return "active now";
-		if (ago < 60000) return `active ${Math.floor(ago / 1000)}s ago`;
-		return `active ${Math.floor(ago / 60000)}m ago`;
-	} catch {
-		// Last-activity text is best effort; missing files should omit the hint.
-		return "";
-	}
-}
-
 export function findLatestSessionFile(sessionDir: string): string | null {
 	if (!fs.existsSync(sessionDir)) return null;
 	const files = fs.readdirSync(sessionDir)

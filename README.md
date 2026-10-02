@@ -1,14 +1,12 @@
-<p>
-  <img src="banner.png" alt="pi-cciotti" width="1100">
-</p>
-
 # pi-cciotti
+
+Most subagent setups burn context on giant schemas before the agent does any work. `pi-cciotti` keeps the model-facing surface small and predictable, cutting it from 17K to about 5K characters.
 
 `pi-cciotti` lets one Pi session delegate focused work to child agents. You ask in plain language, Pi hands the job to a specialist, and the result comes back into the conversation. Code review, scouting, implementation, parallel audits, background jobs: anything that benefits from a second or third set of model eyes.
 
-<https://github.com/user-attachments/assets/702554ec-faaf-4635-80aa-fb5d6e292fd1>
-
-Most subagent setups burn context on giant schemas before the agent does any work. `pi-cciotti` keeps the model-facing surface small and predictable, cutting it from 17.4K to about 5.3K characters.
+<p align="center">
+  <img width="800" height="500" alt="picciotti" src="https://github.com/user-attachments/assets/85804928-8632-41a1-abdc-90ada8ffe3d6" />
+</p>
 
 ## Why use it
 

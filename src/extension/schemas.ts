@@ -153,8 +153,7 @@ const SubagentParamProperties = {
 	dir: Type.Optional(Type.String({
 		description: "Async directory for status/control."
 	})),
-	handoffPath: Type.Optional(Type.String({ description: "Existing manifest for worktree cleanup/discard actions." })),
-	repo: Type.Optional(Type.String({ description: "worktree.cleanup repo; default cwd." })),
+	handoffPath: Type.Optional(Type.String({ description: "Existing manifest for the worktree.discard action." })),
 	index: Type.Optional(Type.Integer({ minimum: 0, description: "Zero-based child/transcript index." })),
 	childId: Type.Optional(Type.String({ minLength: 1, maxLength: 256, description: "Child-scoped stop identity." })),
 	view: Type.Optional(Type.String({
@@ -164,7 +163,7 @@ const SubagentParamProperties = {
 	lines: Type.Optional(Type.Integer({ minimum: 1, maximum: 500, description: "Transcript tail lines; default 80." })),
 	topic: Type.Optional(Type.String({ enum: [...SUBAGENT_GUIDE_TOPICS], description: "Guide topic served by the guide action. Omit to read the overview." })),
 	message: Type.Optional(Type.String({ description: "resume/steer guidance or a control action prompt." })),
-	mode: Type.Optional(Type.String({ enum: ["steer", "follow_up", "auto", "plan", "apply"], description: "steer delivery mode; worktree.cleanup supports plan only, no apply/removal." })),
+	mode: Type.Optional(Type.String({ enum: ["steer", "follow_up", "auto"], description: "steer delivery mode." })),
 	steeringRecovery: Type.Optional(Type.Boolean({ description: "steer: pause/revive after missed acknowledgment; default true in direct steer mode, forced false by extension RPC for exact ownership." })),
 	additional: Type.Optional(Type.Integer({ minimum: 1, description: "grant-spawn-budget: root interactive parent + native user confirmation only; total grants capped at original configured cap." })),
 	focus: Type.Optional(Type.Boolean({ description: "Focus the inspector pane." })),

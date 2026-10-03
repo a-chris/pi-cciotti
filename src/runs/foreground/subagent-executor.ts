@@ -133,7 +133,6 @@ import {
 	formatWorktreeDiffSummary,
 	type WorktreeSetup,
 } from "../shared/worktree.ts";
-import { createWorktreeCleanupPlan, formatWorktreeCleanupPlan } from "../shared/worktree-cleanup-plan.ts";
 import {
 	type AgentProgress,
 	type AsyncJobState,
@@ -5770,29 +5769,6 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			requestParentModel = normalizeParentModel(ctx.model);
 		}
 		if (action) {
-			if (action === "worktree.cleanup") {
-				if (paramsWithResolvedCwd.mode !== "plan") {
-					return { content: [{ type: "text", text: "worktree.cleanup currently supports mode='plan' only; apply/removal is not available yet." }], isError: true, details: { mode: "management", results: [] } };
-				}
-				try {
-					const created = createWorktreeCleanupPlan({
-						repo: paramsWithResolvedCwd.repo?.trim()
-						? path.isAbsolute(paramsWithResolvedCwd.repo) ? paramsWithResolvedCwd.repo : path.resolve(requestCwd, paramsWithResolvedCwd.repo)
-						: requestCwd,
-						...(paramsWithResolvedCwd.handoffPath ? { handoffPath: path.isAbsolute(paramsWithResolvedCwd.handoffPath) ? paramsWithResolvedCwd.handoffPath : path.resolve(requestCwd, paramsWithResolvedCwd.handoffPath) } : {}),
-						...(deps.config.worktreeBaseDir ? { worktreeBaseDir: deps.config.worktreeBaseDir } : {}),
-						foregroundRunOwnership: (runId: string) => {
-							if (deps.state.foregroundControls.has(runId)) return "active" as const;
-							const remembered = deps.state.foregroundRuns?.get(runId);
-							if (!remembered || remembered.children.length === 0 || remembered.children.some((child) => child.status === "detached")) return "unknown" as const;
-							return "terminal" as const;
-						},
-					});
-					return { content: [{ type: "text", text: formatWorktreeCleanupPlan(created) }], details: { mode: "management", results: [] } };
-				} catch (error) {
-					return { content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }], isError: true, details: { mode: "management", results: [] } };
-				}
-			}
 			if (action === "worktree.discard") {
 				if (!paramsWithResolvedCwd.handoffPath?.trim()) {
 					return { content: [{ type: "text", text: "worktree.discard requires handoffPath from parallelHandoff.path or async status." }], isError: true, details: { mode: "management", results: [] } };

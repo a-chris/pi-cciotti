@@ -1,5 +1,5 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "$schema": "https://unpkg.com/knip@6/schema.json",
 
   // Entry points that a static import graph cannot discover. index.ts and install.mjs are
   // omitted because knip already infers them from package.json "exports" and "bin".
@@ -22,15 +22,22 @@
   ],
   "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.mjs", "*.mjs"],
 
-  // Only report a symbol when nothing imports it AND nothing in its own file uses it, i.e.
-  // genuinely deletable rather than merely over-exported.
-  "ignoreExportsUsedInFile": true,
+  // KNIP 6 WARNING (verified empirically 2026-10-02): with knip 6.39.0 this key suppresses far
+  // more than its documented "used in same file" semantics — planted unused exports went
+  // unreported and the finding count collapsed (102 exports → 9). knip 5 behaved as documented.
+  // It is REMOVED; the pre-existing backlog it used to hide (exports/types) is instead demoted
+  // to "warn" below: printed on every run, non-blocking until the burn-down lands, while every
+  // other issue type stays a hard error. Known residual blind spot: knip 6 never reports unused
+  // exports from src/shared/utils.ts (verified: probes at four positions unflagged while the
+  // same content under a different path is fully reported; cause unidentified, upstream issue
+  // material) — dead exports in that one file need manual review.
+  "rules": { "exports": "warn", "types": "warn" },
 
   // acorn is require()'d through a runtime-resolved path in scripted-workflow.ts, so there is
   // no static import to follow. oxlint and its plugin pack are driven by .oxlintrc.json rather
   // than a package script. pi-coding-agent resolves to test/fixtures/...-shim, which is the
   // host API surface the tests type against.
-  "ignoreDependencies": ["acorn", "oxlint", "@oxlint/plugins", "@earendil-works/pi-coding-agent"],
+  "ignoreDependencies": ["acorn", "oxlint"],
 
   // Every entry here is a false positive with a real consumer that knip cannot see.
   //
@@ -48,13 +55,17 @@
   // tool-timeout.ts / external-runs.ts: each keeps one older name as an alias of its
   // canonical export.
   //
-  // the vendored pi-coding-agent shim references an optional image library that is not a
-  // dependency of this package.
+  // npm-background.mjs: bwrap (Bubblewrap) is an optional sandboxing binary invoked via
+  // spawnSync on Linux x64; it is not a JavaScript dependency.
+  //
+  // pi-coding-agent shim: declaration files reference internal modules unresolvable outside
+  // the package; knip 6 reads .d.ts files for unresolved imports.
   "ignoreIssues": {
     "src/shared/settings.ts": ["exports"],
     "src/runs/background/runner-aliases.ts": ["exports"],
     "src/runs/shared/tool-timeout.ts": ["duplicates"],
     "src/api/external-runs.ts": ["duplicates"],
-    "test/fixtures/pi-coding-agent-shim/**": ["unlisted"]
+    "test/smoke/npm-background.mjs": ["binaries"],
+    "test/fixtures/pi-coding-agent-shim/**": ["unlisted", "unresolved"]
   }
 }

@@ -19,7 +19,7 @@ export {
 	suppressProgressForReadOnlyTask,
 	taskDisallowsFileUpdates,
 } from "../runs/shared/child-launch-plan.ts";
-export type { ChildLaunchPlan, ChildLaunchPlanInput, OutputOverrideInput, ResolvedStepBehavior, StepOverrides } from "../runs/shared/child-launch-plan.ts";
+export type { OutputOverrideInput, ResolvedStepBehavior, StepOverrides } from "../runs/shared/child-launch-plan.ts";
 
 // =============================================================================
 // Chain Step Types
@@ -382,5 +382,4 @@ export function resolveParallelBehaviors(
 	});
 }
 
-export type { ParallelTaskResult } from "../runs/shared/parallel-utils.ts";
 export { aggregateParallelOutputs } from "../runs/shared/parallel-utils.ts";

@@ -111,7 +111,7 @@
     "typebox": "1.1.38",
     "@oxlint/plugins": "1.80.0",
     "@types/node": "24.13.3",
-    "knip": "5.88.1",
+    "knip": "6.39.0",
     "oxlint": "1.80.0",
     "typescript": "5.9.3"
   }

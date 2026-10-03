@@ -2457,6 +2457,7 @@ interface AgentDiscoveryCacheEntry {
 }
 
 const agentDiscoveryCache = new Map<string, AgentDiscoveryCacheEntry>();
+export const MAX_DISCOVERY_CACHE_ENTRIES = 64;
 
 function isPathWithin(root: string, candidate: string): boolean {
 	const relative = path.relative(path.resolve(root), path.resolve(candidate));
@@ -2628,8 +2629,8 @@ function buildAgentDiscoverySources(cwd: string, preferredModelProvider?: string
 	};
 }
 
-function ensureDiscoveryChains(sources: AgentDiscoverySources): void {
-	if (sources.userChains) return;
+function ensureDiscoveryChains(sources: AgentDiscoverySources): boolean {
+	if (sources.userChains) return false;
 	sources.packageChainLoaded = sources.packageSubagentPaths.chains.map((entry) => ({ entry, loaded: loadChainsFromDir(entry.dir, "package") }));
 	sources.userChains = loadChainsFromDir(sources.userChainDir, "user");
 	sources.projectChainLoaded = sources.projectChainDirs.map((dir) => ({ dir, loaded: loadChainsFromDir(dir, "project") }));
@@ -2639,14 +2640,14 @@ function ensureDiscoveryChains(sources: AgentDiscoverySources): void {
 	for (const chain of sources.packageChainLoaded) addDirectoryWatchPaths(watchPaths, chain.entry.dir, chain.loaded.files, chain.loaded.directories);
 	sources.chainWatchPaths = watchPaths;
 	sources.watchPaths = [...new Set([...sources.watchPaths, ...watchPaths])];
+	return true;
 }
 
 function getAgentDiscoverySources(cwd: string, preferredModelProvider?: string, includeChains = false): AgentDiscoverySources {
 	const key = discoveryCacheKey(cwd, preferredModelProvider);
 	const cached = agentDiscoveryCache.get(key);
 	if (cached && cached.fingerprint === discoveryFingerprint(cached.sources)) {
-		if (includeChains) {
-			ensureDiscoveryChains(cached.sources);
+		if (includeChains && ensureDiscoveryChains(cached.sources)) {
 			cached.fingerprint = discoveryFingerprint(cached.sources);
 		}
 		return cached.sources;
@@ -2654,6 +2655,10 @@ function getAgentDiscoverySources(cwd: string, preferredModelProvider?: string, 
 	const sources = buildAgentDiscoverySources(cwd, preferredModelProvider);
 	const entry = { sources, fingerprint: discoveryFingerprint(sources) };
 	agentDiscoveryCache.set(key, entry);
+	if (agentDiscoveryCache.size > MAX_DISCOVERY_CACHE_ENTRIES) {
+		const oldest = agentDiscoveryCache.keys().next().value;
+		if (oldest !== undefined) agentDiscoveryCache.delete(oldest);
+	}
 	if (includeChains) {
 		ensureDiscoveryChains(sources);
 		entry.fingerprint = discoveryFingerprint(sources);

@@ -10,6 +10,7 @@ const ARCHIVE_TEXT_LIMIT_BYTES = 64 * 1024;
 const REPLAY_DIR_NAME = "completion-replay";
 const ARCHIVE_DIR_NAME = "output-archives";
 const CLEANUP_INTERVAL_MS = 60_000;
+export const MAX_LAST_CLEANUP_CACHE_ENTRIES = 64;
 const lastCleanupByResultsDir = new Map<string, number>();
 
 export interface CompletionArchiveEntry {
@@ -249,6 +250,10 @@ export function cleanupCompletionReplayIfDue(resultsDir: string, now: number, ma
 	const last = lastCleanupByResultsDir.get(resultsDir);
 	if (last !== undefined && now - last < intervalMs) return false;
 	lastCleanupByResultsDir.set(resultsDir, now);
+	if (lastCleanupByResultsDir.size > MAX_LAST_CLEANUP_CACHE_ENTRIES) {
+		const oldest = lastCleanupByResultsDir.keys().next().value;
+		if (oldest !== undefined) lastCleanupByResultsDir.delete(oldest);
+	}
 	cleanupCompletionReplay(resultsDir, now, maxAgeMs);
 	return true;
 }

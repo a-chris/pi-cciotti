@@ -4,7 +4,7 @@ import { createRequire, syncBuiltinESMExports } from "node:module";
 import * as os from "node:os";
 import * as path from "node:path";
 import { describe, it } from "node:test";
-import { cleanupCompletionReplay, completionArchivePath, completionReplayPath, readCompletionArchive, readCompletionReplay, writeCompletionReplay, writeCompletionArchive } from "../../src/runs/background/completion-replay.ts";
+import { cleanupCompletionReplay, cleanupCompletionReplayIfDue, completionArchivePath, completionReplayPath, MAX_LAST_CLEANUP_CACHE_ENTRIES, readCompletionArchive, readCompletionReplay, writeCompletionReplay, writeCompletionArchive } from "../../src/runs/background/completion-replay.ts";
 import { utf8Tail } from "../../src/shared/utf8.ts";
 import { collectWaitCompletions, recordWaitCompletion } from "../../src/runs/background/wait-completions.ts";
 import { writeAsyncResultFile } from "../../src/runs/background/result-files.ts";
@@ -300,6 +300,32 @@ describe("completion replay", () => {
 			assert.ok(Buffer.byteLength(fallback?.text ?? "", "utf-8") <= 64 * 1024);
 			assert.match(fallback?.text ?? "", /-tail$/);
 			assert.equal((fallback?.text ?? "").includes("duplicate text"), false);
+		} finally {
+			fs.rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it("bounds lastCleanupByResultsDir with FIFO eviction", () => {
+		const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-completion-replay-cap-"));
+		try {
+			const now = 10_000;
+			const intervalMs = 60_000;
+			const count = MAX_LAST_CLEANUP_CACHE_ENTRIES + 4;
+			const dir = (index: number) => path.join(root, `results-${index}`);
+
+			// Prime all distinct results dirs so the first MAX_LAST_CLEANUP_CACHE_ENTRIES
+			// entries are evicted by insertion order once the cap is exceeded.
+			for (let i = 0; i < count; i++) {
+				assert.equal(cleanupCompletionReplayIfDue(dir(i), now, 60_000, intervalMs), true);
+			}
+
+			// The earliest entry was evicted, so its throttle state is gone: a repeat
+			// call runs cleanup again (returns true).
+			assert.equal(cleanupCompletionReplayIfDue(dir(0), now, 60_000, intervalMs), true);
+
+			// A recently-seen entry is still tracked, so it stays throttled within the
+			// interval (returns false) — the cap did not break throttling.
+			assert.equal(cleanupCompletionReplayIfDue(dir(count - 1), now, 60_000, intervalMs), false);
 		} finally {
 			fs.rmSync(root, { recursive: true, force: true });
 		}

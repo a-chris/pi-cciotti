@@ -178,10 +178,10 @@ describe("named workflow resources", () => {
 			async host(key, params) {
 				hostCalls.push(`${key}:${params.command.length}`);
 				assert.equal(key, "wt-setup");
-				return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: `created\n${worktree}\n`, stderr: "", outputPath: "wt.log", durationMs: 1 };
+				return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: `created\nWORKTREE ${worktree}\n`, stderr: "", outputPath: "wt.log", durationMs: 1 };
 			},
 			async launch(key, params) {
-				calls.push({ key, agent: params.agent, task: params.task, prequel: params.prequel, cwd: params.cwd });
+				calls.push({ key, agent: params.agent, task: params.task, prequel: params.prequel, cwd: params.cwd, output: params.output });
 				return { key, ok: true, output: "Planned: three steps", artifactPaths: [] };
 			},
 			async status(key) { return { key, ok: true, output: "unused", artifactPaths: [] }; },
@@ -194,24 +194,51 @@ describe("named workflow resources", () => {
 		assert.match(String(calls[0].task), /Working in git worktree \/tmp\/perl-fixtures\/.pi-perl-fixtures on branch perl\/work\./);
 		assert.equal(calls[0].prequel, "Decisions: use pass-through, not a whitelist");
 		assert.equal(calls[0].cwd, worktree);
-		assert.deepEqual(execution.value, { phase: "plan", plan: "plan.md", worktree, summary: "Planned: three steps" });
+		// The plan must land in the shared worktree under its own name: the operator reviews
+		// it there and the execute call reads it back from there. A relative `output` would be
+		// routed to the managed artifact directory instead, which broke the plan/execute handoff.
+		assert.equal(calls[0].output, `${worktree}/plan.md`);
+		assert.deepEqual(execution.value, { phase: "plan", plan: `${worktree}/plan.md`, worktree, summary: "Planned: three steps" });
 	});
 
-	it("runs the perl plan phase in the plain cwd when worktree setup fails", async () => {
+	it("runs the perl plan phase in the plain cwd when the setup command reports PLAIN", async () => {
+		// Outside a git repository the setup command succeeds with `PLAIN <pwd>`: there is no
+		// worktree to isolate into, but the shared directory still owns plan.md.
 		const resolved = resolveWorkflowResource("perl", { task: "Do the thing" });
 		assert.equal(resolved.ok, true);
 		if (!resolved.ok) return;
-		const calls: Array<{ key: string; cwd?: unknown }> = [];
+		const calls: Array<{ key: string; cwd?: unknown; output?: unknown }> = [];
 		const execution = await runWorkflowScript({
 			script: resolved.resource.script,
-			async host(key) { return { key, kind: "command", ok: false, state: "failed", exitCode: 1, stdout: "", stderr: "not a git repository", outputPath: "wt.log", durationMs: 1, error: "Command exited with code 1." }; },
+			async host(key) { return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: "PLAIN /repo", stderr: "", outputPath: "wt.log", durationMs: 1 }; },
 			async launch(key, params) {
-				calls.push({ key, cwd: params.cwd ?? null });
+				calls.push({ key, cwd: params.cwd, output: params.output });
 				return { key, ok: true, output: "planned", artifactPaths: [] };
 			},
 			async status(key) { return { key, ok: true, output: "unused", artifactPaths: [] }; },
 		});
-		assert.deepEqual(calls, [{ key: "planner", cwd: null }]);
+		assert.deepEqual(calls, [{ key: "planner", cwd: "/repo", output: "/repo/plan.md" }]);
+		assert.deepEqual(execution.value, { phase: "plan", plan: "/repo/plan.md", worktree: null, summary: "planned" });
+	});
+
+	it("runs the perl plan phase on default artifact routing when worktree setup fails", async () => {
+		// A hard setup failure (worktree add error, refused path) leaves no shared directory:
+		// the launch wrapper stays identity and the engine's managed artifact routing applies.
+		const resolved = resolveWorkflowResource("perl", { task: "Do the thing" });
+		assert.equal(resolved.ok, true);
+		if (!resolved.ok) return;
+		const calls: Array<{ key: string; cwd?: unknown; output?: unknown }> = [];
+		const execution = await runWorkflowScript({
+			script: resolved.resource.script,
+			async host(key) { return { key, kind: "command", ok: false, state: "failed", exitCode: 1, stdout: "", stderr: "refusing to replace existing non-worktree path", outputPath: "wt.log", durationMs: 1, error: "Command exited with code 1." }; },
+			async launch(key, params) {
+				calls.push({ key, cwd: params.cwd ?? null, output: params.output ?? null });
+				return { key, ok: true, output: "planned", artifactPaths: [] };
+			},
+			async status(key) { return { key, ok: true, output: "unused", artifactPaths: [] }; },
+		});
+		assert.deepEqual(calls, [{ key: "planner", cwd: null, output: true }]);
+		// With no shared directory the result honestly reports the unqualified name the engine routes.
 		assert.deepEqual(execution.value, { phase: "plan", plan: "plan.md", worktree: null, summary: "planned" });
 	});
 
@@ -227,9 +254,9 @@ describe("named workflow resources", () => {
 		const calls: Array<{ key: string; cwd?: unknown }> = [];
 		const execution = await runWorkflowScript({
 			script: resolved.resource.script,
-			async host(key) { return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: worktree, stderr: "", outputPath: "wt.log", durationMs: 1 }; },
+			async host(key) { return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: `WORKTREE ${worktree}`, stderr: "", outputPath: "wt.log", durationMs: 1 }; },
 			async launch(key, params) {
-				calls.push({ key, cwd: params.cwd });
+				calls.push({ key, cwd: params.cwd, output: params.output });
 				if (key.startsWith("review-")) assert.deepEqual(params.outputSchema?.properties?.verdict?.enum, ["BLOCK", "OK", "OK with notes"]);
 				if (key === "review-1") return { key, ok: true, output: "review one", artifactPaths: [], structuredOutput: { verdict: "BLOCK", findings: ["src/x.ts: missing case"] } };
 				if (key === "review-2") return { key, ok: true, output: "review two", artifactPaths: [], structuredOutput: { verdict: "OK", findings: [] } };
@@ -239,6 +266,9 @@ describe("named workflow resources", () => {
 		});
 		assert.deepEqual(calls.map(({ key }) => key), ["recon", "implement", "review-1", "fix-1", "review-2"]);
 		assert.ok(calls.every(({ cwd }) => cwd === worktree));
+		// context.md is read back by the implement worker from the shared directory, so the
+		// scout must write it there, not to the managed artifact directory.
+		assert.equal(calls.find(({ key }) => key === "recon")?.output, `${worktree}/context.md`);
 		const value = execution.value as { phase: string; plan: string; worktree: string | null; branch: string | null; verdict: string; fixRounds: number; findings: string[] };
 		assert.equal(value.phase, "executed");
 		assert.equal(value.plan, "plan.md");
@@ -256,7 +286,7 @@ describe("named workflow resources", () => {
 		const calls: string[] = [];
 		const execution = await runWorkflowScript({
 			script: resolved.resource.script,
-			async host(key) { return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: "/tmp/perl-fixtures/.pi-perl-fixtures", stderr: "", outputPath: "wt.log", durationMs: 1 }; },
+			async host(key) { return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: "WORKTREE /tmp/perl-fixtures/.pi-perl-fixtures", stderr: "", outputPath: "wt.log", durationMs: 1 }; },
 			async launch(key) {
 				calls.push(key);
 				if (key.startsWith("review-")) return { key, ok: true, output: "blocked", artifactPaths: [], structuredOutput: { verdict: "BLOCK", findings: ["still broken"] } };
@@ -293,7 +323,7 @@ describe("named workflow resources", () => {
 				script: resolved.resource.script,
 				async host(key, params) {
 					commands.push(params.command);
-					return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix", stderr: "", outputPath: "wt.log", durationMs: 1 };
+					return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: "WORKTREE /tmp/perl-fixtures/.pi-perl-fixtures-auth-fix", stderr: "", outputPath: "wt.log", durationMs: 1 };
 				},
 				async launch(key, params) {
 					assert.equal(params.cwd, "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix");
@@ -305,7 +335,7 @@ describe("named workflow resources", () => {
 			assert.equal(commands.length, 1);
 			assert.match(commands[0], /\.pi-perl-\$\(basename \"\$R\"\)-auth-fix\"/);
 			assert.match(commands[0], /git worktree add "\$P" -b perl\/work-auth-fix/);
-			if ("task" in args && args.task) assert.deepEqual(execution.value, { phase: "plan", plan: "plan.md", worktree: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix", summary: "done" });
+			if ("task" in args && args.task) assert.deepEqual(execution.value, { phase: "plan", plan: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix/plan.md", worktree: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix", summary: "done" });
 			else assert.equal((execution.value as { branch: string }).branch, "perl/work-auth-fix");
 		}
 	});

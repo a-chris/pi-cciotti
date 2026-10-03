@@ -190,31 +190,63 @@ export function sanitizePerlSlug(raw: string): string {
 
 /**
  * Idempotent POSIX shell setup for the perl worktree, run through the granted
- * `wt-setup` host command. Resolves the repo root from the workflow cwd,
- * reuses or creates a sibling `.pi-perl-<repo>[-<slug>]` worktree on the
- * `perl/work[-<slug>]` branch, and prints its path. Fails cleanly (exit 1)
- * outside a git repository so the generated script falls back to the plain
- * cwd. The slug is sanitized before it reaches this string, so it cannot
- * inject shell.
+ * `wt-setup` host command. Resolves the repo root from the workflow cwd, reuses
+ * or creates a sibling `.pi-perl-<repo>[-<slug>]` worktree on the
+ * `perl/work[-<slug>]` branch, and prints `WORKTREE <path>`. Outside a git
+ * repository there is no worktree to isolate into, so it prints `PLAIN <pwd>`
+ * (the workflow cwd, which is where the host command runs) and succeeds — the
+ * plain lane still needs a shared directory for `plan.md`. It exits 1 only when
+ * the worktree genuinely cannot be created, which leaves the run on the engine's
+ * default artifact routing. The slug is sanitized before it reaches this string,
+ * so it cannot inject shell.
  */
 function perlWorktreeCommand(slug?: string): string {
 	const suffix = slug ? `-${slug}` : "";
 	const branch = slug ? `perl/work-${slug}` : PERL_WORKTREE_BRANCH;
-	return `R=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1; P="$(dirname "$R")/.pi-perl-$(basename "$R")${suffix}"; git worktree prune 2>/dev/null; if [ -e "$P" ] && [ ! -e "$P/.git" ]; then echo "refusing to replace existing non-worktree path: $P" >&2; exit 1; fi; if [ ! -e "$P/.git" ]; then git worktree add "$P" -b ${branch} 2>/dev/null || git worktree add "$P" ${branch} || exit 1; fi; test -d "$P" || exit 1; echo "$P"`;
+	return `R=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "PLAIN $(pwd)"; exit 0; }; P="$(dirname "$R")/.pi-perl-$(basename "$R")${suffix}"; git worktree prune 2>/dev/null; if [ -e "$P" ] && [ ! -e "$P/.git" ]; then echo "refusing to replace existing non-worktree path: $P" >&2; exit 1; fi; if [ ! -e "$P/.git" ]; then git worktree add "$P" -b ${branch} 2>/dev/null || git worktree add "$P" ${branch} || exit 1; fi; test -d "$P" || exit 1; echo "WORKTREE $P"`;
 }
+
+/** Prefixes the setup command prints so the script can tell a real worktree from a plain-cwd fallback. */
+const PERL_WORKTREE_PREFIX = "WORKTREE ";
+const PERL_PLAIN_PREFIX = "PLAIN ";
 
 /**
  * Generated-script preamble that creates the worktree through the granted
- * `wt-setup` host command (falling back to the plain cwd when setup fails)
- * and returns a `withWt` wrapper that pins every child launch into it.
+ * `wt-setup` host command and returns two launch wrappers over the shared
+ * directory (`base`):
+ * - `withWt` pins a child's `cwd` into it.
+ * - `intoWt(launch, name)` additionally pins the child's `output` to an absolute
+ *   `<base>/<name>`.
+ *
+ * `base` is the worktree, or the plain workflow cwd when the setup command
+ * reports `PLAIN` (not a git repository). It is empty only when setup genuinely
+ * failed, and then both wrappers are identity and children fall back to the
+ * engine's default artifact routing.
+ *
+ * The absolute output pin is what lets the two phases hand work to each other.
+ * A workflow child's relative `output` is deliberately routed to the managed
+ * artifact directory (so a review run cannot litter the repo), which is right for
+ * prose reports but wrong for `plan.md` and `context.md`: the operator reviews
+ * `plan.md` in the shared directory and the execute phase reads both files back
+ * from there, so they must land there under their own names. Only the generated
+ * script knows `base` at runtime, so it passes the absolute path.
  */
 function perlWorktreePreamble(setupCommand: string): string {
 	return `let worktree = "";
+let base = "";
 try {
 	const wtSetup = await runs.host("wt-setup", { kind: "command", command: ${JSON.stringify(setupCommand)}, timeoutMs: ${PERL_WORKTREE_SETUP_TIMEOUT_MS} });
-	worktree = wtSetup.stdout.trim().split("\\n").pop() || "";
-} catch { worktree = ""; }
-const withWt = (launch) => (worktree ? { ...launch, cwd: worktree } : launch);
+	const wtLine = wtSetup.stdout.trim().split("\\n").pop() || "";
+	if (wtLine.startsWith(${JSON.stringify(PERL_WORKTREE_PREFIX)})) {
+		worktree = wtLine.slice(${PERL_WORKTREE_PREFIX.length});
+		base = worktree;
+	} else if (wtLine.startsWith(${JSON.stringify(PERL_PLAIN_PREFIX)})) {
+		base = wtLine.slice(${PERL_PLAIN_PREFIX.length});
+	}
+} catch { worktree = ""; base = ""; }
+const withWt = (launch) => (base ? { ...launch, cwd: base } : launch);
+const intoWt = (launch, name) => (base ? { ...launch, cwd: base, output: base + "/" + name } : launch);
+const planPath = base ? base + "/plan.md" : "plan.md";
 `;
 }
 
@@ -260,7 +292,7 @@ function resolvePerl(args: Readonly<Record<string, unknown>>): ReturnType<Workfl
 		const taskLiteral = JSON.stringify(task.trim());
 		const branchLiteral = JSON.stringify(branch);
 		return {
-			script: `${perlWorktreePreamble(setupCommand)}const launch = ${launchLiteral}; launch.task = ${taskLiteral} + (worktree ? " (Working in git worktree " + worktree + " on branch " + ${branchLiteral} + ". Use these exact paths and branch name in plan.md.)" : ""); return { phase: "plan", plan: "plan.md", worktree: worktree || null, summary: (await runs.run("planner", withWt(launch))).output };`,
+			script: `${perlWorktreePreamble(setupCommand)}const launch = ${launchLiteral}; launch.task = ${taskLiteral} + (worktree ? " (Working in git worktree " + worktree + " on branch " + ${branchLiteral} + ". Use these exact paths and branch name in plan.md.)" : ""); return { phase: "plan", plan: planPath, worktree: worktree || null, summary: (await runs.run("planner", intoWt(launch, "plan.md"))).output };`,
 			hostCommands,
 		};
 	}
@@ -283,7 +315,7 @@ function resolvePerl(args: Readonly<Record<string, unknown>>): ReturnType<Workfl
 	if (prequel !== undefined) implementLaunch.prequel = prequel.trim();
 	return {
 		script: `${perlWorktreePreamble(setupCommand)}const reviewSchema = ${JSON.stringify(reviewSchema)};
-const recon = await runs.run("recon", withWt({ agent: "scout", task: "Read plan.md and write context.md for the worker that will implement it: the exact files and seams to touch, existing conventions, and the verification commands that already exist. Do not implement anything.", async: false, output: true, worktree: false }));
+const recon = await runs.run("recon", intoWt({ agent: "scout", task: "Read plan.md and write context.md for the worker that will implement it: the exact files and seams to touch, existing conventions, and the verification commands that already exist. Do not implement anything.", async: false, output: true, worktree: false }, "context.md"));
 const implementation = await runs.run("implement", withWt(${JSON.stringify(implementLaunch)}));
 let verdict = "BLOCK";
 let findings = [];

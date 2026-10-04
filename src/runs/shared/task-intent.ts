@@ -4,10 +4,10 @@
  * Single authority for reading a task's wording, answering two different
  * questions from one prohibition analysis:
  *
- * - `classifyTaskMutationIntent` / `expectsImplementationMutation`: does the
- *   task REQUIRE file changes? Consumed by the completion mutation guard,
- *   which blocks completion, so its vocabulary is deliberately narrow.
- *   Verbs inside filenames and path-like tokens do not count.
+ * - `classifyTaskMutationIntent`: does the task REQUIRE file changes?
+ *   Consumed by acceptance level inference (soft evidence-gate inference),
+ *   so its vocabulary is deliberately narrow. Verbs inside filenames and
+ *   path-like tokens do not count.
  * - `taskMayMutate`: COULD the task plausibly change files? Consumed by
  *   acceptance level inference, which only raises evidence gates, so its
  *   vocabulary is deliberately broad (any bare write verb).
@@ -217,10 +217,6 @@ export function classifyTaskMutationIntent(agent: string, task: string): TaskMut
 	if (hasImplementationIntent(agent, stripPathLikeTokens(taskText))) return { kind: "implementation" };
 	if (isReviewerStyleAgent(agent)) return { kind: "read-only" };
 	return taskHasReadOnlyDeliverable(taskTextWithoutScopedConstraints) ? { kind: "read-only" } : { kind: "unknown" };
-}
-
-export function expectsImplementationMutation(agent: string, task: string): boolean {
-	return classifyTaskMutationIntent(agent, task).kind === "implementation";
 }
 
 /** Bare write verbs that make a task write-capable for acceptance inference.

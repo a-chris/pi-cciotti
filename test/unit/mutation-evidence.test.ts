@@ -111,8 +111,7 @@ describe("tracked mutation evidence", () => {
 
 	it("uses tracked evidence as completion guard mutation proof", () => {
 		const guard = evaluateCompletionMutationGuard({
-			agent: "worker",
-			task: "Implement the requested fix.",
+			expectsMutation: true,
 			messages: [{ role: "assistant", content: [{ type: "text", text: "Implemented." }] }],
 			tools: ["edit"],
 			mutationEvidence: {

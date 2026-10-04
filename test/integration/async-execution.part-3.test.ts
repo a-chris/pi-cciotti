@@ -511,116 +511,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 		assert.equal(payload.results[0].success, false);
 	});
 
-	it("background completion intent uses disposed child model services before publishing evidence", { timeout: 60_000, skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async (t) => {
-		const reviewTask = 'Review the proposal "Implement the approved fixes" and report whether its reasoning is sound.';
-		const factoryPath = path.join(tempDir, "intent-factory.mjs");
-		const tracePath = path.join(tempDir, "intent-trace.jsonl");
-		const casePath = path.join(tempDir, "intent-case.json");
-		fs.writeFileSync(factoryPath, `
-import fs from "node:fs";
-import assert from "node:assert/strict";
-import { createDefaultChildSessionFactory } from ${JSON.stringify(new URL("../../src/runs/shared/child-session.ts", import.meta.url).href)};
-import { createAssistantMessageEventStream, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
-const scenario = JSON.parse(fs.readFileSync(${JSON.stringify(casePath)}, "utf8"));
-const trace = event => fs.appendFileSync(${JSON.stringify(tracePath)}, event + "\\n");
-export default function() {
-  let disposed = false;
-  const model = { provider: "intent-test", id: "child-attempt", api: "intent-test-api" };
-  const runtime = { apiKey: "fixture-key" };
-  const registry = {
-    runtime,
-    async getApiKeyAndHeaders() {
-      trace("auth");
-      assert.ok(disposed, "auth after child disposal");
-      return { ok: true, apiKey: this.runtime.apiKey, headers: { "x-intent-test": "fixture-header" } };
-    },
-    getRegisteredProviderConfig() { return { api: model.api, streamSimple(selected, context, options) {
-      trace("stream");
-      assert.ok(disposed, "stream after child disposal");
-      assert.equal(selected.provider + "/" + selected.id, "intent-test/child-attempt");
-      assert.equal(options.apiKey, "fixture-key");
-      assert.equal(options.headers["x-intent-test"], "fixture-header");
-      const decided = context.messages.some(message => message.role === "toolResult");
-      const message = !decided
-        ? fauxAssistantMessage(fauxToolCall("task_mutation_decision", { classification: scenario.classification ?? "read_only", confidence: "high", reason: "Scripted task intent." }), { stopReason: "toolUse" })
-        : fauxAssistantMessage("Review findings: the proposal is sound.", { stopReason: "stop" });
-      const stream = createAssistantMessageEventStream();
-      queueMicrotask(() => stream.push({ type: "done", reason: message.stopReason, message }));
-      return stream;
-    } }; },
-  };
-  // Existing SDK seam: production factory/hooks, scripted child/model services.
-  return createDefaultChildSessionFactory({ loadPiCodingAgent: async () => ({
-    ModelRuntime: { create: async () => runtime },
-    SettingsManager: { create: () => ({}) },
-    SessionManager: { inMemory: () => ({}) },
-    DefaultResourceLoader: class {
-      loaded = false;
-      handlers = [];
-      constructor(options) { this.options = options; }
-      async reload() {
-        const pi = { on: (event, handler) => this.handlers.push({ event, handler }), registerTool() {}, events: { on() { return () => {}; }, emit() {} } };
-        for (const hook of this.options.extensionFactories) hook.factory(pi);
-      }
-    },
-    resolveCliModel: ({ cliModel }) => { assert.equal(cliModel, "intent-test/child-attempt"); return { model }; },
-    createAgentSession: async ({ resourceLoader, model }) => {
-      const ctx = Proxy.revocable({ model, modelRegistry: registry, sessionManager: { getSessionId: () => "intent-child", getSessionFile: () => undefined } }, {});
-      let listener;
-      const messages = [];
-      return { session: {
-        model, messages, sessionId: "intent-child",
-        async bindExtensions() { for (const { event, handler } of resourceLoader.handlers) if (event === "session_start") await handler({ type: event }, ctx.proxy); },
-        extensionRunner: { hasHandlers: () => false },
-        subscribe(next) { listener = next; return () => {}; },
-        async prompt() {
-          const message = fauxAssistantMessage("Review findings: the proposal is sound.", { stopReason: "stop" }); messages.push(message); listener({ type: "message_end", message });
-        },
-        async abort() {}, async steer() {}, async followUp() {},
-        dispose() { disposed = true; ctx.revoke(); },
-      } };
-    },
-  }) });
-}
-`);
-		setChildSessionFactoryModule(factoryPath);
-		t.after(() => setChildSessionFactoryModule(fileURLToPath(new URL("../support/runner-child-session-factory.ts", import.meta.url))));
-		for (const scenario of [
-			{ name: "review-rescue", task: reviewTask, success: true, effect: "not-applicable", calls: true },
-			{ name: "implementation", task: "Implement the approved fixes", classification: "implementation", success: false, effect: "missing", calls: true },
-			{ name: "ordinary", task: "Summarize the proposal", success: true, effect: "not-applicable", calls: false },
-		]) {
-			fs.writeFileSync(casePath, JSON.stringify(scenario));
-			fs.writeFileSync(tracePath, "");
-			const id = `async-intent-${scenario.name}-${Date.now().toString(36)}`;
-			const outputPath = path.join(tempDir, `${id}.md`);
-			const launched = executeAsyncSingle(id, {
-				agent: "worker", task: scenario.task,
-				agentConfig: makeAgent("worker", { model: "intent-test/child-attempt" }),
-				output: outputPath,
-				ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
-				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-				shareEnabled: false,			});
-			assert.notEqual(launched.isError, true, `${scenario.name}: ${JSON.stringify(launched)}`);
-			const payload = JSON.parse(fs.readFileSync(await waitForAsyncResultFile(id), "utf8"));
-			await waitForAsyncEvent(id, "subagent.run.process_terminal");
-			assert.equal(payload.success, scenario.success, `${scenario.name}: ${JSON.stringify(payload)}`);
-			assert.equal(payload.results[0].effects?.fileMutation?.status, scenario.effect, scenario.name);
-			const trace = fs.readFileSync(tracePath, "utf8");
-			assert.equal(trace.includes("auth"), scenario.calls, scenario.name);
-			assert.equal(trace.includes("stream"), scenario.calls, scenario.name);
-			if (!scenario.success) assert.match(payload.results[0].error, /completed without making edits/, scenario.name);
-			if (scenario.name === "review-rescue") {
-				assert.equal(payload.results[0].effects.fileMutation.resolvedBy, "llm-intent-arbiter");
-				assert.equal(payload.results[0].effects.fileMutation.expected, true);
-				assert.match(fs.readFileSync(outputPath, "utf8"), /Review findings: the proposal is sound/);
-				const status = JSON.parse(fs.readFileSync(path.join(ASYNC_DIR, id, "status.json"), "utf8"));
-				assert.equal(status.state, "complete");
-				assert.doesNotMatch(fs.readFileSync(path.join(ASYNC_DIR, id, "events.jsonl"), "utf8"), /"reason":"completion_guard"|completed without making edits/);
-			}
-		}
-	});
-
 	it("background implementation runs fail when no mutation attempt occurred", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
 		mockPi.onCall({ output: "I’ll do that now and report back after implementing." });
 
@@ -631,7 +521,7 @@ export default function() {
 		executeAsyncSingle(id, {
 			agent: "worker",
 			task: "Implement the approved fixes",
-			agentConfig: makeAgent("worker"),
+			agentConfig: makeAgent("worker", { completionGuard: true }),
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: {
 				enabled: false,
@@ -728,7 +618,7 @@ export default function() {
 					concurrency: 2,
 				}],
 				resultMode: "parallel",
-				agents: [makeAgent("first"), makeAgent("second")],
+				agents: [makeAgent("first", { completionGuard: true }), makeAgent("second", { completionGuard: true })],
 				ctx: { pi: { events: { emit: observer.emit } }, cwd: repo, currentSessionId: "session-1" },
 				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 				shareEnabled: false,
@@ -798,7 +688,7 @@ export default function() {
 		executeAsyncSingle(id, {
 			agent: "worker",
 			task,
-			agentConfig: makeAgent("worker"),
+			agentConfig: makeAgent("worker", { completionGuard: false }),
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: {
 				enabled: false,

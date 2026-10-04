@@ -81,6 +81,9 @@ export function makeAgentConfigs(names: string[]): AgentConfig[] {
 		inheritGlobalContext: false,
 		inheritProjectContext: false,
 		inheritSkills: false,
+		// See makeAgent: the guard defaults ON for the builtin `worker`; fixture agents opt out
+		// so non-mutation runs are not failed by the guard.
+		completionGuard: false,
 	}));
 }
 
@@ -93,6 +96,10 @@ export function makeAgent(name: string, overrides: Partial<AgentConfig> = {}): A
 		inheritGlobalContext: false,
 		inheritProjectContext: false,
 		inheritSkills: false,
+		// The completion guard defaults ON for the builtin `worker`; tests that use
+		// a worker as a generic (non-mutating) fixture opt out so the guard does not
+		// fail their runs. Tests that specifically assert the guard pass `completionGuard: true`.
+		completionGuard: false,
 		...overrides,
 	};
 }

@@ -22,17 +22,15 @@ export function planCompletionEvidence(input: {
 	guardTriggered?: boolean;
 	completionGuardEnabled: boolean;
 	mutationCapable: boolean;
-	implementationMutationExpected: boolean;
 	mutationAttemptObserved: boolean;
 	mutationEvidence?: TrackedMutationEvidence;
-	arbiterRescued?: boolean;
 	agentContractEnabled: boolean;
 }): CompletionEvidencePlan {
 	const guardBlocked = input.guard?.blocked === true;
 	const guardTriggered = input.guardTriggered
 		?? (input.guard?.triggered === true && !input.mutationAttemptObserved);
 	const mutationExpected = input.guard?.expectedMutation
-		?? (input.completionGuardEnabled && input.mutationCapable && input.implementationMutationExpected);
+		?? (input.completionGuardEnabled && input.mutationCapable);
 	const mutationAttempted = input.guard?.attemptedMutation === true || input.mutationAttemptObserved;
 	const fileMutation = input.guard
 		? {
@@ -41,16 +39,13 @@ export function planCompletionEvidence(input: {
 				: input.guard.expectedMutation
 					? guardTriggered
 						? "missing" as const
-						: input.arbiterRescued
-							? "not-applicable" as const
-							: "observed" as const
+						: "observed" as const
 					: "not-applicable" as const,
 			expected: input.guard.expectedMutation,
 			attempted: guardBlocked ? false : mutationAttempted,
 			...(input.mutationEvidence ? { evidence: input.mutationEvidence } : {}),
 			...(guardBlocked && input.guard.message ? { message: input.guard.message } : {}),
 			...(guardTriggered ? { message: MISSING_IMPLEMENTATION_MUTATION_MESSAGE } : {}),
-			...(input.arbiterRescued ? { resolvedBy: "llm-intent-arbiter" as const } : {}),
 		}
 		: undefined;
 	return {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { classifyTaskMutationIntent, expectsImplementationMutation, taskMayMutate } from "../../src/runs/shared/task-intent.ts";
+import { classifyTaskMutationIntent, taskMayMutate } from "../../src/runs/shared/task-intent.ts";
 
 describe("classifyTaskMutationIntent", () => {
 	it("keeps write imperatives despite investigative wording", () => {
@@ -83,7 +83,6 @@ describe("classifyTaskMutationIntent", () => {
 			"Do not read files or modify anything.",
 		]) {
 			assert.notEqual(classifyTaskMutationIntent("worker", task).kind, "implementation", task);
-			assert.equal(expectsImplementationMutation("worker", task), false, task);
 			assert.equal(taskMayMutate(task), false, task);
 		}
 		assert.equal(classifyTaskMutationIntent("worker", "Do not read more files, run commands, or edit anything; implement the fix").kind, "implementation");
@@ -159,13 +158,6 @@ describe("classifyTaskMutationIntent", () => {
 		// "--write" was never a classifier verb (pre-existing unknown); the
 		// regression guard is that write-capability survives for acceptance.
 		assert.equal(taskMayMutate("Run prettier --write files"), true);
-		// Guard-facing mirror: the completion guard must not expect mutation.
-		assert.equal(expectsImplementationMutation("worker", "Return a review with the top 2-3 must-fix items"), false);
-	});
-
-	it("expectsImplementationMutation mirrors the classifier", () => {
-		assert.equal(expectsImplementationMutation("worker", "Do not modify tests; implement the fix"), true);
-		assert.equal(expectsImplementationMutation("worker", "Review the diff and suggest fixes only. Do not edit files."), false);
 	});
 
 	it("does not treat verbs inside artifact filenames as implementation", () => {

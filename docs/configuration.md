@@ -16,7 +16,7 @@ By default, project settings resolve from the nearest parent directory that cont
 }
 ```
 
-`"git-root"` keeps package discovery, project agents, chains, and `agentOverrides` anchored to the git worktree root when that root also has Pi project config. A nested project can still opt back into nearest-root behavior by setting `"projectRootResolution": "nearest"` in its own `.pi/settings.json`.
+`"git-root"` keeps package discovery, project agents, and `agentOverrides` anchored to the git worktree root when that root also has Pi project config. A nested project can still opt back into nearest-root behavior by setting `"projectRootResolution": "nearest"` in its own `.pi/settings.json`.
 
 ## Extra agent scan directories (settings)
 
@@ -46,7 +46,7 @@ Prune directory subtrees from recursive agent-definition discovery with `subagen
 
 Entries are literal directory paths (no globs), supporting `~` and absolute paths. Relative paths resolve from the directory containing their settings file: the user agent config directory for user settings, or the project config directory (normally `.pi/`) for project settings. Thus `../.agents/plugins` in project `.pi/settings.json` excludes the project's legacy plugin subtree without excluding ordinary `.agents/*.md` agents.
 
-User and nearest-project exclusions are combined for every discovery scope, including all-source diagnostics. They apply before traversal and definition reads; explicit scan roots, environment roots, and installed packages cannot re-include an excluded tree. Normalized and real-path containment also excludes symlink aliases without matching sibling directory prefixes. Settings changes invalidate cached discovery. Excluded agent trees are not fingerprinted; chain discovery keeps its own unchanged watches when it shares a directory. Skills, chains, and the extension's bundled builtin snapshot are outside this setting's scope.
+User and nearest-project exclusions are combined for every discovery scope, including all-source diagnostics. They apply before traversal and definition reads; explicit scan roots, environment roots, and installed packages cannot re-include an excluded tree. Normalized and real-path containment also excludes symlink aliases without matching sibling directory prefixes. Settings changes invalidate cached discovery. Excluded agent trees are not fingerprinted. Skills and the extension's bundled builtin snapshot are outside this setting's scope.
 
 ## `modelResponseAliases`
 
@@ -135,7 +135,7 @@ Pi binds `Ctrl+B` to editor cursor-left by default. The extension shortcut takes
 }
 ```
 
-Opt in to a best-effort Orca observer that creates one Orca terminal tab for each top-level subagent call and mirrors the run's live tool and assistant progress. Parallel and chain children share that one tab, with child section headers in the mirrored log. Tab titles use a persistent worktree-local sequence (`subagents · <run-label> · 1`, `... · 2`, and so on), so separate top-level calls do not reuse the same number. For the same worktree, `orca terminal create` runs one at a time in that sequence so observer tabs appear from left to right as `1`, then `2`, then `3`. This does **not** replace Pi as the runner: native Pi children keep the same lifecycle, status, control, artifact, and result paths. External CLI profiles also keep their existing runner and can mirror their stdout/stderr.
+Opt in to a best-effort Orca observer that creates one Orca terminal tab for each top-level subagent call and mirrors the run's live tool and assistant progress. Parallel and workflow children share that one tab, with child section headers in the mirrored log. Tab titles use a persistent worktree-local sequence (`subagents · <run-label> · 1`, `... · 2`, and so on), so separate top-level calls do not reuse the same number. For the same worktree, `orca terminal create` runs one at a time in that sequence so observer tabs appear from left to right as `1`, then `2`, then `3`. This does **not** replace Pi as the runner: native Pi children keep the same lifecycle, status, control, artifact, and result paths. External CLI profiles also keep their existing runner and can mirror their stdout/stderr.
 
 The integration is off by default and supports macOS and Linux. It is disabled on Windows. When enabled, `pi-cciotti` looks for executable `orca` on `PATH`, or uses the executable path in `PI_SUBAGENT_ORCA_BINARY`. If no executable is available, Orca is not running, the cwd is not an Orca-managed worktree, or `terminal create` fails, the authoritative subagent still runs normally. Tab creation is deliberately best-effort and never changes the child result. A passive observer manifest is also written under `<worktree>/.pi/subagents/views/orca/` when possible so future view surfaces can discover the Orca tab without making Orca authoritative.
 
@@ -253,7 +253,7 @@ The watcher logs `Subagent result scan inspected … scheduled …` through `con
 { "forceTopLevelAsync": true }
 ```
 
-Forces depth-0 internal single, parallel, and chain runs into background mode and bypasses launch UI by forcing `clarify: false`. Nested calls keep their own inherited settings.
+Forces depth-0 internal single, parallel, and workflow runs into background mode and bypasses launch UI by forcing `clarify: false`. Nested calls keep their own inherited settings.
 
 ## `timeoutMs`
 
@@ -261,13 +261,13 @@ Forces depth-0 internal single, parallel, and chain runs into background mode an
 { "timeoutMs": 3600000 }
 ```
 
-Global default runtime deadline, in milliseconds, for subagent runs. It replaces the built-in 30-minute backstop for foreground launches (single, parallel, chain, and workflow) and plain single-agent async runs whenever no call-level `timeoutMs`/`maxRuntimeMs` applies. For single-agent launches, selected agent frontmatter `timeoutMs` still wins. This only moves the *default*. Expiring this run-level deadline is terminal.
+Global default runtime deadline, in milliseconds, for subagent runs. It replaces the built-in 30-minute backstop for foreground launches (single, parallel, and workflow) and plain single-agent async runs whenever no call-level `timeoutMs`/`maxRuntimeMs` applies. For single-agent launches, selected agent frontmatter `timeoutMs` still wins. This only moves the *default*. Expiring this run-level deadline is terminal.
 
 This deadline bounds the whole run. The wait for a single model response is bounded separately by Pi's `httpIdleTimeoutMs` setting (default 300000; `0` disables it), which Pi applies both as the SDK request timeout and as the undici header/body idle timeout. Detached async runners read the same setting from `~/.pi/agent/settings.json` and the project `.pi/settings.json` for their own HTTP dispatcher, so a local model that queues or prefills for longer than five minutes needs `httpIdleTimeoutMs` raised or disabled in Pi settings, plus a `timeoutMs` long enough for the run.
 
 Use it when foreground orchestration or plain async single-agent runs need a longer default than 30 minutes. It does not set async composite top-level deadlines, and it does not replace async fan-out child deadlines.
 
-Composite async runs (async chains, parallel tasks, and scripted workflows) stay unbounded at the top level by design. Their runner children are bounded individually by their own agent or runner defaults, so this value does not cap them. Must be a positive integer no greater than `2147483647` (the largest delay a Node.js timer can honor, roughly 24.8 days); invalid or out-of-range values are ignored and the built-in defaults apply.
+Composite async runs (async parallel tasks and scripted workflows) stay unbounded at the top level by design. Their runner children are bounded individually by their own agent or runner defaults, so this value does not cap them. Must be a positive integer no greater than `2147483647` (the largest delay a Node.js timer can honor, roughly 24.8 days); invalid or out-of-range values are ignored and the built-in defaults apply.
 
 ## `toolTimeoutMs`
 
@@ -307,7 +307,7 @@ Inline or file-backed top-level workflow calls may set a positive safe-integer `
 { "maxSubagentSpawnsPerSession": 100 }
 ```
 
-Optionally caps the total number of child subagent launches during one parent session, including completed and failed children, parallel task counts, static chain steps, and bounded dynamic fanout children. Sessions are unlimited by default. Set this value to `0` to disable a configured cap. `PI_SUBAGENT_MAX_SPAWNS_PER_SESSION` overrides the config for a process and follows the same positive-cap/zero-unlimited semantics.
+Optionally caps the total number of child subagent launches during one parent session, including completed and failed children, parallel task counts and bounded dynamic fanout children. Sessions are unlimited by default. Set this value to `0` to disable a configured cap. `PI_SUBAGENT_MAX_SPAWNS_PER_SESSION` overrides the config for a process and follows the same positive-cap/zero-unlimited semantics.
 
 `subagent_control({ action: "status" })` and fleet status expose used, effective limit, and remaining capacity for this budget. Granting extra launches is not on the model surface: `subagent_control` does not carry the `grant-spawn-budget` action. Raise `maxSubagentSpawnsPerSession` in configuration instead. Grants are additive when they are applied: they never erase cumulative usage, are rejected for unlimited sessions, and cannot raise the total past the original configured cap. Compaction remains part of the same logical parent session and does not reset usage or grants; starting a new parent session does.
 
@@ -321,7 +321,7 @@ Caps cumulative logical child admissions in one top-level run tree. The default 
 
 Inline or file-backed top-level workflow calls may set a positive safe-integer `maxSubagentSpawnsPerRun`; it overrides the environment and config for that workflow. Inherited nested budgets remain authoritative, and the override is not forwarded to child calls.
 
-The budget counts single launches, expanded `tasks`/`count`, static chain steps and parallel groups, actual dynamic `expand` items, appended chain steps, workflow children, and nested child calls. Static and materialized dynamic groups are admitted atomically. Retained-child resume reuses the original logical child claim. Claims are never released or refunded. This cap is independent from the session-wide cumulative spawn budget and `globalConcurrencyLimit`.
+The budget counts single launches, expanded `tasks`/`count` parallel groups, actual dynamic `expand` items, workflow children, and nested child calls. Static and materialized dynamic groups are admitted atomically. Retained-child resume reuses the original logical child claim. Claims are never released or refunded. This cap is independent from the session-wide cumulative spawn budget and `globalConcurrencyLimit`.
 
 ## `maxActiveAsyncRunsPerSession`
 
@@ -329,7 +329,7 @@ The budget counts single launches, expanded `tasks`/`count`, static chain steps 
 { "maxActiveAsyncRunsPerSession": 4 }
 ```
 
-Optionally caps concurrently active top-level async runs owned by one parent session. Unset or `0` keeps the existing unlimited behavior. A positive integer reserves one slot before an async single, parallel, chain, or workflow creates run artifacts or starts children. Foreground runs and nested/workflow children do not reserve another slot.
+Optionally caps concurrently active top-level async runs owned by one parent session. Unset or `0` keeps the existing unlimited behavior. A positive integer reserves one slot before an async single or workflow creates run artifacts or starts children. Foreground runs and nested/workflow children do not reserve another slot.
 
 Queued, running, paused, and needs-attention runs retain capacity. Runner-backed slots release only after terminal logical state and matching observed process-terminal proof from #1030. Missing, malformed, or unknown cleanup proof retains the slot. A terminal async workflow releases after its controller is gone and every launched child is accounted for: awaited foreground children are covered by workflow settlement, while actual background children still require observed process-terminal proof. Resume transfers the source slot without a second charge. Dismissal and history cleanup do not release capacity.
 
@@ -343,7 +343,7 @@ The default is `1200000` milliseconds (20 minutes). The policy releases only a f
 
 This limit bounds current top-level async load. It is separate from cumulative `maxSubagentSpawnsPerSession`, `maxSubagentSpawnsPerRun`, and `globalConcurrencyLimit`.
 
-`subagent_control({ action: "status" })` and fleet status expose used, effective limit, and remaining active capacity. Static chains and parallel calls fail before creating run artifacts or starting partial work when their declared capacity cannot fit. Later retries or unbounded dynamic work are not guaranteed by that preflight.
+`subagent_control({ action: "status" })` and fleet status expose used, effective limit, and remaining active capacity. Static parallel batches fail before creating run artifacts or starting partial work when their declared capacity cannot fit. Later retries or unbounded dynamic work are not guaranteed by that preflight.
 
 ## `parallel`
 
@@ -518,7 +518,7 @@ Controls where subagent artifact files (inputs, outputs, transcripts, metadata) 
 - `"session"` (default): stores artifacts under pi's session directory (`~/.pi/agent/sessions/<session>/subagent-artifacts/`), keeping the working directory clean. It falls back to the OS temp directory when no session file exists.
 - `"temp"`: uses the OS temp directory.
 
-This preference also controls the default workflow artifact directory used by scripted chaining. `"project"` uses `<cwd>/.pi/subagents/chain-runs/`; the directory keeps its legacy name for compatibility. The default `"session"` and `"temp"` use the user-scoped temp workflow artifact directory.
+This preference also controls the workflow artifact directory. `"project"` uses `<cwd>/.pi/subagents/workflow-runs/`. The default `"session"` and `"temp"` use the user-scoped temp workflow artifact directory.
 
 The `"session"` option uses the same directory that `cleanupAllArtifactDirs` already scans for age-based cleanup, so artifacts are still cleaned up automatically. Temporary workflow artifact directories are cleaned up separately after 24 hours.
 

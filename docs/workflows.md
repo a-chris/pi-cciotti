@@ -249,14 +249,12 @@ subagent_workflow({ source: `
 ` });
 ```
 
-`{chain_dir}` remains available inside scripted workflow step templates for legacy-compatible path templates. It expands to the workflow cwd, not to private temporary storage.
-
 ### Migrating old chain shapes
 
-Legacy top-level `chain`, `tasks`, `parallel`, `chainDir`, `/chain`, `/parallel`, `/run-chain`, and durable `.chain.md` execution are no longer the public workflow API. Rewrite them as JavaScript:
+The removed legacy API — top-level `chain`, `chainDir`, the `/chain`, `/parallel`, and `/run-chain` commands, and durable `.chain.md` definitions — has no public replacement shape; public callers receive a loud rejection pointing at `workflowScript`. Rewrite any saved automation as JavaScript:
 
 ```js
-// Old shape, no longer supported:
+// Removed legacy shape:
 // { chain: [{ agent: "scout", task: "Scan" }, { agent: "worker", task: "Fix from {previous}" }] }
 
 // Current shape:
@@ -322,7 +320,7 @@ For watched same-repo workflows, pass `async:false` only when the parent must bl
 
 Synchronous workflows publish trace and `emit(...)` updates through the tool update callback regardless of the live card, including RPC/headless and cross-repository runs. These updates include `details.workflow` and `details.workflowChildren`; the live card being off does not stop transport progress. Running foreground child rows additionally expose bounded `activity` (current tool, timing, and counters), plus resolved model/thinking when available, keyed by `childId`. Activity-only updates coalesce over 100 ms; lifecycle updates remain immediate. Activity clears when children settle, and is not persisted for async workflows. Tool names are limited to 256 UTF-8 bytes and each activity object is below 2 KiB (including JSON escaping); arguments and transcripts are not forwarded.
 
-The legacy `/chain`, `/parallel`, and `/run-chain` commands are not registered.
+The legacy `/chain`, `/parallel`, and `/run-chain` commands are not registered; calls using them fail with a removal diagnostic.
 
 ## Direct commands
 
@@ -376,4 +374,4 @@ Then run it through the native adapter:
 
 The adapter delegates to the named subagent, applies `model`, `skill`, `cwd`, and fork/fresh context metadata, and supports runtime overrides such as `--subagent reviewer`, `--fork`, `--fresh`, and `--bg`.
 
-Prompt templates with `chain:` frontmatter are translated into a workflow script and launched through `/prompt-workflow`; `/chain-prompts` is no longer registered.
+Prompt templates with `chain:` frontmatter are translated into a workflow script and launched through `/prompt-workflow`; `/chain-prompts` is no longer registered, and removed `.chain.md`/`.chain.json` definitions report a conversion diagnostic during discovery.

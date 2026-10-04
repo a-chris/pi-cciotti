@@ -10,11 +10,11 @@ A foreground child is a pi session created inside the parent Pi process, not a s
 
 A background child is a pi session created inside the detached runner process. The runner mirrors session events into `events.jsonl`, `output-<index>.log`, and the transcript. Interrupt and stop abort the child session; steer requests are delivered with the session's `steer` or `followUp`.
 
-Live progress shows compact detail for single, chain, and parallel modes: a bounded one-line task, current tool, recent output, token counts, aggregate cost, duration, activity freshness, current-tool duration, and chain graph metadata when available. Workflow `label` metadata wins over raw task text in compact multi-child cards.
+Live progress shows compact detail for single and workflow runs: a bounded one-line task, current tool, recent output, token counts, aggregate cost, duration, activity freshness, current-tool duration, and workflow graph metadata when available. Workflow `label` metadata wins over raw task text in compact multi-child cards.
 
 Press Pi's configured expand key (`Ctrl+O` by default) to expand the full streaming view with complete output per step.
 
-Sequential chains show a flow line like `done scout → running worker`. Chains with parallel steps show per-step cards instead. Chain status uses `label` and `phase` metadata when present, while falling back to agent names for older chains.
+Workflow progress shows a flow line like `done scout → running worker` for settled-to-running transitions, with per-child cards for active stages. Status uses `label` and `phase` metadata when present, while falling back to agent names.
 
 ## Background runs
 
@@ -38,7 +38,7 @@ async subagent worker · background
     Press configured-expand-key for live detail
 ```
 
-To inspect one background child in text, use `subagent_control({ action: "status", id: "..." })`. For a specific child of a parallel or chain run, target that child's own run id, taken from the `(runId, index)` rows in the parent's status output.
+To inspect one background child in text, use `subagent_control({ action: "status", id: "..." })`. For a specific child of a parallel or workflow run, target that child's own run id, taken from the `(runId, index)` rows in the parent's status output.
 
 In Pi fullscreen mode with mouse dispatch (verified with Pi TUI 0.85.1), left-click
 anywhere on the async widget's header row to fold it into a live one-line status
@@ -91,7 +91,7 @@ After you expand it:
 
 When the focused editor is empty, press `↓` or `←` to expand the summary into `main` plus active children with agent name, state, elapsed time, and token usage. When providers report usage, `window` is the latest assistant turn's input plus cache-read tokens, while `spent` keeps the cumulative input-plus-output total. Old run artifacts without window data keep the existing token-total label. The compact line counts active current-session work. Then use `↑`/`↓` or `j`/`k` to select a child and `Enter` to open the Fleet lobby; press `Enter` or `H` there to open its child-specific inspector through an available Inspect plugin. Printable navigation keys are never intercepted before activation.
 
-FleetView and the under-editor async widget are both enabled by default; set `asyncWidget: false` to keep only FleetView. Successful background completions stay quiet so inactive Pi tabs are not marked unread, while failed or paused completions still notify the originating session. Parallel runs show every active child independently. Chains with parallel groups keep their grouped shape in progress and results, so failed or paused agents stay visible next to completed ones. Children cannot launch subagents, so the status tree is two levels: the run and its children.
+FleetView and the under-editor async widget are both enabled by default; set `asyncWidget: false` to keep only FleetView. Successful background completions stay quiet so inactive Pi tabs are not marked unread, while failed or paused completions still notify the originating session. Parallel runs and workflow fanout show every active child independently, so failed or paused agents stay visible next to completed ones. Children cannot launch subagents, so the status tree is two levels: the run and its children.
 
 ## The fleet inspector
 
@@ -264,10 +264,10 @@ Without `NODE_DEBUG`, tracing only checks the debug-enabled flag: no identity sa
 
 ## Workflow and debug artifacts
 
-Each scripted workflow stores runtime artifacts under a workflow artifact directory. The on-disk directory is still named `chain-runs` for compatibility. With the default `artifactDir: "session"` or with `"temp"`, it is user-scoped temp storage. With `artifactDir: "project"`, the root is `<cwd>/.pi/subagents/chain-runs/`:
+Each scripted workflow stores runtime artifacts under a workflow artifact directory. With the default `artifactDir: "session"` or with `"temp"`, it is user-scoped temp storage. With `artifactDir: "project"`, the root is `<cwd>/.pi/subagents/workflow-runs/`:
 
 ```text
-<tmpdir>/pi-cciotti-<scope>/chain-runs/{runId}/
+<tmpdir>/pi-cciotti-<scope>/workflow-runs/{runId}/
 ```
 
 A run directory may contain files such as `context.md`, `plan.md`, `progress.md`, and `parallel-{stepIndex}/.../output.md`. User-scoped temp workflow artifact directories older than 24 hours are cleaned up on extension startup; project-local and explicit persistent roots are not age-scanned.

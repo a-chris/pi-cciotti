@@ -78,3 +78,22 @@ Remaining work, verified against this tree:
 4. Then Verification section in order: typecheck → typecheck:tests → test:all → check:dead-code → 3 greps.
 
 Budget discipline: the prior worker exhausted 30 min (338 calls) covering Steps 1-6 (~65% of scope). Remaining is ~35% — go straight at the 16 tsc errors first, then mechanical test/doc deletions; leave margin for test:all and the review loop.
+
+## EXECUTE STATUS (final — cutover complete)
+
+All remaining work landed (aee085a4, 184f96fb, 29e6bcd7, 615e38e1, a817ce0a, 1f5ded6e, da6cf259):
+
+1. **tsc**: all 16 errors fixed by deleting dead chain/parallel branches; live parallel-group widget path (workflow/async fanout) restored and gated on `hasParallelGroups`/`activeParallelGroup`.
+2. **Tests**: legacy chain-shape fixtures deleted across render-widget (18), render-fork-badge (7), part-1 (3), part-2 (24), single-execution.part-2 (3), external-cli-runner (1), fork-context (1), async-execution.part-1 (1), timeout defaults (6), missions lifecycle (2), slash placeholders (2), async-execution.part-4 chain-only (chain segment of missing-cwd + coalescing/partial-import/sibling-failure/write-fail), async-status (5 legacy parallel-group/step-wording tests superseded by the simplified formatter in b5f0470f). **Ported, not deleted:** the 5-test background worktree setup-lifecycle suite now drives `executeAsyncSingle` with `worktree:true` — the identical setup-handoff contract is still covered on the live async path.
+3. **Docs**: chain prose removed/updated across docs/* and README; `chain-runs` → `workflow-runs` wording matches `WORKFLOW_RUNS_DIR`; guide-docs facade contract keeps model-read prose free of internal param names.
+4. **Extras**: `AsyncStartedEvent.chain` field and dead `info.chain` fallback removed; dead-code scan (knip) clean.
+
+Verification results:
+- `npm run typecheck` — green.
+- `npm run test:unit` — 2640 tests, 0 fail.
+- `npm run test:integration` — 806 tests; 4 fails, all pre-existing at base `0e84f094` (inline-workflow-visibility, orca-progress-tabs, result-publication, single-execution.part-1); zero new failures vs base.
+- `npm run check:dead-code` — rc 0.
+- `grep -rn '"chain"\|chainName\|chainDir\|append-step' src` — only the public removal-rejection site (public-execution.ts) and prompt-workflows `chain:` frontmatter compilation (untouched per criterion 3).
+- `typecheck:tests` drift equals the base 32-error baseline; new-file delta is only the test-name-pattern cast (6).
+
+Deliberate residuals (per plan): `ChainConfig`/`ChainStepConfig` types for proactive-skills; `chainStepCount`/`chainAgents` TUI/fleet/job-tracker field names (workflow-group carryover — rename deferred); `ChainGateLayer` in workflow-checklist (workflow gate vocabulary, no chain producer); `ChainOutputValidationError` string in chain-outputs.ts.

@@ -179,9 +179,6 @@ function validateConfig(config: Record<string, unknown>): void {
 	if (config.worktree !== undefined && typeof config.worktree !== "boolean") {
 		throw new Error("config.worktree must be a boolean");
 	}
-	if (config.worktreeProvider !== undefined && config.worktreeProvider !== "auto" && config.worktreeProvider !== "native" && config.worktreeProvider !== "worktrunk") {
-		throw new Error('config.worktreeProvider must be "auto", "native", or "worktrunk"');
-	}
 	if (config.worktreeBranchPrefix !== undefined) {
 		if (typeof config.worktreeBranchPrefix !== "string") throw new Error("config.worktreeBranchPrefix must be a string");
 		normalizeWorktreeBranchPrefix(config.worktreeBranchPrefix);
@@ -226,6 +223,7 @@ function validateConfig(config: Record<string, unknown>): void {
 	validateFleetKeybindingsConfig(config.fleetKeybindings);
 	validateArtifactConfig(config.artifactConfig);
 	validateCapacityConfig(config.capacity);
+	if (config.worktreeProvider !== undefined) throw new Error("config.worktreeProvider was removed; Pi uses its native Git worktree allocator");
 	if (config.modelExclusions !== undefined) throw new Error("config.modelExclusions was removed; model failures are no longer persisted or used for automatic switching");
 	if (config.toolDescriptionMode !== undefined) throw new Error("config.toolDescriptionMode was removed; the facade tool descriptions are fixed and depth lives in guide topics");
 	if (config.maxSubagentDepth !== undefined) throw new Error("config.maxSubagentDepth was removed; children cannot launch subagents, so there is no nesting depth to cap");
@@ -241,8 +239,8 @@ function validateConfig(config: Record<string, unknown>): void {
  * keys that were removed, so the removal error surfaces rather than being swallowed.
  */
 const FAIL_CLOSED_CONFIG_KEYS = [
-	"worktreeProvider", "worktreeBranchPrefix",
-	"modelResponseAliases", "modelExclusions", "toolDescriptionMode", "maxSubagentDepth",
+	"worktreeBranchPrefix",
+	"modelResponseAliases", "modelExclusions", "worktreeProvider", "toolDescriptionMode", "maxSubagentDepth",
 	"checkpointBeforeDeadlineMs", "timeoutMs", "toolTimeoutMs", "toolBudget", "control", "delegationLevel",
 ] as const;
 

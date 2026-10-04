@@ -20,8 +20,6 @@ export {
 	type SubagentResultStatus,
 	type SubagentRunMode,
 	type Usage,
-	type ManagedWorktreeProvider,
 	type WorktreeNaming,
-	type WorktreeProvider,
 	type WorkflowResourceProvenance,
 } from "../shared/types.ts";

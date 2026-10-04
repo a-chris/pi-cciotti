@@ -39,7 +39,6 @@ interface AsyncRunStepSummary {
 	workflowKey?: string;
 	worktreePath?: string;
 	branch?: string;
-	provider?: "native" | "worktrunk";
 	naming?: WorktreeNaming;
 	runId?: string;
 	outputName?: string;
@@ -335,7 +334,6 @@ function statusToSummary(asyncDir: string, status: AsyncStatus & { cwd?: string 
 			...(step.workflowKey ? { workflowKey: step.workflowKey } : {}),
 			...(step.worktreePath ? { worktreePath: step.worktreePath } : {}),
 			...(step.branch ? { branch: step.branch } : {}),
-			...(step.provider ? { provider: step.provider } : {}),
 			...(step.naming ? { naming: step.naming } : {}),
 			...(step.runId ? { runId: step.runId } : {}),
 			...(step.outputName ? { outputName: step.outputName } : {}),
@@ -627,7 +625,7 @@ function formatStepLine(step: AsyncRunStepSummary): string {
 	if (modelThinking) parts.push(modelThinking);
 	if (step.durationMs !== undefined) parts.push(formatDuration(step.durationMs));
 	if (step.tokens) parts.push(`${formatTokens(step.tokens.total)} tok`);
-	if (step.worktreePath) parts.push(`worktree ${shortenPath(step.worktreePath)} · branch ${step.branch ?? "unknown"}${step.provider ? ` · provider ${step.provider}` : ""}`);
+	if (step.worktreePath) parts.push(`worktree ${shortenPath(step.worktreePath)} · branch ${step.branch ?? "unknown"}`);
 	return parts.join(" | ");
 }
 

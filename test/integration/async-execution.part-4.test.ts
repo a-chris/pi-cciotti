@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { setChildSessionFactoryModule } from "../../src/runs/shared/child-session.ts";
 import { createEventBus, createTempDir, events, makeAgent, removeTempDir } from "../support/helpers.ts";
 import { deliverInterruptRequest, deliverStopRequest, requestAsyncSteer } from "../../src/runs/background/control-channel.ts";
+import { resolveExpectedWorktreeAgentCwd } from "../../src/runs/shared/worktree.ts";
 import { SUBAGENT_PROCESS_TERMINAL_EVENT } from "../../src/shared/types.ts";
 import { waitForSubagents } from "../../src/runs/background/subagent-wait.ts";
 import type { AsyncResultPayload, AsyncStatusPayload } from "../support/async-execution-fixture.ts";
@@ -158,44 +159,35 @@ export default function() {
 		assert.deepEqual(report.terminal[1], report.terminal[0]);
 	});
 
-	for (const mode of ["success", "stop", "pause", "deadline", "failure-before-JSON"] as const) {
+	for (const mode of ["success", "stop", "pause", "deadline"] as const) {
 		it(`background setup lifecycle: ${mode}`, { skip: !isAsyncAvailable() || process.platform === "win32" ? "requires real POSIX setup executable" : undefined, timeout: 25_000 }, async (t) => {
 			const repo = createRepo("pi-background-setup-");
 			const baseDir = createTempDir();
 			const id = `async-setup-${mode}-${Date.now().toString(36)}`;
 			const asyncDir = path.join(ASYNC_DIR, id);
 			const marker = path.join(repo, ".git", "child-launched");
-			const allocatorFailure = mode === "failure-before-JSON";
-			const oldPath = process.env.PATH;
 			const server = createServer();
 			server.listen(0, "127.0.0.1");
 			await once(server, "listening");
 			const { port } = server.address() as { port: number };
-			const hook = path.join(baseDir, allocatorFailure ? "wt" : "setup-hook.cjs");
+			const hook = path.join(baseDir, "setup-hook.cjs");
 			fs.writeFileSync(hook, `#!${process.execPath}
-const args = process.argv.slice(2);
-if (args.includes('--version')) { console.log('wt v0.75.0'); process.exit(0); }
-if (args.includes('--help')) { console.log('--create --base --no-cd --no-hooks --format'); process.exit(0); }
-if (${allocatorFailure}) require('node:child_process').execFileSync('git', ['branch', args[args.indexOf('--create') + 1]], { cwd: ${JSON.stringify(repo)} });
 // Complete the setup stdin contract before exposing the independent release gate.
 // Otherwise the hook can exit before the runner writes input and cause EPIPE.
 let input = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', chunk => { input += chunk; });
 process.stdin.on('end', () => {
- if (!${allocatorFailure}) {
-  const setup = JSON.parse(input);
-  require('node:assert/strict').equal(setup.runId, ${JSON.stringify(`${id}-s0`)});
-  require('node:assert/strict').equal(setup.repoRoot, ${JSON.stringify(fs.realpathSync(repo))});
- }
+ const setup = JSON.parse(input);
+ require('node:assert/strict').equal(setup.runId, ${JSON.stringify(`${id}-s0`)});
+ require('node:assert/strict').equal(setup.repoRoot, ${JSON.stringify(fs.realpathSync(repo))});
  const socket = require('node:net').connect(${port}, '127.0.0.1', () => socket.write('ready'));
  socket.on('data', data => {
-  if (data.toString() === 'release') { socket.end(); if (${allocatorFailure}) process.exitCode = 1; else console.log('{}'); }
+  if (data.toString() === 'release') { socket.end(); console.log('{}'); }
  });
 });
 setTimeout(() => process.exit(90), 15000).unref();
 `, { mode: 0o755 });
-			if (allocatorFailure) process.env.PATH = `${baseDir}${path.delimiter}${oldPath}`;
 			const bus = createEventBus();
 			let closed = false;
 			const terminal = new Promise<unknown>((resolve) => bus.on(SUBAGENT_PROCESS_TERMINAL_EVENT, (proof) => { closed = true; resolve(proof); }));
@@ -210,7 +202,7 @@ setTimeout(() => process.exit(90), 15000).unref();
 					ctx: { pi: { events: bus }, cwd: repo, currentSessionId: "session-1" },
 					artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 					shareEnabled: false, sessionRoot: path.join(tempDir, "sessions"), acceptance: false,
-					...(allocatorFailure ? { worktreeProvider: "worktrunk" } : { worktreeProvider: "native", worktreeBaseDir: path.join(baseDir, "trees"), worktreeSetupHook: hook }),
+					worktreeBaseDir: path.join(baseDir, "trees"), worktreeSetupHook: hook,
 					...(mode === "deadline" ? { timeoutMs: 4_000 } : {}),
 				});
 				assert.equal(receipt.isError, undefined, receipt.content[0]?.text);
@@ -273,29 +265,7 @@ setTimeout(() => process.exit(90), 15000).unref();
 				assert.ok(held.parallelHandoff?.path);
 				const handoff = JSON.parse(fs.readFileSync(held.parallelHandoff.path, "utf8"));
 				const group = handoff.groups[0];
-				if (allocatorFailure) {
-					assert.equal(status.steps[0].worktreePath, undefined);
-					assert.equal(status.steps[0].branch, undefined);
-					assert.deepEqual(group.cleanup.tasks, []);
-					assert.deepEqual(group.children, []);
-					assert.equal(group.cleanup.state, "partial");
-					assert.equal(group.cleanup.pruned, false);
-					assert.match(group.cleanup.errors.join("\n"), /manual reconciliation required/);
-					const attempt = group.cleanup.errors.find((entry: string) => entry.startsWith("Allocation attempt "));
-					const evidence = JSON.parse(attempt.slice("Allocation attempt ".length));
-					assert.equal(evidence.path, null);
-					assert.equal(evidence.validated, false);
-					assert.equal(evidence.command.status, 1);
-					assert.equal(evidence.command.processTree, "unknown");
-					assert.equal(execFileSync("git", ["branch", "--list", evidence.branch], { cwd: repo, encoding: "utf8" }).trim(), evidence.branch);
-					const persisted = JSON.parse(fs.readFileSync(path.join(asyncDir, "process-terminal.json"), "utf8"));
-					assert.equal(persisted.state, "unknown");
-					assert.equal(persisted.reason, "process-tree-unverified");
-					assert.deepEqual(proof, persisted, "actual runner close must not promote setup unknown with zero child writers");
-					const candidate = JSON.parse(fs.readFileSync(path.join(asyncDir, "process-terminal-candidate.json"), "utf8"));
-					assert.deepEqual(Object.values(candidate.writers).flat(), []);
-					assert.deepEqual(Object.values(candidate.expectedWriters), [0]);
-				} else if (mode === "deadline") {
+				if (mode === "deadline") {
 					assert.equal(payload.timedOut, true);
 					assert.equal(status.timedOut, true);
 					assert.ok(payload.deadlineAt! <= Date.now());
@@ -315,12 +285,62 @@ setTimeout(() => process.exit(90), 15000).unref();
 				if (started && !closed) { deliverStopRequest({ asyncDir, source: "test-cleanup" }); await terminal; }
 				socket?.destroy();
 				await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-				if (oldPath === undefined) delete process.env.PATH; else process.env.PATH = oldPath;
 				removeTempDir(baseDir);
 				removeTempDir(repo);
 			}
 		});
 	}
+
+	it("resolves a worktree launch cwd to the predicted worktree path before spawn", { skip: !isAsyncAvailable() || process.platform === "win32" ? "requires real POSIX worktree allocation" : undefined, timeout: 30_000 }, async () => {
+		const repo = createRepo("pi-worktree-cwd-");
+		const baseDir = createTempDir();
+		const worktreeBaseDir = path.join(baseDir, "trees");
+		const id = `async-worktree-cwd-${Date.now().toString(36)}`;
+		const predictedCwd = resolveExpectedWorktreeAgentCwd(repo, `${id}-s0`, 0, worktreeBaseDir);
+		const asyncDir = path.join(ASYNC_DIR, id);
+		const PLACEHOLDER = "__pi_cciotti_worktree_cwd__";
+		try {
+			mockPi.onCall({ output: "worktree launch resolved to the real predicted path" });
+			const receipt = executeAsyncSingle(id, {
+				agent: "worker",
+				task: "Discover the allocated worktree path",
+				agentConfig: makeAgent("worker", { completionGuard: false }),
+				ctx: { pi: { events: { emit() {} } }, cwd: repo, currentSessionId: "session-1" },
+				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
+				shareEnabled: false,
+				sessionRoot: path.join(tempDir, "sessions"),
+				acceptance: false,
+				worktree: true,
+				worktreeBaseDir,
+			});
+			assert.equal(receipt.isError, undefined, receipt.content[0]?.text);
+
+			// The worktree is allocated before the child spawns, and the status projection exposes its real path.
+			const status = await waitForAsyncState(id, (candidate) => candidate.steps?.[0]?.worktreePath !== undefined);
+			assert.equal(status.steps?.[0]?.worktreePath, predictedCwd);
+
+			// The child is launched into the predicted worktree cwd; the recorded launch stores the concrete path.
+			const deadline = Date.now() + 15_000;
+			let callFiles = fs.readdirSync(mockPi.dir).filter((name) => name.startsWith("call-") && name.endsWith(".json")).sort();
+			while (callFiles.length === 0 && Date.now() < deadline) {
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				callFiles = fs.readdirSync(mockPi.dir).filter((name) => name.startsWith("call-") && name.endsWith(".json")).sort();
+			}
+			assert.ok(callFiles.length > 0, "expected a recorded child launch");
+			const launch = JSON.parse(fs.readFileSync(path.join(mockPi.dir, callFiles[0]), "utf-8"));
+			assert.equal(launch.cwd, predictedCwd);
+
+			// No legacy cwd placeholder may leak into any persisted launch artifact.
+			const persisted = await readAsyncPayload(id);
+			assert.equal(persisted.success, true, persisted.results[0]?.error);
+			for (const file of [path.join(asyncDir, "status.json"), path.join(asyncDir, "events.jsonl"), path.join(RESULTS_DIR, `${id}.json`)]) {
+				if (fs.existsSync(file)) assert.doesNotMatch(fs.readFileSync(file, "utf-8"), new RegExp(PLACEHOLDER));
+			}
+		} finally {
+			removeTempDir(baseDir);
+			removeTempDir(repo);
+		}
+	});
 
 	it("does not start child work when initial async status cannot be written", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
 		const id = `async-status-write-fail-${Date.now().toString(36)}`;

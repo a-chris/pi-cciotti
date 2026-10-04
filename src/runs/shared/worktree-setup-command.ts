@@ -26,7 +26,7 @@ export interface SetupCommandOptions {
 	cwd?: string;
 	env?: NodeJS.ProcessEnv;
 	input?: string;
-	/** Worktrunk uses 128 KiB; Git and hooks use spawnSync's 1 MiB default. */
+	/** Git and hooks use spawnSync's 1 MiB default; setup commands may raise this. */
 	maxBuffer?: number;
 	signal?: AbortSignal;
 	deadlineAt?: number;

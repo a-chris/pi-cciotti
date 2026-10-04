@@ -17,7 +17,7 @@ import { currentCompletionOwnerId } from "../../shared/completion-owner.ts";
 import { planChildLaunch, projectChainOutputSchemas, resolveStepBehavior, suppressProgressForReadOnlyTask, type ResolvedStepBehavior } from "../shared/child-launch-plan.ts";
 import { applyThinkingSuffix, getHostBuiltinToolNames, projectLaunchResolvedChildExtensions, resolvePiLaunchToolPlan } from "../shared/child-tool-plan.ts";
 import { injectSingleOutputInstruction, normalizeSingleOutputOverride, resolveSingleOutputPath, validateFileOnlyOutputMode } from "../shared/single-output.ts";
-import { buildChainInstructions, isDynamicParallelStep, isParallelStep, resolveExistingReadInstructionPaths, resolveExistingReadPaths, writeInitialProgressFile, type ChainStep, type SequentialStep, type StepOverrides } from "../../shared/settings.ts";
+import { buildChainInstructions, isDynamicParallelStep, isParallelStep, resolveExistingReadPaths, writeInitialProgressFile, type ChainStep, type SequentialStep, type StepOverrides } from "../../shared/settings.ts";
 import type { RunnerStep } from "../shared/parallel-utils.ts";
 import type { ContextMode } from "../shared/context-mode.ts";
 import { PI_CODING_AGENT_PACKAGE, resolveBunPiExecutable, resolveInstalledPiPackageRoot, resolvePiPackageRoot } from "../shared/pi-spawn.ts";
@@ -32,7 +32,7 @@ import { resolveToolTimeoutMs, toolTimeoutFromEnv } from "../shared/tool-timeout
 import { resolveModelScopesForAgent, type ModelScopeConfig } from "../shared/model-scope.ts";
 import { findModelInfo, resolveEffectiveThinking } from "../../shared/model-info.ts";
 import { assertThinkingWithinCeiling, intersectThinkingCeilings, type ThinkingLevel } from "../../shared/thinking-ceiling.ts";
-import { resolveExpectedWorktreeAgentCwd, resolveWorktreeProvider, shouldDeferWorktreeCwd, WORKTREE_AGENT_CWD_PLACEHOLDER } from "../shared/worktree.ts";
+import { resolveExpectedWorktreeAgentCwd } from "../shared/worktree.ts";
 import { buildWorkflowGraphSnapshot } from "../shared/workflow-graph.ts";
 import { ChainOutputValidationError, validateChainOutputBindings } from "../shared/chain-outputs.ts";
 import { createStructuredOutputRuntime } from "../shared/structured-output.ts";
@@ -207,7 +207,6 @@ interface AsyncChainParams {
 	worktreeSetupHookTimeoutMs?: number;
 	worktreeBaseDir?: string;
 	baseRef?: string;
-	worktreeProvider?: import("../../shared/types.ts").WorktreeProvider;
 	worktreeBranchPrefix?: string;
 	controlConfig?: ResolvedControlConfig;
 	nestedRoute?: NestedRouteInfo;
@@ -273,7 +272,6 @@ interface AsyncSingleParams {
 	worktreeSetupHookTimeoutMs?: number;
 	worktreeBaseDir?: string;
 	baseRef?: string;
-	worktreeProvider?: import("../../shared/types.ts").WorktreeProvider;
 	worktreeBranchPrefix?: string;
 	worktree?: boolean;
 	controlConfig?: ResolvedControlConfig;
@@ -336,7 +334,6 @@ export interface AsyncRunnerStepBuildParams {
 	waitToolEnabled?: boolean;
 	waitToolDefaultTimeoutMs?: number;
 	worktreeBaseDir?: string;
-	worktreeProvider?: import("../../shared/types.ts").WorktreeProvider;
 	worktreeBranchPrefix?: string;
 	asyncDir: string;
 	outputBaseDir?: string;
@@ -888,7 +885,6 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 		sessionFilesByFlatIndex,
 		thinkingOverridesByFlatIndex,
 		worktreeBaseDir,
-		worktreeProvider,
 		worktreeBranchPrefix,
 		asyncDir,
 	} = params;
@@ -897,15 +893,6 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 	const chainSkills = params.chainSkills ?? [];
 	const availableModels = params.availableModels;
 	const runnerCwd = resolveChildCwd(ctx.cwd, cwd);
-	let managedWorktreeProvider: "native" | "worktrunk" | undefined;
-	try {
-		if (chain.some((step) => "worktree" in step && step.worktree === true)) {
-			const resolved = resolveWorktreeProvider(worktreeProvider, worktreeBaseDir);
-			managedWorktreeProvider = shouldDeferWorktreeCwd(worktreeProvider, worktreeBaseDir) ? "worktrunk" : resolved;
-		}
-	} catch (error) {
-		return { error: error instanceof Error ? error.message : String(error) };
-	}
 	const progressDir = params.progressDir ?? runnerCwd;
 	const graphChain: ChainStep[] = params.attachRoot
 		? [{
@@ -1208,9 +1195,7 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 				return {
 					parallel: s.parallel.map((t, taskIndex) => {
 						let behaviorCwd: string | undefined;
-						if (s.worktree && managedWorktreeProvider === "worktrunk") {
-							behaviorCwd = WORKTREE_AGENT_CWD_PLACEHOLDER;
-						} else if (s.worktree && managedWorktreeProvider === "native") {
+						if (s.worktree) {
 							try {
 								behaviorCwd = resolveExpectedWorktreeAgentCwd(runnerCwd, `${id}-s${stepIndex}`, taskIndex, worktreeBaseDir);
 							} catch {
@@ -1265,9 +1250,7 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 			}
 			const sequential = s as SequentialStep;
 			let behaviorCwd: string | undefined;
-			if (sequential.worktree && managedWorktreeProvider === "worktrunk") {
-				behaviorCwd = WORKTREE_AGENT_CWD_PLACEHOLDER;
-			} else if (sequential.worktree && managedWorktreeProvider === "native") {
+			if (sequential.worktree) {
 				try {
 					behaviorCwd = resolveExpectedWorktreeAgentCwd(runnerCwd, `${id}-s${stepIndex}`, 0, worktreeBaseDir);
 				} catch {
@@ -1337,7 +1320,6 @@ export function executeAsyncChain(
 		worktreeSetupHookTimeoutMs,
 		worktreeBaseDir,
 		baseRef,
-		worktreeProvider,
 		worktreeBranchPrefix,
 		controlConfig,
 		nestedRoute,
@@ -1390,7 +1372,6 @@ export function executeAsyncChain(
 		waitToolEnabled: params.waitToolEnabled,
 		waitToolDefaultTimeoutMs: params.waitToolDefaultTimeoutMs,
 		worktreeBaseDir,
-		worktreeProvider,
 		worktreeBranchPrefix,
 		asyncDir,
 		fast: params.fast,
@@ -1453,7 +1434,6 @@ export function executeAsyncChain(
 				worktreeSetupHookTimeoutMs,
 				worktreeBaseDir,
 				baseRef,
-				worktreeProvider,
 				worktreeBranchPrefix,
 				controlConfig,
 				toolBudget: params.toolBudget,
@@ -1646,7 +1626,6 @@ export function executeAsyncSingle(
 		worktreeSetupHookTimeoutMs,
 		worktreeBaseDir,
 		baseRef,
-		worktreeProvider,
 		worktreeBranchPrefix,
 		controlConfig,
 		nestedRoute,
@@ -1684,18 +1663,7 @@ export function executeAsyncSingle(
 		return formatAsyncStartError("single", error instanceof Error ? error.message : String(error));
 	}
 	const runnerCwd = resolveChildCwd(ctx.cwd, cwd);
-	let managedWorktreeProvider: "native" | "worktrunk" | undefined;
-	if (params.worktree === true) {
-		try {
-			const resolved = resolveWorktreeProvider(params.worktreeProvider, worktreeBaseDir);
-			managedWorktreeProvider = shouldDeferWorktreeCwd(params.worktreeProvider, worktreeBaseDir) ? "worktrunk" : resolved;
-		} catch (error) {
-			return formatAsyncStartError("single", error instanceof Error ? error.message : String(error));
-		}
-	}
-	const instructionCwd = params.worktree === true && managedWorktreeProvider === "worktrunk"
-		? WORKTREE_AGENT_CWD_PLACEHOLDER
-		: params.worktree === true && managedWorktreeProvider === "native"
+	const instructionCwd = params.worktree === true
 		? resolveExpectedWorktreeAgentCwd(runnerCwd, `${id}-s0`, 0, worktreeBaseDir)
 		: runnerCwd;
 	const readExistenceCwd = params.worktree === true ? runnerCwd : instructionCwd;
@@ -1740,9 +1708,7 @@ export function executeAsyncSingle(
 	// absolute paths pass through; relative paths resolve against the child cwd.
 	const reads = params.reads !== undefined ? params.reads : agentConfig.defaultReads ?? false;
 	const readPaths = Array.isArray(reads)
-		? managedWorktreeProvider === "worktrunk"
-			? resolveExistingReadInstructionPaths(reads, instructionCwd, readExistenceCwd)
-			: resolveExistingReadPaths(reads, readExistenceCwd)
+		? resolveExistingReadPaths(reads, readExistenceCwd)
 		: [];
 	const readsInstruction = readPaths.length > 0
 		? `[Read from: ${readPaths.join(", ")}]\n\n`
@@ -2023,7 +1989,6 @@ export function executeAsyncSingle(
 				worktreeSetupHookTimeoutMs,
 				worktreeBaseDir,
 				baseRef,
-				worktreeProvider,
 				worktreeBranchPrefix,
 				controlConfig,
 				timeoutMs,

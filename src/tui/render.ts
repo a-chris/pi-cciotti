@@ -604,7 +604,6 @@ function laneRenderKey(job: AsyncJobState, projection?: WorkflowWidgetProjection
 }
 
 function widgetLaneDetailLines(job: AsyncJobState, theme: Theme, projection?: WorkflowWidgetProjection): string[] {
-	if (job.steps?.length && (job.mode === "parallel" || job.mode === "chain")) return [];
 	const selectedStep = projection ? laneStepForJob(job, projection.steps) : laneStepForJob(job);
 	const lane = projectAsyncLane(job, selectedStep);
 	return lane ? formatLaneProjectionLines(lane, theme, "  ") : [];
@@ -1104,8 +1103,6 @@ function formatWidgetAgents(agents: string[]): string {
 }
 
 function widgetJobName(job: AsyncJobState): string {
-	if (job.mode === "parallel") return "parallel";
-	if (job.mode === "chain") return "chain";
 	if (job.mode === "single" && job.agents?.length === 1) return job.agents[0]!;
 	if (job.agents?.length) return formatWidgetAgents(job.agents);
 	return job.mode ?? "subagent";
@@ -1587,20 +1584,15 @@ function widgetChainDetails(job: AsyncJobState, theme: Theme, expanded = false, 
 
 function widgetParallelAgentDetails(job: AsyncJobState, theme: Theme, expanded = false, width = getTermWidth(), frame?: number): string[] {
 	if (!job.steps?.length) return [];
-	if (job.mode !== "parallel" && job.mode !== "chain") return [];
-	if (job.mode === "chain" && !job.activeParallelGroup && job.parallelGroups?.length) return widgetChainDetails(job, theme, expanded, width, frame);
-	const group = activeParallelWidgetGroup(job);
-	if (group) return parallelWidgetGroupDetails(job, theme, group, expanded, width, frame, Boolean(job.activeParallelGroup));
 	const total = job.stepsTotal ?? job.steps.length;
 	const lines: string[] = [];
 	for (const [index, step] of job.steps.entries()) {
 		const marker = index === job.steps.length - 1 ? "└" : "├";
 		const activity = widgetStepActivity(step, job.updatedAt);
-		const itemTitle = job.mode === "parallel" || job.activeParallelGroup ? "Agent" : "Step";
 		const modelDisplay = modelThinkingBadge(theme, step.model, step.thinking);
 		const label = compactTaskText(step.description, step.label);
 		const display = step.sessionName?.trim() || (label ? `${label} (${step.agent})` : step.agent);
-		lines.push(`  ${theme.fg("dim", `${marker} ${widgetStepGlyph(step.status, theme, widgetStepRunningSeed(step, index), frame)} ${itemTitle} ${index + 1}/${total}: ${display} · ${widgetStepStatus(step.status, theme)}${modelDisplay}${activity ? ` · ${activity}` : ""}`)}`);
+		lines.push(`  ${theme.fg("dim", `${marker} ${widgetStepGlyph(step.status, theme, widgetStepRunningSeed(step, index), frame)} Step ${index + 1}/${total}: ${display} · ${widgetStepStatus(step.status, theme)}${modelDisplay}${activity ? ` · ${activity}` : ""}`)}`);
 		const lane = projectAsyncLane(job, step);
 		if (lane) lines.push(...formatLaneProjectionLines(lane, theme, "    "));
 		for (const nestedLine of formatNestedWidgetLines(step.children, theme, width, expanded, job.updatedAt, expanded ? 8 : 6)) lines.push(`    ${nestedLine}`);
@@ -1743,23 +1735,7 @@ function parallelWidgetStepRows(steps: AsyncJobStep[], total: number, prioritize
 function activeParallelWidgetGroup(job: AsyncJobState): ParallelWidgetGroup | undefined {
 	const steps = job.steps ?? [];
 	if (!steps.length) return undefined;
-	if (job.mode === "parallel") return { steps, total: job.stepsTotal ?? steps.length };
-	if (job.mode !== "chain" || !job.activeParallelGroup) return undefined;
-
-	const chainTotal = job.chainStepCount ?? job.stepsTotal ?? steps.length;
-	const spans = buildAsyncChainStepSpans(chainTotal, steps.length, job.parallelGroups);
-	const currentStep = job.currentStep;
-	const activeSpan = currentStep === undefined
-		? spans.find((span) => span.isParallel)
-		: spans.find((span) => span.isParallel
-			&& currentStep >= span.start
-			&& currentStep < span.start + span.count);
-	return {
-		steps,
-		total: activeSpan?.count ?? job.stepsTotal ?? steps.length,
-		stepIndex: activeSpan?.stepIndex,
-		chainTotal,
-	};
+	return { steps, total: job.stepsTotal ?? steps.length };
 }
 
 function parallelWidgetGroupHeader(
@@ -1858,7 +1834,7 @@ function withDuplicateForegroundLabels(entries: ChainRenderResultEntry[], total:
 }
 
 function buildChainRenderEntries(details: Details, label: MultiProgressLabel): ChainRenderEntry[] | undefined {
-	if (details.mode !== "chain" || !label.hasParallelInChain || label.showActiveGroupOnly) return undefined;
+	if (details.mode !== "workflow" || !label.hasParallelInChain || label.showActiveGroupOnly) return undefined;
 	const entries: ChainRenderEntry[] = [];
 	for (const span of buildChainStepSpans(details)) {
 		if (span.isParallel) {
@@ -1923,34 +1899,6 @@ function buildMultiProgressLabel(details: Pick<Details, "mode" | "results" | "pr
 		&& stepSpans.some((span) => span.stepIndex === details.currentStepIndex && span.isParallel);
 	const itemTitle: "Step" | "Agent" = details.mode === "parallel" || activeParallelGroup ? "Agent" : "Step";
 
-	if (details.mode === "parallel") {
-		const totalCount = details.totalSteps ?? details.results.length;
-		const statuses = new Array(totalCount).fill("pending") as Array<"pending" | "running" | "completed" | "failed" | "stopped" | "detached">;
-		for (const progress of details.progress ?? []) {
-			if (progress.index >= 0 && progress.index < totalCount) statuses[progress.index] = progress.status;
-		}
-		for (let i = 0; i < details.results.length; i++) {
-			const result = details.results[i]!;
-			const progressFromArray = details.progress?.find((progress) => progress.index === i)
-				|| details.progress?.find((progress) => progress.agent === result.agent && progress.status === "running");
-			const index = result.progress?.index ?? progressFromArray?.index ?? i;
-			if (index < 0 || index >= totalCount) continue;
-			const status = result.stopped
-				? "stopped"
-				: result.interrupted || result.detached
-					? "detached"
-					: result.progress?.status
-						?? (result.exitCode === 0 ? "completed" : "failed");
-			statuses[index] = status;
-		}
-		const running = statuses.filter((status) => status === "running").length;
-		const done = statuses.filter((status) => status === "completed").length;
-		const headerLabel = hasRunning
-			? `${formatAgentRunningLabel(running)} · ${done}/${totalCount} done`
-			: `${done}/${totalCount} done`;
-		return { headerLabel, itemTitle, totalCount, hasParallelInChain, activeParallelGroup, groupStartIndex: 0, groupEndIndex: totalCount, showActiveGroupOnly: false, logicalStepCount: totalCount };
-	}
-
 	if (activeParallelGroup) {
 		const currentStepIndex = details.currentStepIndex!;
 		const span = stepSpans[currentStepIndex];
@@ -1979,7 +1927,7 @@ function buildMultiProgressLabel(details: Pick<Details, "mode" | "results" | "pr
 		return { headerLabel, itemTitle, totalCount: groupSize, hasParallelInChain, activeParallelGroup, groupStartIndex: groupStart, groupEndIndex: groupEnd, showActiveGroupOnly: true, logicalStepCount: totalSteps };
 	}
 
-	if (details.mode === "chain" && details.chainAgents?.length) {
+	if (details.mode === "workflow" && details.chainAgents?.length) {
 		const totalCount = details.totalSteps ?? details.chainAgents.length;
 		const doneLogical = stepSpans.filter((span) => {
 			if (span.status && span.status !== "completed") return false;

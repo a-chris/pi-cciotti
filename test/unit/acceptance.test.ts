@@ -211,29 +211,31 @@ describe("acceptance gates", () => {
 		assert.equal(resolved.verify[0]?.id, "ok");
 	});
 
-	it("agent contract disables inferred acceptance without changing current defaults", () => {
+	it("current/default acceptance preserves inferred acceptance defaults", () => {
 		const current = resolveEffectiveAcceptance({ agentName: "worker", acceptanceRole: "writer", task: "Implement the fix", mode: "single", async: true });
 		assert.equal(current.level, "checked");
 		assert.equal(current.review && current.review !== false ? current.review.required : undefined, true);
 		assert.deepEqual(current.inferredReason, ["async write-capable or risky run"]);
 
-		for (const explicit of [undefined, "auto" as const, false] as const) {
-			const resolved = resolveEffectiveAcceptance({ agentName: "worker", acceptanceRole: "writer", task: "Implement the fix", mode: "single", async: true, explicit, agentContract: { version: 1 } });
-			assert.equal(resolved.level, "none");
-			assert.deepEqual(resolved.inferredReason, []);
+		for (const explicit of [undefined, "auto" as const]) {
+			const resolved = resolveEffectiveAcceptance({ agentName: "worker", acceptanceRole: "writer", task: "Implement the fix", mode: "single", async: true, explicit });
+			assert.equal(resolved.level, "checked");
+			assert.deepEqual(resolved.inferredReason, ["async write-capable or risky run"]);
 			assert.equal(resolved.explicit, explicit !== undefined);
 		}
 	});
 
-	it("agent contract keeps explicit acceptance report-optional and verify-only", async () => {
+	it("explicit acceptance is required-report and verify-only under the single contract", async () => {
 		const checked = resolveEffectiveAcceptance({
 			agentName: "worker",
 			task: "Implement the fix",
 			explicit: "checked",
-			agentContract: { version: 1 },
 		});
-		assert.equal(formatAcceptancePrompt(checked, { reportOptional: true }), "");
-		const checkedLedger = await evaluateAcceptance({ acceptance: checked, output: "done", cwd: process.cwd(), reportOptional: true });
+		assert.match(formatAcceptancePrompt(checked), /## Acceptance Contract/);
+		const missingLedger = await evaluateAcceptance({ acceptance: checked, output: "done", cwd: process.cwd() });
+		assert.equal(missingLedger.status, "rejected");
+		assert.match(acceptanceFailureMessage(missingLedger) ?? "", /Structured acceptance report not found/);
+		const checkedLedger = await evaluateAcceptance({ acceptance: checked, output: report(), cwd: process.cwd() });
 		assert.equal(checkedLedger.status, "checked");
 		assert.equal(acceptanceFailureMessage(checkedLedger), undefined);
 
@@ -241,10 +243,9 @@ describe("acceptance gates", () => {
 			agentName: "worker",
 			task: "Implement the fix",
 			explicit: { level: "verified", verify: [{ id: "ok", command: `${process.execPath} -e "process.exit(0)"` }] },
-			agentContract: { version: 1 },
 		});
-		assert.equal(formatAcceptancePrompt(verified, { reportOptional: true }), "");
-		const verifiedLedger = await evaluateAcceptance({ acceptance: verified, output: "done", cwd: process.cwd(), reportOptional: true });
+		assert.match(formatAcceptancePrompt(verified), /## Acceptance Contract/);
+		const verifiedLedger = await evaluateAcceptance({ acceptance: verified, output: report(), cwd: process.cwd() });
 		assert.equal(verifiedLedger.status, "verified");
 		assert.equal(verifiedLedger.verifyRuns[0]?.status, "passed");
 	});
@@ -1334,7 +1335,7 @@ describe("acceptance gates", () => {
 		}
 	});
 
-	it("validates explicit reviewed acceptance at every execution nesting level", () => {
+	it("rejects reviewed as an invalid acceptance level at every execution nesting level", () => {
 		const errors = validateExecutionAcceptance({
 			acceptance: "reviewed",
 			tasks: [{ acceptance: { level: "reviewed" } }],
@@ -1346,12 +1347,11 @@ describe("acceptance gates", () => {
 		});
 
 		assert.equal(errors.length, 5);
-		assert.match(errors[0] ?? "", /^acceptance is an achieved status/);
-		assert.match(errors[1] ?? "", /^tasks\[0\]\.acceptance\.level is an achieved status/);
-		assert.match(errors[2] ?? "", /^chain\[0\]\.acceptance is an achieved status/);
-		assert.match(errors[3] ?? "", /^chain\[1\]\.parallel\[0\]\.acceptance\.level is an achieved status/);
-		assert.match(errors[4] ?? "", /^chain\[2\]\.parallel\.acceptance is an achieved status/);
-		assert.match(errors.join("\n"), /acceptance\.review\.required/);
+		assert.equal(errors[0], "acceptance has invalid level 'reviewed'.");
+		assert.equal(errors[1], "tasks[0].acceptance.level must be one of auto, none, attested, checked, verified.");
+		assert.equal(errors[2], "chain[0].acceptance has invalid level 'reviewed'.");
+		assert.equal(errors[3], "chain[1].parallel[0].acceptance.level must be one of auto, none, attested, checked, verified.");
+		assert.equal(errors[4], "chain[2].parallel.acceptance has invalid level 'reviewed'.");
 	});
 
 	it("rejects transport-permitted true acceptance before execution, including nested inputs", () => {
@@ -1482,9 +1482,8 @@ describe("acceptance gates", () => {
 					{ id: "one", command: `${process.execPath} -e "require('node:fs').writeFileSync('one.txt','ok')"` },
 					{ id: "two", command: `${process.execPath} -e "require('node:fs').writeFileSync('two.txt','ok')"` },
 				] },
-				agentContract: { version: 1 },
 			});
-			const ledger = await evaluateAcceptance({ acceptance, output: "done", cwd, reportOptional: true, artifactsDir, runId: "multi-verify" });
+			const ledger = await evaluateAcceptance({ acceptance, output: report(), cwd, artifactsDir, runId: "multi-verify" });
 			assert.equal(ledger.status, "verified");
 			assert.deepEqual(ledger.verifyRuns.map((run) => [run.id, run.status]), [["one", "passed"], ["two", "passed"]]);
 			assert.equal(fs.readFileSync(path.join(cwd, "one.txt"), "utf-8"), "ok");
@@ -1504,9 +1503,8 @@ describe("acceptance gates", () => {
 				agentName: "worker",
 				task: "run gate",
 				explicit: { level: "verified", verify: [{ id: "gate", command: `${process.execPath} -e "process.stdout.write(process.env.GATE_SECRET+':'+process.env.GATE_INHERITED_SECRET);require('node:fs').appendFileSync('count.txt','x')"`, env: { GATE_SECRET: "not-persisted" } }] },
-				agentContract: { version: 1 },
 			});
-			const evaluate = () => evaluateAcceptance({ acceptance: passing, output: "done", cwd, reportOptional: true, artifactsDir, runId: "memo-run" });
+			const evaluate = () => evaluateAcceptance({ acceptance: passing, output: report(), cwd, artifactsDir, runId: "memo-run" });
 			const first = await evaluate();
 			const same = await evaluate();
 			fs.writeFileSync(path.join(cwd, "untracked.txt"), "ignored\n", "utf-8");
@@ -1533,10 +1531,9 @@ describe("acceptance gates", () => {
 				agentName: "worker",
 				task: "run gate",
 				explicit: { level: "verified", verify: [{ id: "gate", command: `${process.execPath} -e "require('node:fs').appendFileSync('fail-count.txt','x');process.exit(7)"` }] },
-				agentContract: { version: 1 },
 			});
-			const failOnce = await evaluateAcceptance({ acceptance: failing, output: "done", cwd, reportOptional: true, artifactsDir, runId: "failure-run" });
-			const failCached = await evaluateAcceptance({ acceptance: failing, output: "done", cwd, reportOptional: true, artifactsDir, runId: "failure-run" });
+			const failOnce = await evaluateAcceptance({ acceptance: failing, output: report(), cwd, artifactsDir, runId: "failure-run" });
+			const failCached = await evaluateAcceptance({ acceptance: failing, output: report(), cwd, artifactsDir, runId: "failure-run" });
 			assert.equal(failOnce.status, "rejected");
 			assert.equal(failCached.status, "rejected");
 			assert.equal(failCached.verifyRuns[0]?.memoized, true);
@@ -1579,8 +1576,8 @@ describe("acceptance gates", () => {
 		assert.deepEqual(validateAcceptanceInput({ verify: [{ id: "fractional", command: "npm test", timeoutMs: 1.5 }] }), ["acceptance.verify[0].timeoutMs must be an integer >= 1."]);
 		assert.deepEqual(validateAcceptanceInput(false), []);
 		assert.deepEqual(validateAcceptanceInput("checked"), []);
-		assert.match(validateAcceptanceInput("reviewed").join("\n"), /achieved status.*omit acceptance.*acceptance\.review\.required/i);
-		assert.match(validateAcceptanceInput({ level: "reviewed" }).join("\n"), /achieved status.*omit acceptance.*acceptance\.review\.required/i);
+		assert.equal(validateAcceptanceInput("reviewed")[0], "acceptance has invalid level 'reviewed'.");
+		assert.equal(validateAcceptanceInput({ level: "reviewed" })[0], "acceptance.level must be one of auto, none, attested, checked, verified.");
 		assert.deepEqual(validateAcceptanceInput({ criteria: ["ship the fix"], review: false, stopRules: ["stay scoped"] }), []);
 		assert.match(validateAcceptanceInput({ criteria: [{ id: "missing-must" }] }).join("\n"), /acceptance\.criteria\[0\]\.must is required/);
 		assert.match(validateAcceptanceInput({ criteria: [

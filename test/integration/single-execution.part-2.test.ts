@@ -1170,25 +1170,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		assert.equal(result.finalOutput, partialOutput);
 	});
 
-	it("agent contract reports omitted acceptance separately without injecting a prompt", async () => {
-		mockPi.onCall({ output: "Plan only" });
-		const agents = [makeAgent("worker", { tools: ["read", "write"] })];
-
-		const result = await runSync(tempDir, agents, "worker", "Implement the approved file changes", {
-			runId: "v1-no-acceptance",
-			agentContract: { version: 1 },
-		});
-		const call = readCall();
-
-		assert.equal(result.exitCode, 0);
-		assert.equal(result.agentContract?.version, 1);
-		assert.deepEqual(result.execution, { status: "completed", success: true, exitCode: 0 });
-		assert.equal(result.acceptance?.status, "not-required");
-		assert.equal(result.review?.status, "not-requested");
-		assert.deepEqual(result.effects, {});
-		assert.doesNotMatch(call.args.join("\n"), /## Acceptance Contract/);
-	});
-
 	it("does not inject inferred acceptance into reviewer prompts", async () => {
 		for (const [index, task] of [
 			"Review the diff and return findings only.",
@@ -1202,40 +1183,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 			assert.equal(result.exitCode, 0);
 			assert.doesNotMatch(readCall().args.join("\n"), /## Acceptance Contract/);
 		}
-	});
-
-	it("agent contract keeps acceptance rejection out of execution status", async () => {
-		mockPi.onCall({ output: "Done\n```acceptance-report\n{\"criteriaSatisfied\":[{\"id\":\"criterion-1\",\"status\":\"not-satisfied\",\"evidence\":\"no proof\"}]}\n```" });
-		const agents = [makeAgent("worker", { tools: ["read"], completionGuard: false })];
-
-		const result = await runSync(tempDir, agents, "worker", "Summarize the fix", {
-			runId: "v1-acceptance-reject",
-			agentContract: { version: 1 },
-			acceptance: { level: "checked", criteria: ["Return required proof"] },
-		});
-
-		assert.equal(result.exitCode, 0);
-		assert.equal(result.error, undefined);
-		assert.equal(result.execution?.status, "completed");
-		assert.equal(result.execution?.success, true);
-		assert.equal(result.acceptance?.status, "rejected");
-		assert.match(result.acceptance.runtimeChecks?.[0]?.message ?? "", /not-satisfied/);
-	});
-
-	it("agent contract records explicit completion guard as an effect", async () => {
-		mockPi.onCall({ output: "Plan only" });
-		const agents = [makeAgent("worker", { tools: ["read", "write"], completionGuard: true })];
-
-		const result = await runSync(tempDir, agents, "worker", "Implement the approved file changes", {
-			runId: "v1-completion-effect",
-			agentContract: { version: 1 },
-		});
-
-		assert.equal(result.exitCode, 0);
-		assert.equal(result.execution?.status, "completed");
-		assert.equal(result.effects?.fileMutation?.status, "missing");
-		assert.equal(result.effects?.fileMutation?.expected, true);
-		assert.equal(result.effects?.fileMutation?.attempted, false);
 	});
 
 	it("direct single tool calls support outputSchema", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
@@ -1416,8 +1363,8 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 			{
 				async: false,
 				workflowScript: `
-					const first = await runs.run("first", { agent: "echo", task: "First", outputSchema: ${JSON.stringify(firstSchema)}, agentContract: { version: 1 }, acceptance: false, output: true });
-					return runs.run("resumed", { resume: first.runId, task: "Resume", outputSchema: ${JSON.stringify(schema)}, agentContract: { version: 1 }, acceptance: false, output: false });
+					const first = await runs.run("first", { agent: "echo", task: "First", outputSchema: ${JSON.stringify(firstSchema)}, acceptance: false, output: true });
+					return runs.run("resumed", { resume: first.runId, task: "Resume", outputSchema: ${JSON.stringify(schema)}, acceptance: false, output: false });
 				`,
 			},
 			new AbortController().signal,
@@ -3240,7 +3187,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 			);
 
 			assert.equal(result.isError, true);
-			assert.match(result.content[0]?.text ?? "", /achieved status.*omit acceptance.*acceptance\.review\.required/i);
+			assert.match(result.content[0]?.text ?? "", /invalid level 'reviewed'|level must be one of auto, none, attested, checked, verified/i);
 		}
 		assert.equal(mockPi.callCount(), 0);
 	});
@@ -3260,7 +3207,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		);
 
 		assert.equal(result.isError, true);
-		assert.match(result.content[0]?.text ?? "", /Cannot append step:.*achieved status.*acceptance\.review\.required/i);
+		assert.match(result.content[0]?.text ?? "", /invalid level 'reviewed'|level must be one of auto, none, attested, checked, verified/i);
 		assert.equal(mockPi.callCount(), 0);
 	});
 
@@ -4092,7 +4039,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		let terminal: RunSyncResult | undefined;
 		const receipt = await runSync(tempDir, makeAgentConfigs(["echo"]), "echo", "Keep the receipt isolated", {
 			runId: "detached-deep-receipt-isolation",
-			agentContract: { version: 1 },
 			acceptance: {
 				level: "checked",
 				criteria: [{
@@ -4116,7 +4062,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 			content: Array<{ type?: string; text?: string; callerOwned?: boolean }>;
 		}>;
 		const callerOwnedReceiptText = `caller-owned mutation\n${receiptReport}`;
-		(receipt.agentContract as unknown as { version: number }).version = 999;
 		receiptMessages[0]!.model = "caller-owned/model";
 		receiptMessages[0]!.content[0]!.text = callerOwnedReceiptText;
 		receiptMessages[0]!.content[0]!.callerOwned = true;
@@ -4143,7 +4088,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		assert.ok(terminal);
 		assert.equal(terminal.exitCode, 0);
 		assert.equal(terminal.finalOutput, "terminal answer");
-		assert.deepEqual(terminal.agentContract, { version: 1 });
 		assert.equal(terminal.acceptance?.status, "checked");
 		assert.equal(terminal.acceptance?.runtimeChecks.every((check) => check.status === "passed"), true);
 		assert.equal(terminal.progress.status, "completed");
@@ -4199,7 +4143,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		const receipt = await runSync(tempDir, makeAgentConfigs(["echo"]), "echo", "Task", {
 			runId: "detached-completion-pipeline-throw",
 			acceptance: { level: "checked", criteria: ["result is checked"] },
-			agentContract: { version: 1 },
 			onDetachReady: (detach) => {
 				assert.equal(detach("user request"), true);
 			},
@@ -4212,7 +4155,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 			},
 		});
 		assert.equal(receipt.detached, true);
-		(receipt.agentContract as unknown as { version: number }).version = 999;
 		receipt.messages.push({ role: "assistant", content: [{ type: "text", text: "caller-only fallback message" }] });
 		const mutableAcceptance = receipt.acceptance as unknown as {
 			status: string;
@@ -4237,7 +4179,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		assert.equal(terminal.execution?.status, "failed");
 		assert.equal(terminal.execution?.success, false);
 		assert.equal(terminal.review?.status, "not-requested");
-		assert.deepEqual(terminal.agentContract, { version: 1 });
 		assert.deepEqual(terminal.effects, {});
 		assert.equal(terminal.usage.turns, 0);
 		assert.doesNotMatch(JSON.stringify(terminal.messages), /caller-only fallback message/);

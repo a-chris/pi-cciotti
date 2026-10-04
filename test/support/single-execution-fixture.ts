@@ -100,7 +100,6 @@ interface RunSyncResult {
 	outputSaveError?: string;
 	sessionFile?: string;
 	structuredOutput?: unknown;
-	agentContract?: { version: 1 };
 	execution?: { status?: string; success?: boolean; exitCode?: number; error?: string };
 	review?: { status?: string };
 	effects?: { fileMutation?: { status?: string; expected?: boolean; attempted?: boolean; message?: string } };

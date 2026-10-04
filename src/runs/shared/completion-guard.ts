@@ -20,8 +20,8 @@ const READ_ONLY_BUILTIN_TOOLS = new Set([
 const CURSOR_FILE_MUTATION_THINKING =
 	/(?:^|\n)\s*Cursor (?:edit|write)\s*:/i;
 
-export function completionGuardEnabled(agent: string, flag: boolean | undefined): boolean {
-	return flag ?? agent === "worker";
+export function completionGuardEnabled(flag: boolean | undefined): boolean {
+	return flag !== false;
 }
 
 export interface CompletionMutationGuardInput {
@@ -49,7 +49,7 @@ export function hasMutationToolCapability(tools: string[] | undefined, mcpDirect
 }
 
 export function validateImplementationToolContract(input: { agent: string; tools?: string[]; mcpDirectTools?: string[]; configuredExtensions?: string[]; requestedTools?: string[]; completionGuard?: boolean }): string | undefined {
-	if (!completionGuardEnabled(input.agent, input.completionGuard)) return undefined;
+	if (!completionGuardEnabled(input.completionGuard)) return undefined;
 	const requestedMutationTools = input.requestedTools?.filter((tool) => !READ_ONLY_BUILTIN_TOOLS.has(tool)) ?? [];
 	const declaredMutationToolsWereRemoved = requestedMutationTools.length > 0 && !hasMutationToolCapability(input.tools, input.mcpDirectTools);
 	const configuredExtensionCapability = (input.configuredExtensions?.length ?? 0) > 0 && !declaredMutationToolsWereRemoved;

@@ -456,7 +456,7 @@ describe("async resume lookup", () => {
 
 			assert.throws(
 				() => resolveAsyncResumeTarget({ id: "run-reviewed-acceptance" }, { asyncDirRoot: asyncRoot, resultsDir }),
-				/achieved status.*acceptance\.review\.required/i,
+				/acceptance\.level must be one of auto, none, attested, checked, verified/i,
 			);
 		} finally {
 			fs.rmSync(root, { recursive: true, force: true });

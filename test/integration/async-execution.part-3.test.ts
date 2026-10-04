@@ -715,9 +715,9 @@ export default function() {
 		assert.doesNotMatch(eventsText, /"reason":"completion_guard"/);
 	});
 
-	it("agent contract keeps async acceptance and file-mutation effects separate from execution", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
+	it("explicit acceptance rejection with missing edits fails the async run closed", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
 		mockPi.onCall({ output: "I’ll do that now and report back after implementing.\n```acceptance-report\n{\"criteriaSatisfied\":[{\"id\":\"criterion-1\",\"status\":\"not-satisfied\",\"evidence\":\"no proof\"}]}\n```" });
-		const id = `async-v1-separate-${Date.now().toString(36)}`;
+		const id = `async-fail-closed-${Date.now().toString(36)}`;
 
 		executeAsyncSingle(id, {
 			agent: "worker",
@@ -734,7 +734,6 @@ export default function() {
 			},
 			shareEnabled: false,
 			sessionRoot: path.join(tempDir, "sessions"),
-			agentContract: { version: 1 },
 			acceptance: { level: "checked", criteria: ["Return required proof"] },
 		});
 
@@ -742,17 +741,14 @@ export default function() {
 		const payload = JSON.parse(fs.readFileSync(resultPath, "utf-8")) as AsyncResultPayload;
 		const statusPayload = await waitForAsyncState(id, (candidate) => candidate.state === "complete");
 
-		assert.equal(payload.success, true);
-		assert.equal(payload.state, "complete");
-		assert.equal(payload.exitCode, 0);
-		assert.equal(payload.results[0]?.agentContract?.version, 1);
-		assert.equal(payload.results[0]?.execution?.status, "completed");
-		assert.equal(payload.results[0]?.execution?.success, true);
+		assert.equal(payload.success, false);
+		assert.equal(payload.exitCode, 1);
+		assert.equal(payload.results[0]?.execution?.status, "failed");
+		assert.equal(payload.results[0]?.execution?.success, false);
 		assert.equal(payload.results[0]?.acceptance?.status, "rejected");
 		assert.equal(payload.results[0]?.effects?.fileMutation?.status, "missing");
 		assert.equal(statusPayload.state, "complete");
-		assert.equal(statusPayload.steps?.[0]?.agentContract?.version, 1);
-		assert.equal(statusPayload.steps?.[0]?.execution?.status, "completed");
+		assert.equal(statusPayload.steps?.[0]?.execution?.status, "failed");
 		assert.equal(statusPayload.steps?.[0]?.effects?.fileMutation?.status, "missing");
 	});
 

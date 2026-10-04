@@ -24,7 +24,6 @@ export function planCompletionEvidence(input: {
 	mutationCapable: boolean;
 	mutationAttemptObserved: boolean;
 	mutationEvidence?: TrackedMutationEvidence;
-	agentContractEnabled: boolean;
 }): CompletionEvidencePlan {
 	const guardBlocked = input.guard?.blocked === true;
 	const guardTriggered = input.guardTriggered
@@ -54,7 +53,7 @@ export function planCompletionEvidence(input: {
 		mutationExpected,
 		mutationAttempted,
 		fileMutation,
-		legacyFailureError: guardTriggered && !input.agentContractEnabled
+		legacyFailureError: guardTriggered
 			? MISSING_IMPLEMENTATION_MUTATION_ERROR
 			: undefined,
 	};

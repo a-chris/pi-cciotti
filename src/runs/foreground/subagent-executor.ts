@@ -61,7 +61,6 @@ import { claimRunFanoutBatch, claimRunFanoutBatchWithCommit, createRunFanoutBudg
 import { retainLiveForegroundNestedRoute } from "../../integrations/pi-web-session-liveness.ts";
 import { validateToolBudgetConfig } from "../shared/tool-budget.ts";
 import { intersectSubagentCapabilityCeilings, resolveCurrentSubagentCapabilityCeiling, type ResolvedSubagentCapabilityCeiling } from "../shared/capability-ceiling.ts";
-import { isAgentContract } from "../shared/agent-contract.ts";
 import { normalizeExtensionBindings, type ExtensionBindings } from "../shared/extension-bindings.ts";
 import { resolveRequiredChildExtensions } from "../../shared/required-child-extensions.ts";
 import { finalizeSingleOutput, injectSingleOutputInstruction, normalizeSingleOutputOverride, outputPathMappingFromTask, resolveSingleOutputPath, validateFileOnlyOutputMode } from "../shared/single-output.ts";
@@ -137,7 +136,6 @@ import {
 	type AsyncJobState,
 	type AsyncStatus,
 	type AcceptanceInput,
-	type AgentContract,
 	type ArtifactConfig,
 	type ArtifactPaths,
 	type ControlConfig,
@@ -281,7 +279,6 @@ interface TaskParam {
 	skill?: string | string[] | boolean;
 	outputSchema?: JsonSchemaObject | false;
 	acceptance?: AcceptanceInput;
-	agentContract?: AgentContract;
 	toolBudget?: ToolBudgetConfig;
 }
 
@@ -382,7 +379,6 @@ export interface SubagentParamsLike {
 	chainDir?: string;
 	acceptance?: AcceptanceInput;
 	gate?: string;
-	agentContract?: AgentContract;
 	additional?: number;
 	missionId?: string;
 	mission?: unknown;
@@ -717,7 +713,6 @@ function rememberForegroundRun(state: SubagentState, input: { modelResponseAlias
 			const resumeContract = omitUndefinedProperties({
 				modelResponseAliases: input.modelResponseAliases,
 				outputSchema: input.params.outputSchema,
-				agentContract: input.params.agentContract,
 				acceptance: input.params.acceptance,
 				output: input.effectiveOutput,
 				outputMode: input.effectiveOutputMode,
@@ -1919,7 +1914,6 @@ async function resumeAsyncRun(input: {
 			shareEnabled: input.params.share === true,
 			sessionRoot: input.deps.getSubagentSessionRoot(parentSessionFile),
 			chainSkills: normalized === false ? [] : (normalized ?? []),
-			agentContract: input.params.agentContract,
 			fast: input.params.fast,
 			dynamicFanoutMaxItems: input.deps.config.chain?.dynamicFanout?.maxItems,
 			waitToolEnabled: input.deps.waitToolEnabled,
@@ -2006,7 +2000,6 @@ async function resumeAsyncRun(input: {
 		if (error instanceof ActiveAsyncCapacityError) return { content: [{ type: "text", text: error.message }], isError: true, details: { mode: "single", results: [], activeAsyncCapacity: error.snapshot } };
 		return { content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }], isError: true, details: { mode: "single", results: [] } };
 	}
-	const agentContract = input.params.agentContract ?? foregroundContract?.agentContract ?? recoveryDescriptor?.agentContract;
 	const artifactConfig: ArtifactConfig = recoveryDescriptor?.artifactConfig ?? omitUndefinedProperties({ ...DEFAULT_ARTIFACT_CONFIG, enabled: input.params.artifacts !== false, dir: input.deps.config.artifactDir ?? DEFAULT_ARTIFACT_CONFIG.dir });
 	const artifactsDir = recoveryDescriptor?.artifactsDir ?? getArtifactsDir(parentSessionFile, effectiveCwd, artifactConfig.dir);
 	const availableModels = input.ctx.modelRegistry.getAvailable().map(toModelInfo);
@@ -2072,7 +2065,6 @@ async function resumeAsyncRun(input: {
 		output: input.params.output !== undefined ? input.params.output : foregroundContract?.output ?? recoveryDescriptor?.outputPath,
 		outputMode: input.params.outputMode ?? foregroundContract?.outputMode ?? recoveryDescriptor?.outputMode,
 		outputClaimPath: input.params.workflowOutputClaimPath,
-		...(agentContract ? { agentContract } : {}),
 		...(outputSchema ? { structuredOutputSchema: outputSchema } : {}),
 		...(recoveryDescriptor?.skills ? { skills: [...recoveryDescriptor.skills] } : {}),
 		...(acceptance !== undefined ? { acceptance } : {}),
@@ -3222,7 +3214,6 @@ async function runAsyncPath(data: ExecutionContextData, deps: ExecutorDeps): Pro
 			worktreeBranchPrefix: deps.config.worktreeBranchPrefix,
 			controlConfig,
 			nestedRoute,
-			agentContract: params.agentContract,
 			structuredOutputSchema: params.outputSchema || undefined,
 			extensionBindings: params.extensionBindings,
 			acceptance: params.acceptance,
@@ -3825,7 +3816,6 @@ async function runSinglePath(data: ExecutionContextData, deps: ExecutorDeps): Pr
 			modelScope: modelScopes,
 			skills: effectiveSkills,
 			structuredOutput: structuredRuntime,
-			agentContract: params.agentContract,
 			acceptance: params.acceptance,
 			acceptanceContext: { mode: "single" },
 			workflowChildPermitLaunch: data.workflowChildPermitLaunch,
@@ -4457,8 +4447,7 @@ export function prepareWorkflowLaunchParams(
 		const baseRef = Object.hasOwn(childParams, "baseRef") ? childParams.baseRef : undefined;
 		const outputSchema = Object.hasOwn(childParams, "outputSchema") ? childParams.outputSchema : workflowDefaults.outputSchema;
 		if (outputSchema !== undefined && outputSchema !== false) assertJsonSchemaObject(outputSchema, "outputSchema");
-		const agentContract = Object.hasOwn(childParams, "agentContract") ? childParams.agentContract : workflowDefaults.agentContract;
-		if (agentContract !== undefined && !isAgentContract(agentContract as AgentContract)) throw new Error("agentContract must be { version: 1 }.");
+		if (Object.hasOwn(childParams, "agentContract")) throw new Error("agentContract is not supported");
 		const acceptance = Object.hasOwn(childParams, "acceptance") ? childParams.acceptance : workflowDefaults.acceptance;
 		const output = Object.hasOwn(childParams, "output") ? childParams.output : workflowDefaults.output;
 		if (output !== undefined && typeof output !== "string" && typeof output !== "boolean") throw new Error("output must be a path string or boolean.");
@@ -4476,7 +4465,6 @@ export function prepareWorkflowLaunchParams(
 			...(worktree !== undefined ? { worktree: worktree as boolean } : {}),
 			...(baseRef !== undefined ? { baseRef: baseRef as string } : {}),
 			...(outputSchema !== undefined ? { outputSchema } : {}),
-			...(agentContract !== undefined ? { agentContract: agentContract as AgentContract } : {}),
 			...(acceptance !== undefined ? { acceptance: acceptance as AcceptanceInput } : {}),
 			...(output !== undefined ? { output: output as string | boolean } : {}),
 			...(outputMode !== undefined ? { outputMode: outputMode as OutputMode } : {}),

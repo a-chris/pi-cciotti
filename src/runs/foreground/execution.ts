@@ -88,7 +88,7 @@ import {
 } from "../shared/long-running-guard.ts";
 import { acceptanceFailureMessage, buildSkippedAcceptanceLedger, captureStagedIndexBaseline, evaluateAcceptance, formatAcceptancePrompt, resolveEffectiveAcceptance, stripAcceptanceReport, validateAcceptanceInput } from "../shared/acceptance.ts";
 import { PROMPT_REDACTED } from "../../shared/utils.ts";
-import { attachContractProjections, isAgentContract } from "../shared/agent-contract.ts";
+import { attachContractProjections } from "../shared/agent-contract.ts";
 import { initialToolBudgetState, toolBudgetState } from "../shared/tool-budget.ts";
 import { resolveLaunchBinding } from "../../shared/launch-contract.ts";
 import { consumeWorkflowChildPermit } from "../../shared/workflow-child-permit.ts";
@@ -146,7 +146,6 @@ function persistSingleResultMetadata(input: {
 		durationMs: target.progressSummary?.durationMs,
 		toolCount: target.progressSummary?.toolCount,
 		error: target.error,
-		agentContract: target.agentContract,
 		launchContractDigest: target.launchContractDigest,
 		launchResolvedExtensions: target.launchResolvedExtensions,
 		runtimeAcknowledgedExtensions: target.runtimeAcknowledgedExtensions,
@@ -452,7 +451,6 @@ async function runSingleAttempt(
 		agent: agent.name,
 		task: shared.originalTask ?? task,
 		...(childSessionName ? { sessionName: childSessionName } : {}),
-		...(options.agentContract ? { agentContract: options.agentContract } : {}),
 		launchContractDigest,
 		launchResolvedExtensions,
 		exitCode: 0,
@@ -1407,7 +1405,7 @@ async function runSingleAttempt(
 			? `${timeoutMessage}\n\n${result.timeoutRecovery.message}\n\nPartial output before timeout:\n${fullOutput}`
 			: `${timeoutMessage}\n\n${result.timeoutRecovery.message}`;
 	}
-	const completionGuardOn = completionGuardEnabled(agent.name, agent.completionGuard);
+	const completionGuardOn = completionGuardEnabled(agent.completionGuard);
 	const completionGuard = ((result.exitCode === 0 && !result.error) || toolAvailabilityError) && completionGuardOn
 		? evaluateCompletionMutationGuard({
 			expectsMutation: completionGuardOn,
@@ -1428,7 +1426,6 @@ async function runSingleAttempt(
 		mutationCapable: hasMutationToolCapability(contractTools, toolPlan.effectiveMcpTools),
 		mutationAttemptObserved,
 		mutationEvidence,
-		agentContractEnabled: isAgentContract(options.agentContract),
 	});
 	if (completionEvidence.fileMutation) {
 		result.effects = {
@@ -1622,9 +1619,8 @@ async function runSyncCompletionInner(
 		async: options.acceptanceContext?.async,
 		dynamic: options.acceptanceContext?.dynamic,
 		dynamicGroup: options.acceptanceContext?.dynamicGroup,
-		agentContract: options.agentContract,
 	});
-	const acceptancePrompt = formatAcceptancePrompt(effectiveAcceptance, { reportOptional: isAgentContract(options.agentContract), structuredOutput: Boolean(options.structuredOutput?.acceptanceReportPath) });
+	const acceptancePrompt = formatAcceptancePrompt(effectiveAcceptance, { structuredOutput: Boolean(options.structuredOutput?.acceptanceReportPath) });
 	const taskWithAcceptance = acceptancePrompt ? `${task}\n${acceptancePrompt}` : task;
 	options.onEffectivePrompt?.(taskWithAcceptance);
 	const sessionEnabled = Boolean(options.sessionFile || options.sessionDir) || shareEnabled;
@@ -1896,7 +1892,6 @@ async function runSyncCompletionInner(
 					: undefined,
 				cwd: options.cwd ?? runtimeCwd,
 				stagedIndexBaseline,
-				reportOptional: isAgentContract(options.agentContract),
 				artifactsDir: options.artifactsDir,
 				runId: options.runId,
 			});
@@ -1907,7 +1902,7 @@ async function runSyncCompletionInner(
 	}
 	const acceptanceFailure = acceptanceFailureMessage(result.acceptance);
 	stripAcceptanceReportsFromMessages(result.messages);
-	if (acceptanceFailure && result.acceptance.explicit && result.exitCode === 0 && !result.interrupted && !result.timedOut && !isAgentContract(options.agentContract)) {
+	if (acceptanceFailure && result.acceptance.explicit && result.exitCode === 0 && !result.interrupted && !result.timedOut) {
 		result.exitCode = 1;
 		if (result.savedOutputPath) {
 			result.finalOutput = finalizeSingleOutput({
@@ -1939,7 +1934,7 @@ async function runSyncCompletionInner(
 			result.progress.error = result.error;
 		}
 	}
-	if (isAgentContract(options.agentContract)) attachContractProjections(result);
+	attachContractProjections(result);
 	if (!result.blocked && !result.timedOut && !result.stopped && !result.interrupted) {
 		const reason = parseBlockedReason(result.finalOutput);
 		if (reason) result.blocked = reason;
@@ -1986,9 +1981,6 @@ export async function runSync(
 	task: string,
 	options: RunSyncOptions,
 ): Promise<SingleResult> {
-	// Capture the strict contract before consumer-owned objects can be mutated
-	// after a detached receipt is published.
-	const strictContract = isAgentContract(options.agentContract);
 	let detachedReason: string | undefined;
 	let publishedReceipt: SingleResult | undefined;
 	let activeDetachAttempt: ((reason?: string) => boolean) | undefined;
@@ -2013,10 +2005,6 @@ export async function runSync(
 			// separately owned while the completion pipeline remains live.
 			publishedReceipt = structuredClone(detachedReceipt);
 			const callerReceipt = structuredClone(detachedReceipt);
-			// A strict contract was already validated before detach; normalize private
-			// and caller snapshots to the only safely known version.
-			publishedReceipt.agentContract = strictContract ? { version: 1 } : undefined;
-			callerReceipt.agentContract = strictContract ? { version: 1 } : undefined;
 			detachedReason = detachedReceipt.detachedReason ?? "user request";
 			resolveReceipt(callerReceipt);
 			return true;
@@ -2067,7 +2055,7 @@ export async function runSync(
 				? buildSkippedAcceptanceLedger(publishedReceipt.acceptance.effectiveAcceptance, { id: "completion-pipeline", message: failureMessage })
 				: undefined,
 		});
-		if (strictContract) attachContractProjections(failedResult);
+		attachContractProjections(failedResult);
 		try {
 			// Replace the provisional detach receipt metadata with the authoritative
 			// terminal failure. Persistence remains best-effort and cannot orphan work.

@@ -7,7 +7,6 @@ import type {
 	AcceptanceConfig,
 	AcceptanceEvidenceKind,
 	AcceptanceInput,
-	AgentContract,
 	AcceptanceLedger,
 	AcceptanceLevel,
 	AcceptanceReport,
@@ -23,7 +22,6 @@ import type {
 	SingleResult,
 	SubagentRunMode,
 } from "../../shared/types.ts";
-import { isAgentContract } from "./agent-contract.ts";
 import { classifyTaskMutationIntent, stripSeverityCompounds, taskMayMutate } from "./task-intent.ts";
 
 const LEVEL_RANK: Record<Exclude<AcceptanceLevel, "auto">, number> = {
@@ -52,7 +50,6 @@ const ACCEPTANCE_CONFIG_KEYS = new Set(["level", "report", "preserveStagedIndex"
 const ACCEPTANCE_GATE_KEYS = new Set(["id", "must", "evidence", "severity"]);
 const ACCEPTANCE_VERIFY_KEYS = new Set(["id", "command", "timeoutMs", "cwd", "env", "allowFailure"]);
 const ACCEPTANCE_REVIEW_KEYS = new Set(["agent", "focus", "required"]);
-const EXPLICIT_REVIEWED_UNAVAILABLE = "is an achieved status, not a requestable acceptance level. For a read-only reviewer call, omit acceptance. To require independent review of a writer result, use acceptance.review.required and orchestrate the reviewer separately.";
 
 function normalizeLevel(level: AcceptanceLevel | undefined): Exclude<AcceptanceLevel, "auto"> | "auto" {
 	return level ?? "auto";
@@ -243,8 +240,7 @@ export function validateAcceptanceInput(input: unknown, pathLabel = "acceptance"
 	if (normalized.error) return [normalized.error];
 	input = normalized.value;
 	if (typeof input === "string") {
-		if (input === "reviewed") errors.push(`${pathLabel} ${EXPLICIT_REVIEWED_UNAVAILABLE}`);
-		else if (!VALID_LEVELS.has(input as AcceptanceLevel)) errors.push(`${pathLabel} has invalid level '${input}'.`);
+		if (!VALID_LEVELS.has(input as AcceptanceLevel)) errors.push(`${pathLabel} has invalid level '${input}'.`);
 		else if (input === "none") errors.push(`${pathLabel} level "none" requires a reason; use { level: "none", reason: "..." }.`);
 		else if (input === "verified") errors.push(`${pathLabel} level "verified" requires object form with at least one runtime verify command. Use level "checked" or provide a non-empty acceptance.verify array.`);
 		return errors;
@@ -257,9 +253,7 @@ export function validateAcceptanceInput(input: unknown, pathLabel = "acceptance"
 	for (const key of Object.keys(value)) {
 		if (!ACCEPTANCE_CONFIG_KEYS.has(key)) errors.push(`${pathLabel}.${key} is not supported.`);
 	}
-	if (value.level === "reviewed") {
-		errors.push(`${pathLabel}.level ${EXPLICIT_REVIEWED_UNAVAILABLE}`);
-	} else if (value.level !== undefined && (typeof value.level !== "string" || !VALID_LEVELS.has(value.level as AcceptanceLevel))) {
+	if (value.level !== undefined && (typeof value.level !== "string" || !VALID_LEVELS.has(value.level as AcceptanceLevel))) {
 		errors.push(`${pathLabel}.level must be one of auto, none, attested, checked, verified.`);
 	}
 	if (value.report !== undefined && value.report !== "on" && value.report !== "off") {
@@ -456,32 +450,9 @@ export function resolveEffectiveAcceptance(input: {
 	async?: boolean;
 	dynamic?: boolean;
 	dynamicGroup?: boolean;
-	agentContract?: AgentContract;
 }): ResolvedAcceptanceConfig {
 	const explicit = normalizeAcceptanceInput(input.explicit);
 	const explicitLevel = normalizeLevel(explicit.level);
-	if (isAgentContract(input.agentContract)) {
-		const level = explicitAcceptanceCanDisable(explicit) || explicitLevel === "auto"
-			? "none"
-			: explicitLevel;
-		const evidence = unique(explicit.evidence ?? []);
-		const criteria = normalizeCriteria(
-			explicit.criteria as Array<string | { id?: string; must?: string; evidence?: AcceptanceEvidenceKind[]; severity?: "required" | "recommended" }> | undefined,
-			evidence,
-		);
-		return {
-			level,
-			explicit: input.explicit !== undefined,
-			inferredReason: [],
-			criteria,
-			evidence,
-			preserveStagedIndex: explicit.preserveStagedIndex,
-			verify: explicit.verify ?? [],
-			review: explicit.review,
-			stopRules: explicit.stopRules ?? [],
-			reason: explicit.reason,
-		};
-	}
 	const inferred = inferLevel(input);
 	const inferredLevel = inferred.level === "none" && explicitAcceptanceRequestsPolicy(explicit) ? "attested" : inferred.level;
 	const level = explicitAcceptanceCanDisable(explicit)
@@ -519,9 +490,8 @@ export function formatReviewGateLabel(review: AcceptanceReviewGate): string {
 	return review.agent ? `${status} by ${review.agent}` : status;
 }
 
-export function formatAcceptancePrompt(acceptance: ResolvedAcceptanceConfig, options: { reportOptional?: boolean; structuredOutput?: boolean } = {}): string {
+export function formatAcceptancePrompt(acceptance: ResolvedAcceptanceConfig, options: { structuredOutput?: boolean } = {}): string {
 	if (acceptance.level === "none") return "";
-	if (options.reportOptional && !acceptanceRequiresChildReport(acceptance)) return "";
 	const lines = [
 		"",
 		"## Acceptance Contract",
@@ -1433,7 +1403,6 @@ export async function evaluateAcceptance(input: {
 	reviewResult?: AcceptanceReviewResult;
 	signal?: AbortSignal;
 	abortMessage?: string;
-	reportOptional?: boolean;
 	artifactsDir?: string;
 	runId?: string;
 }): Promise<AcceptanceLedger> {
@@ -1475,18 +1444,12 @@ export async function evaluateAcceptance(input: {
 		ledger.childReport = parsed.report;
 		ledger.status = "attested";
 		ledger.evidenceStatus = "attested";
-	} else if (!input.reportOptional || needsReport || parsed.error !== ACCEPTANCE_REPORT_NOT_FOUND) {
+	} else if (needsReport || parsed.error !== ACCEPTANCE_REPORT_NOT_FOUND) {
 		ledger.childReportParseError = parsed.error;
 		ledger.runtimeChecks.push({ id: "attestation", status: "failed", message: parsed.error ?? "Structured acceptance report missing." });
-		if (ledger.recovery) {
-			ledger.status = "rejected";
-			ledger.evidenceStatus = "rejected";
-		}
-		if (!input.reportOptional) {
-			ledger.status = "rejected";
-			ledger.evidenceStatus = "rejected";
-			return ledger;
-		}
+		ledger.status = "rejected";
+		ledger.evidenceStatus = "rejected";
+		return ledger;
 	} else {
 		ledger.childReportParseError = parsed.error;
 	}

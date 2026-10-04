@@ -25,13 +25,10 @@ function assistantText(text: string): Message {
 	} as unknown as Message;
 }
 
-test("completionGuardEnabled defaults on for worker and off otherwise", () => {
-	assert.equal(completionGuardEnabled("worker", undefined), true);
-	assert.equal(completionGuardEnabled("reviewer", undefined), false);
-	assert.equal(completionGuardEnabled("delegate", undefined), false);
-	assert.equal(completionGuardEnabled("worker", true), true);
-	assert.equal(completionGuardEnabled("worker", false), false);
-	assert.equal(completionGuardEnabled("delegate", true), true);
+test("completionGuardEnabled defaults on for all agents and opts out only with false", () => {
+	assert.equal(completionGuardEnabled(undefined), true);
+	assert.equal(completionGuardEnabled(true), true);
+	assert.equal(completionGuardEnabled(false), false);
 });
 
 test("expectsMutation with no mutation attempt triggers the completion guard", () => {
@@ -163,10 +160,11 @@ test("implementation tool contract rejects only-read-only worker launches", () =
 		}) ?? "",
 		/completionGuard enabled, but its tool allowlist has no mutation-capable tools/,
 	);
-	// Non-worker agents default to completionGuard off, so they pass regardless.
+	// Guard is on by default for all agents; only an explicit opt-out passes.
 	assert.equal(validateImplementationToolContract({
 		agent: "reviewer",
 		tools: ["read", "grep", "find", "ls"],
+		completionGuard: false,
 	}), undefined);
 	assert.equal(validateImplementationToolContract({
 		agent: "worker",

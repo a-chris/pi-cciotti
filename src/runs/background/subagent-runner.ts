@@ -132,7 +132,7 @@ import { resolveLaunchBinding } from "../../shared/launch-contract.ts";
 import { writeInitialProgressFile } from "../../shared/settings.ts";
 import { parseBlockedReason } from "../shared/blocked-result.ts";
 import { acceptanceFailureMessage, aggregateAcceptanceReport, buildSkippedAcceptanceLedger, captureStagedIndexBaseline, evaluateAcceptance, formatAcceptancePrompt, resolveAcceptanceReportMode, resolveEffectiveAcceptance, stripAcceptanceReport } from "../shared/acceptance.ts";
-import { attachContractProjections, isAgentContract } from "../shared/agent-contract.ts";
+import { attachContractProjections } from "../shared/agent-contract.ts";
 import { waitForImportedAsyncRoot } from "./chain-root-attachment.ts";
 import { appendRunnerStepsToStatus, consumeChainAppendRequests, countPendingChainAppendRequests, statusStepDescription } from "./chain-append.ts";
 import { asyncStatusChildIdentity } from "../shared/child-identity.ts";
@@ -248,7 +248,6 @@ interface StepResult {
 	truncated?: boolean;
 	transcriptPath?: string;
 	transcriptError?: string;
-	agentContract?: import("../../shared/types.ts").AgentContract;
 	launchContractDigest?: string;
 	/** Fail-closed completion reason parsed from the child's final output. */
 	blocked?: string;
@@ -796,7 +795,7 @@ export async function runSingleStepInner(
 	// instructions never leak into the display name.
 	const childSessionName = step.sessionName ?? deriveChildSessionName({ agent: step.agent, task, label: step.label });
 	if (step.effectiveAcceptance && (step.runner?.type === "external-cli" || step.runner?.type === "external-job")) {
-		const acceptancePrompt = formatAcceptancePrompt(step.effectiveAcceptance, { reportOptional: isAgentContract(step.agentContract), structuredOutput: Boolean(step.structuredOutput?.acceptanceReportPath) });
+		const acceptancePrompt = formatAcceptancePrompt(step.effectiveAcceptance, { structuredOutput: Boolean(step.structuredOutput?.acceptanceReportPath) });
 		if (acceptancePrompt) task = `${task}\n${acceptancePrompt}`;
 	}
 	const sessionEnabled = Boolean(step.sessionFile) || ctx.sessionEnabled;
@@ -1184,7 +1183,7 @@ export async function runSingleStepInner(
 			&& (!hiddenError?.hasError || hasEmptyTerminalAssistantResponse(run.messages))
 			? formatEmptyTerminalAssistantResponseError(run.messages)
 			: undefined;
-		const completionGuardOn = completionGuardEnabled(step.agent, step.completionGuard);
+		const completionGuardOn = completionGuardEnabled(step.completionGuard);
 		const completionToolPlan = resolvedTaskToolPlan;
 		const completionTools = completionToolPlan ? (completionToolPlan.explicitToolAllowlist ? completionToolPlan.effectiveToolAllowlist : undefined) : step.tools;
 		const mutationEvidence = collectTrackedMutationEvidence(mutationSnapshot, step.cwd ?? ctx.cwd);
@@ -1210,7 +1209,6 @@ export async function runSingleStepInner(
 			mutationCapable: hasMutationToolCapability(completionTools, completionToolPlan?.effectiveMcpTools ?? step.mcpDirectTools),
 			mutationAttemptObserved,
 			mutationEvidence: completionMutationEvidence,
-			agentContractEnabled: isAgentContract(step.agentContract),
 		});
 		const finalOutputHasPersistableFileContent = run.exitCode === 0 && !run.error && !emptyOutputError && Boolean(stripAcceptanceReport(run.finalOutput).trim());
 		const requiredOutput = step.outputMode === "file-only" && step.outputPath
@@ -1256,7 +1254,7 @@ export async function runSingleStepInner(
 			afterCompactionSettlement: run.afterCompactionSettlement === true,
 		});
 		const fileMutationEffect = completionEvidence.fileMutation ?? (missingRequiredOutputAfterMutation ? { status: "observed" as const, expected: completionEvidence.mutationExpected, attempted: true, evidence: mutationEvidence } : undefined);
-		finalResult = { ...run, exitCode: effectiveExitCode, model: candidate ?? run.model, error, structuredOutput, runtimeAcknowledgedExtensions, ...(step.agentContract ? { agentContract: step.agentContract } : {}), ...(fileMutationEffect || settlementDiagnostic ? { effects: { ...(fileMutationEffect ? { fileMutation: fileMutationEffect } : {}), ...(settlementDiagnostic ? { settlementDiagnostic } : {}) } } : {}) } as RunChildSessionResult;
+		finalResult = { ...run, exitCode: effectiveExitCode, model: candidate ?? run.model, error, structuredOutput, runtimeAcknowledgedExtensions, ...(fileMutationEffect || settlementDiagnostic ? { effects: { ...(fileMutationEffect ? { fileMutation: fileMutationEffect } : {}), ...(settlementDiagnostic ? { settlementDiagnostic } : {}) } } : {}) } as RunChildSessionResult;
 		if (run.stopped || run.timedOut || ctx.timeoutSignal?.aborted || ctx.stopSignal?.aborted || ctx.skipAcceptance?.()) break singleLaunch;
 		if (effectiveExitCode === 0 && !error) break singleLaunch;
 		if (completionEvidence.guardTriggered) break singleLaunch;
@@ -1358,7 +1356,6 @@ export async function runSingleStepInner(
 			stagedIndexBaseline,
 			signal: combinedAbortSignal([ctx.timeoutSignal, ctx.stopSignal]),
 			abortMessage: ctx.stopSignal?.aborted ? ctx.stopMessage ?? "Subagent stopped by user." : ctx.timeoutMessage ?? "Subagent timed out.",
-			reportOptional: isAgentContract(step.agentContract),
 			artifactsDir: ctx.artifactsDir,
 			runId: ctx.id,
 		}))
@@ -1373,7 +1370,7 @@ export async function runSingleStepInner(
 				: acceptance
 		: undefined;
 	const acceptanceFailure = effectiveAcceptance ? acceptanceFailureMessage(effectiveAcceptance) : undefined;
-	const acceptanceCanFailRun = acceptanceFailure && effectiveAcceptance?.explicit && (finalResult?.exitCode ?? 1) === 0 && !finalResult?.interrupted && !timedOutAfterAcceptance && !stoppedAfterAcceptance && !isAgentContract(step.agentContract);
+	const acceptanceCanFailRun = acceptanceFailure && effectiveAcceptance?.explicit && (finalResult?.exitCode ?? 1) === 0 && !finalResult?.interrupted && !timedOutAfterAcceptance && !stoppedAfterAcceptance;
 	const effectiveFinalExitCode = timedOutAfterAcceptance || stoppedAfterAcceptance ? 1 : acceptanceCanFailRun ? 1 : finalResult?.exitCode ?? 1;
 	const blockedReason = !stoppedAfterAcceptance && !timedOutAfterAcceptance ? parseBlockedReason(finalResult?.finalOutput) : undefined;
 	const baseFinalError = stoppedAfterAcceptance
@@ -1427,7 +1424,6 @@ export async function runSingleStepInner(
 		agent: step.agent,
 		...(childSessionName ? { sessionName: childSessionName } : {}),
 		context: step.context,
-		...(step.agentContract ? { agentContract: step.agentContract } : {}),
 		launchContractDigest: actualLaunchContractDigest,
 		output: outputForSummary,
 		outputState,
@@ -1464,7 +1460,7 @@ export async function runSingleStepInner(
 		launchResolvedExtensions,
 		...((finalResult as (RunChildSessionResult & { runtimeAcknowledgedExtensions?: RuntimeAcknowledgedChildExtensions }) | undefined)?.runtimeAcknowledgedExtensions ? { runtimeAcknowledgedExtensions: (finalResult as RunChildSessionResult & { runtimeAcknowledgedExtensions?: RuntimeAcknowledgedChildExtensions }).runtimeAcknowledgedExtensions } : {}),
 	});
-	return isAgentContract(step.agentContract) ? attachContractProjections(result as unknown as import("../../shared/types.ts").SingleResult) as unknown as typeof result : result;
+	return attachContractProjections(result as unknown as import("../../shared/types.ts").SingleResult) as unknown as typeof result;
 }
 
 async function runSingleStep(
@@ -1828,7 +1824,6 @@ export async function runSubagent(
 					label: task.label,
 					outputName: task.outputName,
 					structured: task.structured,
-					...(task.agentContract ? { agentContract: task.agentContract } : {}),
 					...(task.launchContractDigest ? { launchContractDigest: task.launchContractDigest } : {}),
 					...(task.launchResolvedExtensions ? { launchResolvedExtensions: task.launchResolvedExtensions } : {}),
 					...(task.capabilityCeiling ? { capabilityCeiling: task.capabilityCeiling } : {}),
@@ -1858,7 +1853,6 @@ export async function runSubagent(
 				outputName: step.collect.as,
 				structured: Boolean(step.collect.outputSchema),
 				...(step.parallel.contextLimit !== undefined ? { contextLimit: step.parallel.contextLimit } : {}),
-				...(step.agentContract ? { agentContract: step.agentContract } : {}),
 				...(step.capabilityCeiling ? { capabilityCeiling: step.capabilityCeiling } : {}),
 				...(step.thinkingCeiling ? { thinkingCeiling: step.thinkingCeiling } : {}),
 				status: "pending",
@@ -1881,7 +1875,6 @@ export async function runSubagent(
 				label: step.label,
 				outputName: step.outputName,
 				structured: step.structured,
-				...(step.agentContract ? { agentContract: step.agentContract } : {}),
 				...(step.launchContractDigest ? { launchContractDigest: step.launchContractDigest } : {}),
 				...(step.launchResolvedExtensions ? { launchResolvedExtensions: step.launchResolvedExtensions } : {}),
 				...(step.capabilityCeiling ? { capabilityCeiling: step.capabilityCeiling } : {}),
@@ -3283,7 +3276,6 @@ export async function runSubagent(
 				mode: config.mode,
 				async: true,
 				dynamicGroup: true,
-				agentContract: step.agentContract,
 			}));
 
 			if (materialized.parallel.length === 0) {
@@ -3315,14 +3307,13 @@ export async function runSubagent(
 						cwd,
 						signal: combinedAbortSignal([timeoutAbortController.signal, stopAbortController.signal]),
 						abortMessage: stopAbortController.signal.aborted ? stopMessage : timeoutMessage ?? "Subagent timed out.",
-						reportOptional: isAgentContract(step.agentContract),
 					}))
 					: undefined;
 				const groupStopped = stopped || stopAbortController.signal.aborted;
 				const groupTimedOut = !groupStopped && (timedOut || timeoutAbortController.signal.aborted);
 				const effectiveGroupAcceptance = groupTimedOut || groupStopped ? undefined : groupAcceptance;
 				if (placeholder && effectiveGroupAcceptance) placeholder.acceptance = effectiveGroupAcceptance;
-				const groupAcceptanceFailure = effectiveGroupAcceptance && (!isAgentContract(step.agentContract) || step.gateOn === "acceptance") ? acceptanceFailureMessage(effectiveGroupAcceptance) : undefined;
+				const groupAcceptanceFailure = effectiveGroupAcceptance ? acceptanceFailureMessage(effectiveGroupAcceptance) : undefined;
 				if (groupTimedOut || groupStopped || groupAcceptanceFailure) {
 					const errorMessage = groupStopped ? stopMessage : groupTimedOut ? timeoutMessage ?? "Subagent timed out." : groupAcceptanceFailure!;
 					statusPayload.state = groupStopped ? "stopped" : "failed";
@@ -3371,7 +3362,6 @@ export async function runSubagent(
 						mode: config.mode,
 						async: true,
 						dynamic: step.parallel.acceptanceInput === undefined,
-						agentContract: step.parallel.agentContract ?? step.agentContract,
 					})),
 					systemPrompt: step.parallel.namespaceOutputPath ? injectOutputPathSystemPrompt(step.parallel.systemPrompt ?? "", outputPath, step.parallel) : step.parallel.systemPrompt,
 					outputPath,
@@ -3395,7 +3385,6 @@ export async function runSubagent(
 					...(task.phase ?? step.phase ? { phase: task.phase ?? step.phase } : {}),
 					...(task.label ? { label: task.label } : {}),
 					structured: Boolean(task.structuredOutputSchema),
-					...(task.agentContract ? { agentContract: task.agentContract } : {}),
 					...(task.launchResolvedExtensions ? { launchResolvedExtensions: task.launchResolvedExtensions } : {}),
 					...(task.capabilityCeiling ? { capabilityCeiling: task.capabilityCeiling } : {}),
 					status: "pending",
@@ -3542,7 +3531,6 @@ export async function runSubagent(
 				setOptionalProperty(requiredStatusStep(statusPayload, fi), "error", stopped || childStopped ? stopMessage : timedOut ? (timeoutMessage ?? "Subagent timed out.") : singleResult.error);
 				setOptionalProperty(requiredStatusStep(statusPayload, fi), "transcriptPath", singleResult.transcriptPath ?? requiredStatusStep(statusPayload, fi).transcriptPath);
 				setOptionalProperty(requiredStatusStep(statusPayload, fi), "transcriptError", singleResult.transcriptError);
-				setOptionalProperty(requiredStatusStep(statusPayload, fi), "agentContract", singleResult.agentContract);
 				setOptionalProperty(requiredStatusStep(statusPayload, fi), "launchContractDigest", singleResult.launchContractDigest);
 				setOptionalProperty(requiredStatusStep(statusPayload, fi), "launchResolvedExtensions", singleResult.launchResolvedExtensions);
 				setOptionalProperty(requiredStatusStep(statusPayload, fi), "runtimeAcknowledgedExtensions", singleResult.runtimeAcknowledgedExtensions);
@@ -3577,7 +3565,6 @@ export async function runSubagent(
 					agent: pr.agent,
 					...(pr.sessionName ? { sessionName: pr.sessionName } : {}),
 					context: pr.context,
-					agentContract: pr.agentContract,
 					launchContractDigest: pr.launchContractDigest,
 					launchResolvedExtensions: pr.launchResolvedExtensions,
 					runtimeAcknowledgedExtensions: pr.runtimeAcknowledgedExtensions,
@@ -3620,7 +3607,7 @@ export async function runSubagent(
 			const failures = parallelResults.filter((result) => result.exitCode !== 0 && result.exitCode !== -1);
 			const acceptanceFailures = parallelResults
 				.map((result, originalIndex) => ({ result, originalIndex, task: dynamicSteps[originalIndex] }))
-				.filter(({ result, task }) => isAgentContract(task?.agentContract ?? step.agentContract) && task?.gateOn === "acceptance" && result.acceptance?.status === "rejected");
+				.filter(({ result }) => result.acceptance?.status === "rejected");
 			if (acceptanceFailures.length > 0) {
 				const message = acceptanceFailures
 					.map(({ result, originalIndex }) => `Dynamic item ${originalIndex + 1} (${result.agent}, key ${materialized.items[originalIndex]?.key ?? originalIndex}) acceptance rejected: ${(result.acceptance ? acceptanceFailureMessage(result.acceptance) : undefined) ?? "acceptance rejected"}`)
@@ -3650,13 +3637,12 @@ export async function runSubagent(
 							cwd,
 							signal: combinedAbortSignal([timeoutAbortController.signal, stopAbortController.signal]),
 							abortMessage: stopAbortController.signal.aborted ? stopMessage : timeoutMessage ?? "Subagent timed out.",
-							reportOptional: isAgentContract(step.agentContract),
 						}))
 						: undefined;
 					const groupStopped = stopped || stopAbortController.signal.aborted;
 					const groupTimedOut = !groupStopped && (timedOut || timeoutAbortController.signal.aborted);
 					const effectiveGroupAcceptance = groupTimedOut || groupStopped ? undefined : groupAcceptance;
-					const groupAcceptanceFailure = effectiveDynamicGroupAcceptance.explicit && effectiveGroupAcceptance && (!isAgentContract(step.agentContract) || step.gateOn === "acceptance") ? acceptanceFailureMessage(effectiveGroupAcceptance) : undefined;
+					const groupAcceptanceFailure = effectiveDynamicGroupAcceptance.explicit && effectiveGroupAcceptance ? acceptanceFailureMessage(effectiveGroupAcceptance) : undefined;
 					const groupError = groupStopped ? stopMessage : groupTimedOut ? timeoutMessage ?? "Subagent timed out." : groupAcceptanceFailure;
 					markDynamicGraphGroup(stepIndex, groupError ? groupStopped ? "stopped" : "failed" : "completed", groupError, effectiveGroupAcceptance);
 					if (groupError) {
@@ -3925,7 +3911,6 @@ export async function runSubagent(
 						setOptionalProperty(requiredStatusStep(statusPayload, fi), "error", stopped || childStopped ? stopMessage : timedOut ? (timeoutMessage ?? "Subagent timed out.") : singleResult.error);
 						setOptionalProperty(requiredStatusStep(statusPayload, fi), "transcriptPath", singleResult.transcriptPath ?? requiredStatusStep(statusPayload, fi).transcriptPath);
 						setOptionalProperty(requiredStatusStep(statusPayload, fi), "transcriptError", singleResult.transcriptError);
-						setOptionalProperty(requiredStatusStep(statusPayload, fi), "agentContract", singleResult.agentContract);
 						setOptionalProperty(requiredStatusStep(statusPayload, fi), "launchResolvedExtensions", singleResult.launchResolvedExtensions);
 						setOptionalProperty(requiredStatusStep(statusPayload, fi), "runtimeAcknowledgedExtensions", singleResult.runtimeAcknowledgedExtensions);
 						setOptionalProperty(requiredStatusStep(statusPayload, fi), "effects", singleResult.effects);
@@ -4002,7 +3987,6 @@ export async function runSubagent(
 					results.push(omitUndefinedProperties({
 						agent: pr.agent,
 						context: pr.context,
-						agentContract: pr.agentContract,
 						launchContractDigest: pr.launchContractDigest,
 						launchResolvedExtensions: pr.launchResolvedExtensions,
 						output: pr.output,
@@ -4110,12 +4094,12 @@ export async function runSubagent(
 					runId: id,
 					stepIndex,
 					success: parallelResults.every((r) => r.exitCode === 0 || r.exitCode === -1)
-						&& parallelResults.every((result, index) => !(isAgentContract(group.parallel[index]?.agentContract) && group.parallel[index]?.gateOn === "acceptance" && result.acceptance?.status === "rejected")),
+						&& parallelResults.every((result) => result.acceptance?.status !== "rejected"),
 				}));
 
 				const acceptanceGateFailure = parallelResults
 					.map((result, index) => ({ result, index, task: group.parallel[index] }))
-					.find(({ result, task }) => isAgentContract(task?.agentContract) && task?.gateOn === "acceptance" && result.acceptance?.status === "rejected");
+					.find(({ result }) => result.acceptance?.status === "rejected");
 				if (acceptanceGateFailure) {
 					statusPayload.error = (acceptanceGateFailure.result.acceptance ? acceptanceFailureMessage(acceptanceGateFailure.result.acceptance) : undefined) ?? "Parallel acceptance gate rejected the step.";
 					writeStatusPayload();
@@ -4295,7 +4279,6 @@ export async function runSubagent(
 				agent: singleResult.agent,
 				...(singleResult.sessionName ? { sessionName: singleResult.sessionName } : {}),
 				context: singleResult.context,
-				agentContract: singleResult.agentContract,
 				launchContractDigest: singleResult.launchContractDigest,
 				launchResolvedExtensions: singleResult.launchResolvedExtensions,
 				runtimeAcknowledgedExtensions: singleResult.runtimeAcknowledgedExtensions,
@@ -4397,7 +4380,6 @@ export async function runSubagent(
 			setOptionalProperty(requiredStatusStep(statusPayload, flatIndex), "error", stopped || childStopped ? stopMessage : timedOut ? (timeoutMessage ?? "Subagent timed out.") : singleResult.error);
 			setOptionalProperty(requiredStatusStep(statusPayload, flatIndex), "transcriptPath", singleResult.transcriptPath ?? requiredStatusStep(statusPayload, flatIndex).transcriptPath);
 			setOptionalProperty(requiredStatusStep(statusPayload, flatIndex), "transcriptError", singleResult.transcriptError);
-			setOptionalProperty(requiredStatusStep(statusPayload, flatIndex), "agentContract", singleResult.agentContract);
 			setOptionalProperty(requiredStatusStep(statusPayload, flatIndex), "launchResolvedExtensions", singleResult.launchResolvedExtensions);
 			setOptionalProperty(requiredStatusStep(statusPayload, flatIndex), "runtimeAcknowledgedExtensions", singleResult.runtimeAcknowledgedExtensions);
 			setOptionalProperty(requiredStatusStep(statusPayload, flatIndex), "effects", singleResult.effects);
@@ -4493,7 +4475,7 @@ export async function runSubagent(
 			}
 
 			flatIndex++;
-			if (isAgentContract(seqStep.agentContract) && seqStep.gateOn === "acceptance" && singleResult.acceptance?.status === "rejected") {
+			if (singleResult.acceptance?.status === "rejected") {
 				statusPayload.error = acceptanceFailureMessage(singleResult.acceptance) ?? "Chain acceptance gate rejected the step.";
 				writeStatusPayload();
 				break;
@@ -4718,7 +4700,6 @@ export async function runSubagent(
 				truncated: r.truncated,
 				transcriptPath: r.transcriptPath,
 				transcriptError: r.transcriptError,
-				agentContract: r.agentContract,
 				launchContractDigest: r.launchContractDigest,
 				launchResolvedExtensions: r.launchResolvedExtensions,
 				runtimeAcknowledgedExtensions: r.runtimeAcknowledgedExtensions,

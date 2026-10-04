@@ -28,6 +28,8 @@ Children never spawn subagents: delegation is a parent-only capability.
 
 ## Launch shape
 
+When delegating a task that should change files, ensure the agent has `completionGuard: true` (the builtin `worker` has it on by default).
+
 | Need | Use |
 | --- | --- |
 | One bounded task for one child | direct `{ agent, task }` |

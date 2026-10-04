@@ -20,7 +20,6 @@ describe("planCompletionEvidence", () => {
 			guard: { expectedMutation: true, attemptedMutation: false, triggered: true, blocked: false },
 			completionGuardEnabled: true,
 			mutationCapable: true,
-			implementationMutationExpected: true,
 			mutationAttemptObserved: false,
 			mutationEvidence: evidence,
 			agentContractEnabled: false,
@@ -42,7 +41,6 @@ describe("planCompletionEvidence", () => {
 			guard: { expectedMutation: true, attemptedMutation: false, triggered: true, blocked: false },
 			completionGuardEnabled: true,
 			mutationCapable: true,
-			implementationMutationExpected: true,
 			mutationAttemptObserved: false,
 			agentContractEnabled: true,
 		});
@@ -52,12 +50,11 @@ describe("planCompletionEvidence", () => {
 		assert.equal(plan.legacyFailureError, undefined);
 	});
 
-	it("projects blocked tool availability and arbiter rescue consistently", () => {
+	it("projects blocked tool availability and observed/not-applicable completions", () => {
 		const blocked = planCompletionEvidence({
 			guard: { expectedMutation: true, attemptedMutation: false, triggered: false, blocked: true, message: "tools unavailable" },
 			completionGuardEnabled: true,
 			mutationCapable: false,
-			implementationMutationExpected: true,
 			mutationAttemptObserved: true,
 			agentContractEnabled: false,
 		});
@@ -78,30 +75,39 @@ describe("planCompletionEvidence", () => {
 			afterCompactionSettlement: false,
 		});
 
-		const rescued = planCompletionEvidence({
-			guard: { expectedMutation: true, attemptedMutation: false, triggered: true, blocked: false },
+		const observed = planCompletionEvidence({
+			guard: { expectedMutation: true, attemptedMutation: true, triggered: false, blocked: false },
 			guardTriggered: false,
 			completionGuardEnabled: true,
 			mutationCapable: true,
-			implementationMutationExpected: true,
-			mutationAttemptObserved: false,
-			arbiterRescued: true,
+			mutationAttemptObserved: true,
 			agentContractEnabled: false,
 		});
-		assert.deepEqual(rescued.fileMutation, {
-			status: "not-applicable",
+		assert.deepEqual(observed.fileMutation, {
+			status: "observed",
 			expected: true,
-			attempted: false,
-			resolvedBy: "llm-intent-arbiter",
+			attempted: true,
 		});
-		assert.equal(rescued.legacyFailureError, undefined);
+		assert.equal(observed.legacyFailureError, undefined);
+
+		const notApplicable = planCompletionEvidence({
+			guard: { expectedMutation: false, attemptedMutation: false, triggered: false, blocked: false },
+			completionGuardEnabled: true,
+			mutationCapable: true,
+			mutationAttemptObserved: false,
+			agentContractEnabled: false,
+		});
+		assert.deepEqual(notApplicable.fileMutation, {
+			status: "not-applicable",
+			expected: false,
+			attempted: false,
+		});
 	});
 
 	it("derives fallback expectation when terminal failure prevents guard evaluation", () => {
 		const plan = planCompletionEvidence({
 			completionGuardEnabled: true,
 			mutationCapable: true,
-			implementationMutationExpected: true,
 			mutationAttemptObserved: false,
 			agentContractEnabled: false,
 		});
@@ -115,7 +121,6 @@ describe("projectSettlementDiagnostic", () => {
 		const plan = planCompletionEvidence({
 			completionGuardEnabled: true,
 			mutationCapable: true,
-			implementationMutationExpected: true,
 			mutationAttemptObserved: false,
 			agentContractEnabled: false,
 		});
@@ -137,7 +142,6 @@ describe("projectSettlementDiagnostic", () => {
 		const plan = planCompletionEvidence({
 			completionGuardEnabled: false,
 			mutationCapable: false,
-			implementationMutationExpected: false,
 			mutationAttemptObserved: false,
 			agentContractEnabled: false,
 		});

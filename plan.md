@@ -66,3 +66,15 @@ Plus a manual smoke: launch an async `workflowScript` run, confirm status/Fleet 
 - Renaming `chain-root-attachment.ts` → `async-root-attachment.ts` (rather than keeping the chain-named file) is consistent with the hard-cutover rule; its surviving functions are workflow/single infrastructure.
 - The `chain-runs` artifact directory rename is a breaking change for existing on-disk runs; old run artifacts become invisible by design (no compat alias), per VISION.md:51-57 and the work-item instruction.
 - `SUBAGENT_RPC_MANAGEMENT_ACTIONS = [] as const` stays as-is (already empty).
+
+## EXECUTE STATUS (updated after first worker timed out — read this first)
+
+Steps 1-6 are DONE and committed (fa218edd, 7157bcad, 0e84f094, 6017e46e): chain modules deleted, async-root-attachment renamed, settings/agents/executor/async-execution/subagent-runner chain paths removed, SubagentRunMode collapsed to `"single" | "workflow"`, public-execution legacy branches collapsed, chain test files deleted, stray `x`/`pnpm-lock.yaml` removed (npm repo — do NOT run pnpm or recreate them). Do NOT redo Steps 1-6.
+
+Remaining work, verified against this tree:
+1. **`npm run typecheck` is RED — exactly 16 errors.** 3 in `src/slash/slash-live-state.ts` (:87 `mode:"parallel"`, :147 `mode:"chain"`, :231 comparison — make synthetic entries `"workflow"` or delete if chain-only) and 13 in `src/tui/render.ts` (stale `"chain"`/`"parallel"`/`chainAgents` comparisons at ~:1896,:1897,:1900,:2009,:2023,:2163,:2331,:2341,:2371,:2388,:3140,:3462). Commit a543a9a8 already deleted the parallel/chain branches in `widgetParallelAgentDetails`/`activeParallelWidgetGroup`. Fix by DELETING dead branches (hard cutover); keep composite `"workflow"` step rendering via the surviving steps/`workflowGraph`/`buildChainStepSpans` projection; `widgetChainDetails` (~:1568) dies.
+2. **Step 9 (tests):** 7 test files still hold `.chain.md`/`.chain.json` fixture assertions; 13 files still hold `"was removed"`/`"Legacy "` assertions. `grep -rln` them, delete per plan (never rewrite to old behavior); add the loud-`.chain`-rejection test.
+3. **Step 10 (docs):** strip chain language per plan (35 hits across docs/).
+4. Then Verification section in order: typecheck → typecheck:tests → test:all → check:dead-code → 3 greps.
+
+Budget discipline: the prior worker exhausted 30 min (338 calls) covering Steps 1-6 (~65% of scope). Remaining is ~35% — go straight at the 16 tsc errors first, then mechanical test/doc deletions; leave margin for test:all and the review loop.

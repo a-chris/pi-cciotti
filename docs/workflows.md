@@ -251,7 +251,7 @@ subagent_workflow({ source: `
 
 ### Migrating old chain shapes
 
-The removed legacy API — top-level `chain`, `chainDir`, the `/chain`, `/parallel`, and `/run-chain` commands, and durable `.chain.md` definitions — has no public replacement shape; public callers receive a loud rejection pointing at `workflowScript`. Rewrite any saved automation as JavaScript:
+The removed legacy API — top-level `chain`, `chainDir`, the `/chain`, `/parallel`, and `/run-chain` commands, and durable `.chain.md` definitions — has no public replacement shape; public callers receive a loud rejection pointing at the scripted workflow parameter. Rewrite any saved automation as JavaScript:
 
 ```js
 // Removed legacy shape:

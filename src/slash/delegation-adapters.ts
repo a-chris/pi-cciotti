@@ -65,7 +65,7 @@ export interface PromptTemplateBridgeResult {
 	isError?: boolean;
 	content?: unknown;
 	details?: {
-		mode?: "single" | "parallel" | "chain" | "workflow" | "management";
+		mode?: "single" | "workflow" | "management";
 		runId?: string;
 		timedOut?: boolean;
 		stopped?: boolean;

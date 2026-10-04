@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { writePendingAsyncResultFile } from "../../src/runs/background/result-files.ts";
-import { waitForImportedAsyncRoot } from "../../src/runs/background/chain-root-attachment.ts";
+import { waitForImportedAsyncRoot } from "../../src/runs/background/async-root-attachment.ts";
 
 let tempDir: string;
 
@@ -22,9 +22,9 @@ function root(runId = "root-run", index = 0) {
 	};
 }
 
-describe("async chain root attachment", () => {
+describe("async root attachment", () => {
 	beforeEach(() => {
-		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-chain-root-attachment-"));
+		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-async-root-attachment-"));
 	});
 
 	afterEach(() => {

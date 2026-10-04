@@ -1,130 +1,116 @@
-# Context for: Remove the chain orchestration subsystem (plan.md / issue #20)
+# Context for: Remove chain orchestration — worker brief (post-Steps 1–6)
 
-Repo: `a-chris/pi-cciotti` — worktree `/Users/chris/github/.pi-perl-pi-subagents-remove-chain-orchestration`, branch `perl/work-remove-chain-orchestration` (clean at `afdf5ad2`). Read `VISION.md` before deciding anything; hard-cutover policy is at VISION.md:50-57 (no aliases/legacy paths). Read `plan.md` in full — line numbers in plan.md were verified against this checkout but WILL drift; re-grep before each edit.
+Repo `a-chris/pi-cciotti`, worktree `/Users/chris/github/.pi-perl-pi-subagents-remove-chain-orchestration`, branch `perl/work-remove-chain-orchestration`, working tree CLEAN. Read `plan.md` (EXECUTE STATUS section first) and `VISION.md:50-57` (hard cutover: no aliases/legacy paths; tests prove current contract, delete obsolete assertions instead of serving them).
 
-Everything below was re-verified against the current checkout in this run.
+**Everything below was re-verified against the current tree in this scout run** (commits `fa218edd`, `0e84f094`, `7157bcad`, `a543a9a8`, `f018ee38` = plan.md with EXECUTE STATUS). Plan's Steps 1–6 are committed; do NOT redo them. What "done" means is verified below under **Current State** — including places where the plan's "done" claim is contradicted by the tree.
 
-## The one non-obvious survival trap (plan finding 1)
+# Files Retrieved
 
-`src/runs/background/chain-root-attachment.ts` (256 LOC) must be **renamed**, not deleted: `waitForImportedAsyncRoot` / `resolveAsyncRootResultPath` / `ImportedAsyncRoot` / `ImportedAsyncRootResult` are used by the surviving workflowScript awaited-async + revive paths. Only the chain-step `importAsyncRoot` consumer in `subagent-runner.ts` (`:137`, step handling `~:700-721`) dies. Rename file → `src/runs/background/async-root-attachment.ts`, rename the unit test, update import sites.
+- `plan.md` (whole file) — scope, findings 1–10, steps, verification, EXECUTE STATUS.
+- `src/slash/slash-live-state.ts` (310 LOC, whole) — 3 of the 16 tsc errors.
+- `src/tui/render.ts` (3646 LOC; read error-line neighborhoods) — 13 of the 16 tsc errors.
+- `src/shared/types.ts` (:385 modes, :813 AsyncJobState key list, :1306 `chainAgents?`, :2524 `WORKFLOW_RUNS_DIR`) — mode/type surface.
+- `src/extension/public-execution.ts` (:120-180) — surviving loud-rejection shape (steps 1 done).
+- `src/runs/background/subagent-runner.ts`, `src/runs/shared/chain-outputs.ts` (30 LOC), `src/runs/background/parallel-groups.ts` (45 LOC), `src/runs/background/async-root-attachment.ts` (256 LOC) — surviving modules with chain-origin names.
+- `scripts/typecheck-tests.mjs` (whole) + `test/typecheck-baseline.json` — test typecheck ratchet mechanics.
+- `package.json`, `knip.jsonc`, `VISION.md:45-60`, `docs/*` (grep), `test/` (targeted greps + a 17-file `node --test` run for baseline failures).
 
-## Files & Seams to Touch (by plan step)
+# Current State (verified against tree — read this first)
 
-### Step 1 — `src/extension/public-execution.ts` (273 LOC, NOT `src/runs/public-execution.ts`)
-- Entry: `normalizePublicSubagentExecution()` — the per-legacy-field rejection branches to collapse into ONE generic message:
-  - `params.chainName !== undefined` rejection (~`:116-118`, "Durable chain management was removed…")
-  - `config.steps` object rejection (~`:119-121`)
-  - `params.resume` rejection (~`:122-124`)
-  - `hasLegacyOrchestration` = `tasks/chain/parallel/concurrency/chainDir` (~`:126-128`, "Legacy top-level chain and parallel inputs were removed…")
-  - legacy actions: `append-step` (:130-132), `approve-checkpoint/reject-checkpoint` (:134-136), `single` (:137-139), `parallel|tasks|chain` (:140-142)
-  - `params.step !== undefined` rejection (~`:152`, "step is not a public execution field…")
-- Keep ONE generic "unknown/unsupported top-level params" rejection naming the supported surface (`agent`+`task`, `workflowScript`, current actions). Keep the `:141`-adjacent chain-management message only if merged into that generic form (plan says delete).
-- `SUBAGENT_RPC_MANAGEMENT_ACTIONS = [] as const` at `src/extension/rpc.ts:65` — leave as-is.
+## 1. `npm run typecheck` is RED — exactly 16 errors (re-run confirmed, list is complete)
 
-### Step 2 — delete/rename modules (imports to fix)
-| File | LOC | Action | Living consumers |
-|---|---|---|---|
-| `src/agents/chain-serializer.ts` | 280 | delete | `agents.ts:16` (`parseChain, parseJsonChain`); `test/unit/agent-frontmatter.test.ts:9`; `test/unit/chain-serializer.test.ts` |
-| `src/runs/background/chain-append.ts` | 321 | delete | `subagent-runner.ts:138`; `async-execution.ts:75` (`statusStepDescription`); `subagent-executor.ts:51` (`enqueueChainAppendRequest, readPendingChainAppendRequests, runnerStepOutputNames`); `test/integration/async-execution.part-3.test.ts:21`; `test/unit/chain-append.test.ts` |
-| `src/runs/shared/dynamic-fanout.ts` | 297 | delete | `subagent-runner.ts:94` (`DynamicFanoutError, materializeDynamicParallelStep, validateDynamicCollection`); `chain-outputs.ts:3` (dies with it); `test/unit/dynamic-fanout.test.ts` |
-| `src/runs/background/chain-root-attachment.ts` | 256 | **rename** → `src/runs/background/async-root-attachment.ts` | `subagent-runner.ts:137`; `async-execution.ts:71` (type-only); `subagent-executor.ts:86`; `test/unit/chain-root-attachment.test.ts:7` |
-| `src/runs/shared/chain-outputs.ts` | 107 | delete (unless single path needs output refs) | `subagent-runner.ts:89` (`outputEntryFromAsyncResult, resolveOutputReferences` — used at `:754`, `:4059`, `:4356`, chain/step paths); `async-execution.ts:37` (chain-only `validateChainOutputBindings`); `subagent-executor.ts:52` (`at :1234`, `:2426-2428` chain paths); `chain-serializer.ts:4`; `dynamic-fanout.test.ts:3` |
-| `src/runs/background/parallel-groups.ts` | 45 | delete if nothing survives | `render.ts:31`; `stale-run-reconciler.ts:9`; `async-job-tracker.ts:20`; `run-status.ts:20`; `async-status.ts:12` — all chain/parallel-mode machinery; verify each after mode collapse |
+**`src/slash/slash-live-state.ts` (3):**
+- `:87` `mode: "parallel"` — inside `buildParallelInitialResult` (dead: `params.tasks` no longer reachable).
+- `:147` `mode: "chain"` — inside `buildChainInitialResult` (dead: `params.chain` no longer reachable).
+- `:231` `details.mode === "chain"` — inside `applySlashUpdate` (currentStepIndex propagation).
 
-### Step 3 — `src/shared/settings.ts` (385 LOC)
-- Chain exports to remove: `SequentialStep`, `ParallelTaskItem`, `DynamicExpandSpec`, `DynamicParallelTemplate`, `DynamicCollectSpec`, `DynamicParallelStep`, `ParallelStep`, `ChainStep` (`:25-118`); `isParallelStep` (:124); `isDynamicParallelStep` (:128); `getStepAgents` (:133); `createChainDir` (:147); `cleanupOldChainDirs` (:153); `ResolvedTemplates`/`resolveChainTemplates` (:182-210); `resolveChainPath` (:230); `buildChainInstructions` (:256); **`resolveParallelBehaviors` (:300-379) — delete ENTIRELY** (plan.md lists it both "remove" and under the confusing "keep the helpers, drop the chainSkills param" note; it is chain-only — its only consumer is `async-execution.ts` `buildAsyncRunnerSteps` chain path `:965,:1002,:1203,:1232`, which dies in Step 2. The `chainSkills` param at settings.ts:319,369-375 is INSIDE `resolveParallelBehaviors`); the `aggregateParallelOutputs` re-export at `:385`.
-- Keep (surviving consumers): `expandHomePath` (`agents.ts:2335,:2350`); `resolveExistingReadInstructionPaths` / `resolveExistingReadPaths` (`async-execution.ts:1746-1747` single path, `subagent-executor.ts:38,:3713`, `slash-commands.ts:880`); `writeInitialProgressFile` (`subagent-runner.ts:133,:1677`).
-- `CHAIN_RUNS_DIR` import at `settings.ts:11` dies with `createChainDir`/`cleanupOldChainDirs` — but NOTE: the constant itself lives in `src/shared/types.ts:2531` and is renamed in Step 5; only the settings.ts import dies.
-- Importers of settings.ts: `subagent-runner.ts:133`, `async-execution.ts:20`, `subagent-executor.ts:34-44` — prune their chain-shaped imports.
-- `src/extension/index.ts:399` — remove `cleanupOldChainDirs()` call; `:32` import.
+Dead-with-them (delete too): `isParallelChainStep` (:111), `chainStepLabel`, `flattenChainResults`, `ChainStepLike`/`SequentialChainStepLike`/`ParallelChainStepLike` types (:28-39), and the `buildSlashInitialResult` dispatch that picks parallel/chain (:246-250) — reduce to `buildSingleInitialResult` only (`mode: "single"`; it already handles `workflowScript` via `previewSimpleWorkflowRun`).
 
-### Step 4 — `src/agents/agents.ts` (2901 LOC) discovery
-- Remove: `parseChain, parseJsonChain` import (:16); `getUserChainDir` (:356); `PackageChainPath` interface (:373) + `chains` field plumbing (:381, :522, :541-546, :649-684); `.chain.md` exclusion in `listAgentDefinitionFiles` (:1860); `loadChainsFromDir` (:2222-2247); `resolveNearestProjectChainDirs` (:2272); source-load plumbing (:2444-2446, :2634-2636); `getAgentDiscoverySources` `includeChains` param (:2646, :2650, :2662); `buildAllDiscovery` chain merge (:2790-2822); snapshot fields `chains`/`chainDiagnostics` (:2393-2394); `discoverAgentSnapshot` options `includeChains` (:2837-2841).
-- **Loud rejection**: when the directory scan (`listFilesRecursive`-driven, `shouldPruneDiscoveryDir` at :1722) encounters a `chains/` dir or `*.chain.md`/`*.chain.json` file, emit an `AgentDiscoveryDiagnostic`-style entry: `Chain definitions (.chain.md/.chain.json) were removed; convert to workflowScript (see /prompt-workflow)`. Never parse them.
-- **Keep residual types** (compile only — proactive-skills.ts + identity.ts): `ChainStepConfig` (:213), `ChainConfig` (:236), `ChainDiscoveryDiagnostic` (:247), and `AgentDiscoveryDiagnostic extends ChainDiscoveryDiagnostic` (:253). Plan: prefer folding `ChainDiscoveryDiagnostic` into `AgentDiscoveryDiagnostic` if it carried only chain fields (it does: source/filePath/error).
-- `src/extension/index.ts:496` — `discoverAgentSnapshot(cwd, scope, preferredModelProvider, { includeChains: false })` option removal (also at `:497` region). `test/unit/agent-discovery-cache.test.ts` passes `{ includeChains: false }` at :70,:89,:136,:159,:182.
-- `src/agents/identity.ts:24` — keep `ChainConfig` in the union, no change.
+**`src/tui/render.ts` (13):** `:1896`, `:1897`, `:1900` (inside `buildMultiProgressLabel` — `hasParallelInChain`/`activeParallelGroup`/`itemTitle`), `:2009`+`:2023` (inside `widgetStats` `job.activeParallelGroup` / `job.currentStep` branches), `:2163` (nested-children `steps` condition), `:2331` (`widgetChainDetails` call), `:2341`+`:2371` (step totals), `:2388` (compact widget collapse condition), `:3140`+`:3462` (duration aggregation `d.mode === "chain"`).
 
-### Step 5 — mode collapse
-- `src/shared/types.ts:385` `SubagentRunMode = "single" | "parallel" | "chain" | "workflow"` → `"single" | "workflow"`; `:386` `SubagentResultMode = SubagentRunMode` follows.
-- `src/shared/types.ts:2281` delete `interface ExtensionChainConfig` (only field `dynamicFanout.maxItems`); `:2422` delete `chain?: ExtensionChainConfig`.
-- `src/missions/types.ts:12` `MissionRunMode = "single" | "parallel" | "chain" | "workflow" | "external"` → `"single" | "workflow" | "external"`.
-- Artifact-dir rename (plan finding 9): `types.ts:2531` `CHAIN_RUNS_DIR = path.join(TEMP_ROOT_DIR, "chain-runs")` → `WORKFLOW_RUNS_DIR = .../workflow-runs`; `types.ts:2537` `DIRS.chain` rename. Update `src/shared/artifacts.ts`: `:3` import, `:18` legacy-layout probe `.pi/subagents/chain-runs/run.json` (decide: keep as read-only migration notice only if removing breaks a test — `test/unit/artifacts.test.ts` asserts `:60`/`:66-69` and `:52-53` packaging-warning paths), `:137-150` `getProjectChainRunsDir`/`getChainRunsDir`. Update `src/extension/doctor.ts` `:12,:24,:52,:229` ("chain runs" → "workflow runs"); `test/unit/doctor.test.ts:88` (`chainRunsDir: path.join(root, "missing-chains")`) and any artifacts.test.ts assertions.
-- `mode: "chain" | "parallel"` literal references to update (verified):
-  - `async-status.ts:693,:696-697` (parallel/chain step-label branches; `:684-698` region)
-  - `async-job-tracker.ts:689` `mode: info.mode ?? (info.chain ? "chain" : "single")` — plan says fallback becomes `info.workflowScript ? "workflow" : "single"`; **verify the field**: `AsyncStartedEvent` (types.ts:1514) has NO `workflowScript`; it has `mode?`, `workflowGraph?`, `workflowKey?`, `parentWorkflowRunId?`. Use `info.mode ?? (info.workflowGraph ? "workflow" : "single")` or just `"single"` — decide with tsc. Also `:669` `info.chain` fallback for `rawAgents`.
-  - `run-status.ts:146-148` (parallel/chain step labels)
-  - `stale-run-reconciler.ts:202-217` (`chainStepCount`/`parallelGroups` propagation — drop if chain-only)
-  - `async-resume.ts:303` (mode allowlist)
-  - `async-retention.ts:27` (`RUN_MODES` set)
-  - `missions/lifecycle.ts:91-94` (`missionRunModeForResult`; `mode` value is `Details["mode"]`, which already collapses — but the `["single","parallel","chain","workflow"].includes(...)` allowlist at `:354` must drop parallel/chain), `missions/store.ts:34`
-  - `slash-live-state.ts:87` (`mode: "parallel"`), `:111`, `:147` (`mode: "chain"`), `:231`
-  - `slash/delegation-adapters.ts:68` (mode union `"single" | "parallel" | "chain" | "workflow" | "management"`)
-  - `foreground-history.ts:120` (restorable-run check)
-  - `nested-events.ts:362,:366` (mode + chainStepCount passthrough)
-  - `tui/fleet-status.ts:202,:215,:439,:459,:609`
-  - `api/preflight.ts` — grep shows NO `chain`/`parallel` strings; nothing to change.
-  - `src/runs/shared/async-status-projection.ts` — grep shows 0 `chain` hits already (two-mode: `kindForMode` at :186 returns `"workflow" | "subagent"`); plan's "find via grep" yields nothing.
+Surviving render machinery to KEEP (workflow path): `buildChainStepSpans` (:1620, uses `workflowGraph` first, falls back to `chainAgents`), `buildAsyncChainStepSpans`, `ChainStepSpan` interface (:1619), `flatToLogicalStepIndex` (import :31 from `../runs/background/parallel-groups.ts`), `activeParallelWidgetGroup`/`parallelWidgetGroupDetails`/`widgetParallelAgentDetails` (already de-chained in a543a9a8), the `mode === "workflow"` branch inside `buildMultiProgressLabel` (:1930-1948), workflow checklist/stage/`workflowGraph` projection. `widgetChainDetails` (:1565-1584) dies. Only delete dead branches — keep composite `"workflow"` step rendering through the surviving steps/workflowGraph projection. `chainAgents` (types.ts:1306) and `chainStepCount`/`parallelGroups`/`currentStepIndex`/`totalSteps` fields REMAIN on `Details`/`AsyncJobState` and are read by surviving code (async-job-tracker still normalizes them) — do not delete those fields now.
 
-### Step 6 — `src/runs/foreground/subagent-executor.ts` (6898 LOC — the big one)
-- `:337-341` internal durable-run compat fields (`chain?`, `tasks?`, `concurrency?`) — delete (comment at :337).
-- `params.chain`/`params.tasks`/`params.parallel` branches: `:539`, `:618-632` (step/count planning), `:1705` (attach root error), `:1726` (`attachChain`), `:2259-2311` (task/chain schema projection incl. `projectChainOutputSchemas` at :2311), `:2342-2428` (validation region, `validateChainOutputBindingsWithContext` at :1234,:2426-2428, `getStepAgents`-style loops), `:2550-2557`.
-- `getRequestedModeLabel` (:2440-2444) → return only `"single" | "workflow"` (drop the `chain`/`parallel` branches).
-- `inferExecutionMode` (:3976-3981) → `params.workflowScript !== undefined ? "workflow" : "single"`.
-- `appendStepToAsyncChain` (:1138-1290) — delete; `:1293` `resultMode: "chain"` dies with it; `:6106-6112` `action === "append-step"` dispatch — delete.
-- `isComposite` (:2660) → `(params.workflowScript ?? params.workflowScriptPath) !== undefined`. Wait — current is `(params.chain?.length ?? 0) > 0 || (params.tasks?.length ?? 0) > 0 || params.workflowScript !== undefined`; plan: reduce to `params.workflowScript !== undefined`.
-- Keep workflowScript handling untouched: `loadWorkflowScriptPath` (:486-500), run dispatch (:4632-4726).
-- Knip `rules: { "exports": "warn", "types": "warn" }` (non-blocking) — other knip findings are hard errors; see `knip.jsonc`.
+## 2. Verification grep 1 will still fail after the 16 errors are fixed — 30 hits today, categorized
 
-### Step 7 — TUI render (`src/tui/render.ts`, 87 chain/parallel hits; `src/tui/fleet-status.ts`)
-- `render.ts`: `:607` (empty steps guard for parallel/chain), `:1107-1108` (detail mode labels), `:1568` `widgetChainDetails` (delete function), `:1590-1599` (chain step widget branch), `:1746-1747`, `:1861-1985` (active-parallel-group machinery: `hasParallelInChain` :1920, `activeParallelGroup` :1921-1924, `buildMultiProgressLabel` :1918), `:2061-2075`, `:2215`, `:2383-2440` (`job.mode === "chain"` branches and chain step counts), `:3192,:3514` duration aggregations. Composite `"workflow"` runs must still render steps via the surviving `steps`/`workflowGraph` projection (`:366`, `:422`, `:448`, `:623-631`, `:1069-1070`, `:1628-1632` `buildChainStepSpans` — keep the workflowGraph path).
-- `fleet-status.ts`: `:202,:215` (chain/parallel steps), `:439,:459` (chain current-step skipping), `:609` (`isActiveState` allowlist).
-- `async-status-projection.ts` — no change needed (already workflow/other two-mode).
+`grep -rn "\"chain\"\|chainName\|chainDir\|append-step" src --include='*.ts'` currently:
+- **Must-fix (the 16 tsc errors):** `tui/render.ts:1896,1897,1900,2009,2023,2163,2331,2341,2371,2388,3140,3462`; `slash/slash-live-state.ts:147,231` (+ `:87`).
+- **Plan-authorized keep (loud rejection / survived guards):** `extension/public-execution.ts:141,146,155` (`chainName`/`chainDir`/`"append-step"` rejection detection — step 1 done, message generic: "Unknown or unsupported top-level parameter. Public execution supports only { agent, task? } … and the current control actions."); `workflows/scripted-workflow.ts:397,2115` (legacy top-level param guards); `slash/prompt-workflows.ts:27,87` (`chain:` frontmatter → workflowScript — acceptance criterion 3, must NOT touch).
+- **Leftover from step 5 the plan claims done but the tree contradicts — decide + fix (compiles, so no tsc signal):** `missions/types.ts:12` `MissionRunMode = "single" | "parallel" | "chain" | "workflow" | "external"` (plan step 5 says → `"single" | "workflow" | "external"`; no commit touched missions), `missions/store.ts:34` (same `MISSION_RUN_MODES` set — if you narrow `MissionRunMode`, this set is a type error → update it), `missions/lifecycle.ts:354` (`["single","parallel","chain","workflow"].includes(event.mode)` — narrow and coerce persisted old values, e.g. map legacy chain/parallel to `"single"` or drop), `slash/delegation-adapters.ts:68` (mode union `"single" | "parallel" | "chain" | "workflow" | "management"` — collapse to `"single" | "workflow" | "management"`).
+- **Name-only residuals in surviving code (plan silent; compiles; grep-flagged — rename only if you want grep 1 fully clean, otherwise document):** `shared/settings.ts:170-174` `resolveChainPath(filePath, chainDir)` — now internal only, resolves instruction paths; rename to non-chain name (e.g. `resolveInstructionPath`/`instructionDir`). `runs/foreground/subagent-executor.ts:299` `chainName?: string` and `:382` `chainDir?: string` on `SubagentParamsLike` — required by public-execution's rejection checks; keep unless you also rework the rejection.
 
-### Step 8 — parallel-support module audit
-- `workflow-graph.ts` (225) — **keep** (render.ts:41, async-execution.ts:36).
-- `parallel-handoff.ts` (389) — consumers `async-resume.ts:14`, `retained-children.ts:5`, `subagent-runner.ts:142`, `subagent-executor.ts:71` are all SURVIVING paths (worktree handoff, async resume). Keep unless knip proves otherwise.
-- `parallel-utils.ts` (271) — surviving consumers: `scripted-workflow.ts:5` (`DEFAULT_GLOBAL_CONCURRENCY_LIMIT, Semaphore`), `utils.ts:586` (`mapConcurrent` re-export), `subagent-runner.ts:70-78` (mixed single/chain use of `mapConcurrent` at :3473,:3831, `flattenSteps` :72,:1824,:2414 — check if :2414 chain-append path dies with it), `settings.ts:385` re-export (dies). `RunnerSubagentStep`/`RunnerStep`/`isParallelGroup`/`isDynamicRunnerGroup`/`aggregateParallelOutputs` — mostly chain-shaped; let knip decide.
-- `child-launch-plan.ts` (162) — keep (settings.ts, async-execution.ts, subagent-executor.ts import it); `projectChainOutputSchemas` (:66) looks chain-only — tsc/knip decide.
+## 3. Tests: what actually fails today (empirical run of the affected unit files)
 
-### Step 9 — tests (delete, don't port)
-- Delete: `test/unit/chain-serializer.test.ts`, `test/unit/chain-append.test.ts`, `test/unit/dynamic-fanout.test.ts`.
-- Rename: `test/unit/chain-root-attachment.test.ts` → `async-root-attachment.test.ts` (fix import `:7`, temp-dir prefix `:27` `pi-chain-root-attachment-`; keep only surviving-function assertions).
-- Strip `.chain.md`/`.chain.json` fixtures and `"was removed"`/`"Legacy "` assertions from (verified chain references exist in): `agent-discovery-cache.test.ts` (`:103,:226,:334`), `pi-coding-agent-dir.test.ts` (`:119,:141`), `agent-exclude-dirs.test.ts` (`:212,:219`), `agent-frontmatter.test.ts` (`:9` import), `proactive-skills.test.ts` (keep pure recommend/format cases, drop chain-discovery cases `:26-88`), `agent-management.test.ts` (`:764-766`), `doctor.test.ts` (`:43-88`), `async-resume.test.ts` (`:158,:162,:520,:865-958`), `artifacts.test.ts` (`:52-69`), plus notify/child-tool-plan/delegation-api/authority-policy/preflight/prompt-template-bridge/config-enrichment-keys/path-resolution (plan lists them; verify current contents).
-- `test/integration/async-execution.part-3.test.ts:21` — remove `readPendingChainAppendRequests` import.
-- Add one NEW unit test: discovery emits the loud `.chain.md` rejection diagnostic (current-contract test, allowed).
+Ran all 17 flagged unit files. **Failing now:**
+- `test/unit/agent-frontmatter.test.ts` — whole file fails to LOAD: `ERR_MODULE_NOT_FOUND …/src/agents/chain-serializer.ts` (import at `:9` `import { parseChain, serializeChain }`). Must strip all chain fixture tests (file is ~2.3k lines; only the `chain-serializer` import and `.chain.md`/`.chain.json` fixture tests die).
+- `test/unit/async-root-attachment.test.ts` — whole file fails to LOAD: stale import `:7` still points at renamed `../../src/runs/background/chain-root-attachment.ts` → retarget to `async-root-attachment.ts`. Also `:27` tempDir prefix `pi-chain-root-attachment-` and describe title "async chain root attachment" (:24) are cosmetic chain names — rename, keep surviving-function assertions.
+- `test/unit/agent-discovery-cache.test.ts` — 5 failing: "agent discovery snapshots", "invalidates agent and chain projections when files change or appear", "does not parse chains on the ordinary effective discovery fast path", "cold includeChains=true still materializes chains", "does not re-include excluded package roots or change chain discovery" (`.chain.md` fixtures at `:103,:226,:334-353`).
+- `test/unit/agent-exclude-dirs.test.ts` — 1 failing: "settings subagents.agentExcludeDirs" (`.chain.json` fixtures at `:212,:219`; exclusion behavior no longer chain-aware — drop the two chain fixture wrangles or fold into agent-only assertions).
+- `test/unit/pi-coding-agent-dir.test.ts` — 2 failing: "PI_CODING_AGENT_DIR runtime paths" and "discovers user agents, chains, and settings" (`.chain.md` at `:119,:141`, asserts `discovered.chains` — field no longer exists).
 
-### Step 10 — docs (strip chain/parallel key language; `grep chain docs/` = 35 hits)
-- `docs/configuration.md` verified hits: `:19,:49,:138,:256,:264,:270,:310,:324,:332,:346`,`:348-352` (`## parallel` section), `:521` (delete "keeps its legacy name for compatibility" + document new `workflow-runs` dir).
-- `docs/observability.md`: `:13,:17,:41`, `:267-270` (chain-runs naming).
-- `docs/extension-api.md`: `:487-488` (discovery row), `:140`.
+**Passing today (verified — do NOT strip these):** `agent-management`, `doctor`, `proactive-skills`, `public-execution`, `notify`, `preflight`, `path-resolution`, `delegation-api`, `child-tool-plan`, `prompt-template-bridge`, `config-enrichment-keys`, `authority-policy`, `async-resume`.
+
+⚠ **Important: the plan's "strip `'was removed'`/`'Legacy '` assertions" instruction is over-broad and will destroy unrelated coverage if followed mechanically.** Verified: `notify.test.ts:421` "Legacy cwd-scoped done", `pi-coding-agent-dir.test.ts:327,334` (`modelExclusions was removed`), `delegation-api.test.ts:578,586` + `prompt-template-bridge.test.ts:216` (prompt-template delegation), `child-tool-plan.test.ts:95` (`'subagent' tool was removed`), `authority-policy.test.ts:18` + `config-enrichment-keys.test.ts:95-108` (`projectOpen`/`maxSubagentDepth`/`toolDescriptionMode` removed), `path-resolution.test.ts:76` ("Legacy agent" in a `.agents` dir fixture), `preflight.test.ts:574-576` (`.agents` legacy dir fixture), `async-resume.test.ts:368-369` (turn-budget recovery) — **none are chain-related; all 13 of these files pass today**. Only strip chain-driven assertions (the `.chain.md`/`.chain.json` fixtures and `append-step`/`chainName` cases). The plan's own `proactive-skills` note ("only the chain-discovery-driven cases; keep the pure recommend/format cases") is the correct discriminator — apply it everywhere. `proactive-skills.test.ts:31` (`filePath: /tmp/${name}.chain.md`) and `doctor.test.ts:45` (`filePath: /tmp/${name}.chain.md`) are fixture helpers feeding chain-discovery-shaped input; both files pass because the fixtures are inert — judge by the plan's note, don't cascade-delete.
+
+**Still to strip — chain assertions that do NOT fail today but contradict the cutover (plan step 9):**
+- `test/unit/public-execution.test.ts:175` (`action: "append-step"`) and `:188` (`chainName: "review-pipeline"`) — legacy-rejection tests; rewrite to assert the surviving generic rejection (or delete).
+- `test/unit/agent-management.test.ts:764-766` (`.chain.md` fixture files in a "keeps old chains" scenario) — passed today; plan says strip.
+- `test/integration/async-execution.part-3.test.ts:21` imports deleted `../../src/runs/background/chain-append.ts` (whole-file load failure; also `append-step` cases at `:1536-1586`).
+- `test/integration/single-execution.part-2.test.ts:3239` `action: "append-step"` + expect "Cannot append step: …" — executor no longer dispatches append-step; the rejection path survived as the public-execution generic message; update or delete.
+- **GAP (not in plan's list): `test/integration/external-cli-runner.test.ts:8` imports deleted `chain-append.ts` (`enqueueChainAppendRequest`) and a whole test at `:347-397` "applies external idle attention to runtime-appended chain steps" with `resultMode: "chain"`. Broken import → `test:integration` fails. Delete that test + import.**
+- New test to ADD (current-contract, plan-authorized): discovery emits the loud rejection diagnostic — unit test asserting `Chain definitions (.chain.md/.chain.json) were removed; convert to workflowScript (see /prompt-workflow)` appears as an `AgentDiscoveryDiagnostic`-style entry when a scan hits `chains/` dir or `*.chain.md`/`*.chain.json` (see `src/agents/agents.ts:1844,1836,2196`). Natural home: `test/unit/agent-discovery-cache.test.ts`.
+
+**Test-typecheck ratchet (`npm run typecheck:tests`):** script `scripts/typecheck-tests.mjs` only fails on (a) files whose per-file tsc error count EXCEEDS `test/typecheck-baseline.json`, (b) baseline entries no longer producing errors ("stale"). Right now (a) is triggered by the 4 broken-import test files and (b) by stale baseline entries `test/unit/chain-append.test.ts` / `test/unit/dynamic-fanout.test.ts` (:58,:66) for files already deleted. After fixing tests, run `node scripts/typecheck-tests.mjs --update` and commit the shrunken baseline. (The earlier worker already renamed `chain-root-attachment.test.ts` → `async-root-attachment.test.ts` in the baseline.)
+
+## 4. Docs (step 10) — `grep -rn "chain" docs/` = 35 hits
+
+- `docs/agents.md`: `:29` (".chain.md files do not define agents" — reverse it: they no longer define anything; loud-reject), `:246`, `:352`, `:376` (chain/parallel acceptance & skill wording).
+- `docs/configuration.md`: `:19` (chains anchored to git-root), `:49` ("chain discovery keeps its own unchanged watches" — delete), `:138` (parallel/chain children share a tab), `:256` (forceTopLevelAsync wording), `:264` (:timeoutMs composite), `:270` ("async chains, parallel tasks…"), `:310`, `:324` (spawn budget wording incl. "appended chain steps"), `:332`, `:346` (static chains/parallel), `:521` ("…keeps its legacy name for compatibility" — delete; `chain-runs` → `workflow-runs`).
+- `docs/observability.md`: `:13,:17,:41` (chain/parallel live-progress wording), `:267-270` ("still named `chain-runs` for compatibility" — rename to `workflow-runs`; artifact layout is `…/workflow-runs/{runId}/` now, constant `WORKFLOW_RUNS_DIR` at `src/shared/types.ts:2524`).
+- `docs/extension-api.md`: `:140` ("single, counted parallel, and chain children"), `:487-488` (discovery row "Agent and chain discovery"; executor row "single, parallel, chain, management").
 - `docs/models.md`: `:136`. `docs/tool-reference.md`: `:9,:265,:342`.
-- `docs/workflows.md`: `:125,:137,:252-260,:325,:379` (migration section describes the removed shapes — rewrite to current workflowScript-only surface).
-- `docs/agents.md`: `:29,:246,:352,:376`.
+- `docs/workflows.md`: `:125`, `:137` (scripted chaining — keep, this is the surviving path), `:252` (`{chain_dir}` legacy template keeps working — keep, it's live behavior), `:254-260` (migration section — rewrite to read as "these shapes were removed"), `:325`, `:379` (legacy commands not registered).
 
-## Existing Conventions
-- Each plan step ends with `npm run typecheck` green before moving on.
-- Hard cutover, NO legacy aliases (VISION.md:50-57). Tests must prove the current contract; delete stale assertions rather than serving them (VISION.md:52-53 + AGENTS.md).
-- `knip.jsonc` rules: unused `exports`/`types` are non-blocking warnings; everything else is a hard error. Dead exports in `src/shared/utils.ts` are a known knip blind spot — manual review.
-- The one deliberate residual: `ChainConfig`/`ChainStepConfig` stay in `agents.ts` purely so `proactive-skills.ts` and `identity.ts` compile. `agent-management.ts:979-984` builds `proactiveInput` WITHOUT `chains` (verified).
-- `src/slash/prompt-workflows.ts:211-234` (`chain:` frontmatter → workflowScript) — **do not touch** (acceptance criterion 3).
+# Key Code
 
-## Verification (run in order; all must pass)
+- `SubagentRunMode` — `src/shared/types.ts:385` `"single" | "workflow"`; `SubagentResultMode = SubagentRunMode` :386. Collapsed already.
+- `MissionRunMode` — `src/missions/types.ts:12` still has `"parallel" | "chain"` (leftover, see above).
+- `WORKFLOW_RUNS_DIR` — `src/shared/types.ts:2524` (`TEMP_ROOT_DIR/workflow-runs`), `DIRS.workflow` :2530. Artifact rename already landed in `src/shared/artifacts.ts` (0e84f094) and `src/extension/doctor.ts:52,229` ("workflow runs") — **docs are the only remaining `chain-runs` mentions** (verified: zero `chain-runs`/`CHAIN_RUNS_DIR` hits in `src/`).
+- Surviving renamed module: `src/runs/background/async-root-attachment.ts` — consumed by `subagent-runner.ts:135` (`waitForImportedAsyncRoot`, incl. step handling at :676-720) and `subagent-executor.ts:85` (`resolveAsyncRootResultPath, waitForImportedAsyncRoot`). All imports updated.
+- Deleted modules (do not re-create): `agents/chain-serializer.ts`, `background/chain-append.ts`, `shared/dynamic-fanout.ts`. Still present but ONLY `subagent-runner.ts` imports them: `chain-outputs.ts` (30 LOC, `subagent-runner.ts:88`) and `parallel-groups.ts` (45 LOC, `render.ts:31` `flatToLogicalStepIndex`, `async-job-tracker.ts:20`, `async-status.ts:12`, `stale-run-reconciler.ts:9` `normalizeParallelGroups`) — both compile and have live consumers; **out of remaining scope unless knip/tests prove otherwise** (do not port chain behavior into them).
+- Loud rejection, already in `src/agents/agents.ts`: scan collects `chainFiles` (:1801,:1836-1837,:1844) and `:2196` pushes diagnostic "Chain definitions (.chain.md/.chain.json) were removed; convert to workflowScript (see /prompt-workflow)". Residual types `ChainConfig` (:235)/`ChainStepConfig` (:212) stay for `proactive-skills.ts`/`identity.ts` (plan finding 7 — do NOT remove).
+- Also untouched on purpose: `src/slash/prompt-workflows.ts:211-234` `chain:` → workflowScript compilation.
+
+# Architecture
+
+`index.ts` → `src/extension/index.ts` → foreground `runs/foreground/subagent-executor.ts` / background `runs/background/async-execution.ts` (spawns `subagent-runner.ts` child processes) / slash `src/slash/*` / TUI `src/tui/*` reading async-status projections. `workflowScript` is now the only orchestration path; `"chain"`/`"parallel"` survive only as (a) legacy-input rejections, (b) persisted-data unions (`MissionRunMode`), and (c) mode comparisons awaiting deletion (the 16 errors). Data exits via result files under `DIRS.results`/`DIRS.async` and `WORKFLOW_RUNS_DIR`.
+
+# Existing Conventions
+
+- Each step ends with `npm run typecheck` green; verification order is fixed: typecheck → typecheck:tests → test:all → check:dead-code → 3 greps (see below) + manual smoke.
+- Hard cutover/no aliases (VISION.md:50-57). Delete stale assertions; never rewrite production to serve old tests. Everything added by knip/tsc arbitrates deletions.
+- `knip.jsonc`: unused `exports`/`types` are non-blocking warnings; all other knip findings are hard errors. Dead exports in `src/shared/utils.ts` are a known knip blind spot.
+- `typecheck:tests` is a per-file error ratchet against `test/typecheck-baseline.json`; refresh with `node scripts/typecheck-tests.mjs --update` after test deletions and commit the shrunken baseline.
+- **npm repo** — do NOT run pnpm, do not re-create `pnpm-lock.yaml`; stray `x` file must not reappear (both removed in 6017e46e).
+- Rule of thumb used throughout the earlier steps: `grep -rln` then adjudicate per file — a hit is not automatically a deletion target (proactive-skills precedent).
+- `test/smoke/standalone-shared.ts:21` still calls the public API with `chain:` params — a manual smoke fixture only (not in `test:all`), but it exercises removed API surface; update or remove it while in there.
+
+# Verification (already shipped shell of each command; run in order)
+
 ```bash
-npm run typecheck          # tsc --noEmit
-npm run typecheck:tests    # node scripts/typecheck-tests.mjs
-npm run test:all           # test:unit && test:integration
+npm run typecheck          # currently RED: 16 errors — target: green
+npm run typecheck:tests    # currently RED (broken test imports + stale baseline) — run `node scripts/typecheck-tests.mjs --update` after test edits
+npm run test:all           # currently RED (agent-frontmatter, async-root-attachment, agent-discovery-cache, agent-exclude-dirs, pi-coding-agent-dir, async-execution.part-3, external-cli-runner)
 npm run check:dead-code    # knip
-grep -rn "\"chain\"\|chainName\|chainDir\|append-step" src --include='*.ts'
-grep -rn "\.chain\.md\|\.chain\.json" src --include='*.ts'
-grep -rn "chain" docs/
+grep -rn "\"chain\"\|chainName\|chainDir\|append-step" src --include='*.ts'   # see hit list + adjudication above
+grep -rn "\.chain\.md\|\.chain\.json" src --include='*.ts'                    # current: only agents.ts:1755(:1756),:1843,:1844,:2196 — exactly the loud-rejection path, already passing
+grep -rn "chain" docs/                                                        # 35 hits, all in step-10 files above
 ```
-Plus manual smoke: launch an async `workflowScript` run; confirm status/Fleet renders under mode `"workflow"` with step visibility.
 
-## Architecture
-`index.ts` → `src/extension/index.ts` (`registerSubagentExtension`, ~:388; guards on `PI_SUBAGENT_CHILD_ENV`) → `subagent-executor.ts` (foreground) / `async-execution.ts` (background) / `subagent-runner.ts` (child process). Discovery is centralized in `agents.ts`; shared config/types in `src/shared/`. TUI renders from async-status projections via `render.ts`/`fleet-status.ts`. Data exits via result files under `DIRS.results`/`DIRS.async` and workflow artifacts dir.
+Manual smoke (plan): launch an async `workflowScript` run, confirm TUI status/Fleet renders mode `"workflow"` with step visibility (this is the check that the render.ts deletions kept the workflow path intact).
 
-## Start Here
-1. `src/extension/public-execution.ts` — normalizePublicSubagentExecution (Step 1).
-2. `src/shared/types.ts` `SubagentRunMode` :385 then the module deletions (Step 2).
-3. `src/runs/background/subagent-runner.ts` — the largest consumer of deleted modules; single-run logic here MUST survive.
+# Start Here
+
+1. **Kill the 16 tsc errors first** (plan budget note: prior worker used ~65% of budget; remaining work is mechanical). Slash-live-state: delete the three chain/parallel builders + dispatch, collapse to `buildSingleInitialResult`, drop the `:231` branch. Render.ts: delete dead `"chain"`/`"parallel"` branches per line list above, keep workflowGraph/chainAgents-based workflow rendering.
+2. Decide the plan-vs-tree gaps: `missions/types.ts:12` + `store.ts:34` + `lifecycle.ts:354`, `slash/delegation-adapters.ts:68` (all grep-1 hits the plan's "steps 1-6 done" implies are gone), and whether to rename `settings.ts` `resolveChainPath`/`chainDir`.
+3. Tests: fix the 4 broken imports, strip the 5 failing files' chain fixtures, add the loud-rejection diagnostic test, update/delete `append-step` assertions (public-execution, single-execution.part-2, async-execution.part-3, **external-cli-runner — the uncovered gap**), then `--update` the typecheck baseline.
+4. Docs per the exact line list. 5. Verification in order, then manual smoke.

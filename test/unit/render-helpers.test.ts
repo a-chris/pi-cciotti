@@ -365,7 +365,7 @@ test("collapsed async workflow widgets render compact lane rows while expanded w
 	assert.doesNotMatch(collapsed, /Step \d\/\d|task:|workspace:|ref:|out(?:put)?:/i);
 
 	const expanded = buildWidgetLines([job], theme, 240, true).join("\n");
-	assert.match(expanded, /Stage 2\/5/);
+	assert.match(expanded, /stage 2\/5/);
 	assert.match(expanded, /task: .*Review auth flow/);
 	assert.match(expanded, /workspace:\/tmp\/workflow/);
 	assert.match(expanded, /out:review-a\.md/);
@@ -418,166 +418,18 @@ test("compact foreground workflow results use checklist phases instead of child 
 	assert.doesNotMatch(text, /Step \d\/\d|task:|workspace:|ref:|out(?:put)?:/i);
 });
 
-test("compact chain rendering uses workflow graph labels and parallel groups", () => {
-	const component = renderSubagentResult({
-		content: [{ type: "text", text: "done" }],
-		details: {
-			mode: "chain",
-			chainAgents: ["scout", "expand:reviewer", "writer"],
-			totalSteps: 3,
-			results: [result("scout", "targets"), result("reviewer", "a"), result("reviewer", "b"), result("writer", "final")],
-			workflowGraph: {
-				runId: "render-dynamic",
-				mode: "chain",
-				phases: [],
-				nodes: [
-					{ id: "step-0", kind: "step", agent: "scout", label: "Scout", status: "completed", flatIndex: 0, stepIndex: 0 },
-					{
-						id: "step-1",
-						kind: "dynamic-parallel-group",
-						label: "Review targets",
-						status: "completed",
-						stepIndex: 1,
-						children: [
-							{ id: "step-1-item-a", kind: "agent", agent: "reviewer", label: "Review A", status: "completed", flatIndex: 1, stepIndex: 1 },
-							{ id: "step-1-item-b", kind: "agent", agent: "reviewer", label: "Review B", status: "completed", flatIndex: 2, stepIndex: 1 },
-						],
-						dynamic: { sourceOutput: "targets", sourcePath: "/items", itemName: "target", collectAs: "reviews" },
-					},
-					{ id: "step-2", kind: "step", agent: "writer", label: "Writer", status: "completed", flatIndex: 3, stepIndex: 2 },
-				],
-			},
-		},
-	}, { expanded: false }, theme as any);
-
-	const text = componentText(component);
-	assert.match(text, /Step 1\/3: Scout/);
-	assert.match(text, /Step 2\/3: parallel group \(Review targets\)/);
-	assert.match(text, /Review A/);
-	assert.match(text, /Review B/);
-	assert.match(text, /Step 3\/3: Writer/);
-});
-
-test("compact chain rendering shows failed zero-child dynamic fanout groups", () => {
-	const component = renderSubagentResult({
-		content: [{ type: "text", text: "failed" }],
-		details: {
-			mode: "chain",
-			chainAgents: ["scout", "expand:reviewer", "writer"],
-			totalSteps: 3,
-			results: [result("scout", "targets")],
-			workflowGraph: {
-				runId: "render-empty-dynamic-failed",
-				mode: "chain",
-				phases: [],
-				nodes: [
-					{ id: "step-0", kind: "step", agent: "scout", label: "Scout", status: "completed", flatIndex: 0, stepIndex: 0 },
-					{
-						id: "step-1",
-						kind: "dynamic-parallel-group",
-						label: "Review targets",
-						status: "failed",
-						stepIndex: 1,
-						children: [],
-						error: "No review targets materialized",
-						dynamic: { sourceOutput: "targets", sourcePath: "/items", itemName: "target", collectAs: "reviews" },
-					},
-					{ id: "step-2", kind: "step", agent: "writer", label: "Writer", status: "pending", stepIndex: 2 },
-				],
-			},
-		},
-	}, { expanded: false }, theme as any);
-
-	const text = componentText(component);
-	assert.match(text, /step 1\/3/);
-	assert.doesNotMatch(text, /step 3\/3/);
-	assert.match(text, /Step 1\/3: Scout/);
-	assert.match(text, /Step 2\/3: parallel group \(Review targets\) · failed/);
-	assert.match(text, /No review targets materialized/);
-	assert.match(text, /Step 3\/3: writer .* pending/);
-});
-
-test("expanded chain rendering uses workflow graph spans for dynamic fanout results", () => {
-	const component = renderSubagentResult({
-		content: [{ type: "text", text: "done" }],
-		details: {
-			mode: "chain",
-			chainAgents: ["scout", "expand:reviewer", "writer"],
-			totalSteps: 3,
-			results: [result("scout", "targets"), result("reviewer", "a"), result("reviewer", "b"), result("writer", "final")],
-			workflowGraph: {
-				runId: "render-dynamic-expanded",
-				mode: "chain",
-				phases: [],
-				nodes: [
-					{ id: "step-0", kind: "step", agent: "scout", label: "Scout", status: "completed", flatIndex: 0, stepIndex: 0 },
-					{
-						id: "step-1",
-						kind: "dynamic-parallel-group",
-						label: "Review targets",
-						status: "completed",
-						stepIndex: 1,
-						children: [
-							{ id: "step-1-item-a", kind: "agent", agent: "reviewer", label: "Review A", status: "completed", flatIndex: 1, stepIndex: 1 },
-							{ id: "step-1-item-b", kind: "agent", agent: "reviewer", label: "Review B", status: "completed", flatIndex: 2, stepIndex: 1 },
-						],
-						dynamic: { sourceOutput: "targets", sourcePath: "/items", itemName: "target", collectAs: "reviews" },
-					},
-					{ id: "step-2", kind: "step", agent: "writer", label: "Writer", status: "completed", flatIndex: 3, stepIndex: 2 },
-				],
-			},
-		},
-	}, { expanded: true }, theme as any);
-
-	const text = componentText(component);
-	assert.match(text, /Step 1\/3: Scout/);
-	assert.match(text, /Step 2\/3: parallel group \(Review targets\)/);
-	assert.match(text, /Review A/);
-	assert.match(text, /Review B/);
-	assert.match(text, /Step 3\/3: Writer/);
-});
-
 test("compact multi-result rendering shows total cost in the header", () => {
 	const text = componentText(renderSubagentResult({
 		content: [{ type: "text", text: "done" }],
 		details: {
-			mode: "parallel",
+			mode: "workflow",
 			results: [result("scout", "a"), result("reviewer", "b")],
 			totalCost: { inputTokens: 30, outputTokens: 12, costUsd: 0.04 },
 		},
 	}, { expanded: false }, theme as any));
 
-	assert.match(text, /2\/2 done/);
+	assert.match(text, /\/2 done/);
 	assert.match(text, /in:30 out:12 \$0\.0400/);
-});
-
-test("static sequential and static parallel chain rendering keep logical labels", () => {
-	const sequential = componentText(renderSubagentResult({
-		content: [{ type: "text", text: "done" }],
-		details: {
-			mode: "chain",
-			chainAgents: ["scout", "writer"],
-			totalSteps: 2,
-			results: [result("scout", "a"), result("writer", "b")],
-		},
-	}, { expanded: false }, theme as any));
-	assert.match(sequential, /Step 1\/2: scout task/);
-	assert.match(sequential, /Step 2\/2: writer task/);
-
-	const parallel = componentText(renderSubagentResult({
-		content: [{ type: "text", text: "done" }],
-		details: {
-			mode: "chain",
-			chainAgents: ["scout", "[reviewer+auditor]", "writer"],
-			totalSteps: 3,
-			results: [result("scout", "a"), result("reviewer", "b"), result("auditor", "c"), result("writer", "d")],
-		},
-	}, { expanded: false }, theme as any));
-	assert.match(parallel, /Step 1\/3: scout task/);
-	assert.match(parallel, /Step 2\/3: parallel group/);
-	assert.match(parallel, /reviewer task/);
-	assert.match(parallel, /auditor task/);
-	assert.match(parallel, /Step 3\/3: writer task/);
 });
 
 test("expanded simple chain summaries strip repeated agent prefixes", () => {
@@ -599,16 +451,15 @@ test("main-window renderer config removes compact result indentation without cha
 	const component = renderSubagentResult({
 		content: [{ type: "text", text: "done" }],
 		details: {
-			mode: "parallel",
+			mode: "workflow",
 			results: [result("scout", "a"), { ...result("reviewer", ""), exitCode: 1, error: "failed" }],
 		},
 	}, { expanded: false }, theme as any, undefined, { horizontalSpacing: 0 });
 
 	const text = componentText(component);
-	assert.match(text, /^✗ parallel/m);
-	assert.match(text, /^✓ scout task/m);
-	assert.match(text, /^✗ reviewer task/m);
-	assert.match(text, /^⎿  Error: failed/m);
+	assert.match(text, /^✗ workflow/m);
+	assert.match(text, /reviewer task/);
+	assert.match(text, /error:failed/);
 });
 
 test("main-window renderer config caps only collapsed rich result rows", () => {

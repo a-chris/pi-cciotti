@@ -6,7 +6,6 @@ import * as path from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { handleManagementAction } from "../../src/agents/agent-management.ts";
 import { serializeAgent } from "../../src/agents/agent-serializer.ts";
-import { parseChain, serializeChain } from "../../src/agents/chain-serializer.ts";
 import { discoverAgents, discoverAgentsAll, inspectAgentDefinitionDirectory, type AgentConfig } from "../../src/agents/agents.ts";
 import { parseFrontmatter } from "../../src/agents/frontmatter.ts";
 import { buildInProcessChildLaunch } from "../../src/runs/shared/child-launch.ts";
@@ -141,7 +140,7 @@ describe("agent definition directory inspection", () => {
 		fs.writeFileSync(file, "not a directory", "utf-8");
 		assert.equal(inspectAgentDefinitionDirectory(path.join(root, "absent")).state, "absent");
 		assert.equal(inspectAgentDefinitionDirectory(empty).state, "empty");
-		assert.deepEqual(inspectAgentDefinitionDirectory(candidates), { state: "candidates", files: [path.join(candidates, "worker.md")] });
+		assert.deepEqual(inspectAgentDefinitionDirectory(candidates), { state: "candidates", files: [path.join(candidates, "worker.md")], chainFiles: [] });
 		assert.equal(inspectAgentDefinitionDirectory(file).state, "not-directory");
 		assert.equal(inspectAgentDefinitionDirectory(path.join(root, "blocked"), {
 			existsSync: () => true,
@@ -899,53 +898,11 @@ Do work
 	});
 });
 
-describe("chain discovery", () => {
-	it("prefers same-scope .chain.json over .chain.md for the same runtime name", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-chain-format-precedence-"));
-		tempDirs.push(dir);
-		const chainsDir = path.join(dir, ".pi", "chains");
-		fs.mkdirSync(chainsDir, { recursive: true });
-		fs.writeFileSync(path.join(chainsDir, "dynamic-review.chain.md"), `---
-name: dynamic-review
-description: Markdown fallback
----
-
-## scout
-
-Run the markdown chain
-`, "utf-8");
-		fs.writeFileSync(path.join(chainsDir, "dynamic-review.chain.json"), JSON.stringify({
-			name: "dynamic-review",
-			description: "JSON dynamic chain",
-			chain: [
-				{
-					agent: "scout",
-					task: "Return targets",
-					as: "targets",
-					outputSchema: { type: "object" },
-				},
-				{
-					expand: { from: { output: "targets", path: "/items" }, maxItems: 4 },
-					parallel: { agent: "reviewer", task: "Review {item.path}" },
-					collect: { as: "reviews" },
-				},
-			],
-		}), "utf-8");
-
-		const result = discoverAgentsAll(dir);
-		const chain = result.chains.find((candidate) => candidate.name === "dynamic-review");
-		assert.equal(chain?.description, "JSON dynamic chain");
-		assert.equal(chain?.filePath.endsWith(".chain.json"), true);
-		assert.equal("expand" in (chain?.steps[1] ?? {}), true);
-	});
-});
-
-describe("package-provided agents and chains", () => {
-	it("discovers package agents and chains from installed package manifests", () => withTempHome(() => {
+describe("package-provided agents", () => {
+	it("discovers package agents from installed package manifests", () => withTempHome(() => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-package-discovery-"));
 		tempDirs.push(dir);
 		const workflowRoot = path.join(dir, ".pi", "npm", "node_modules", "my-pi-workflow");
-		const chainsRoot = path.join(dir, ".pi", "npm", "node_modules", "@scope", "chain-workflow");
 		writeJson(path.join(workflowRoot, "package.json"), {
 			name: "my-pi-workflow",
 			version: "1.2.3",
@@ -961,25 +918,6 @@ description: Review changes for this workflow.
 
 Review the workflow.
 `);
-		writeJson(path.join(chainsRoot, "package.json"), {
-			name: "@scope/chain-workflow",
-			pi: {
-				subagents: {
-					chains: ["./chains"],
-				},
-			},
-		});
-		writeAgent(path.join(chainsRoot, "chains", "review.chain.md"), `---
-name: review
-package: my-workflow
-description: Run workflow review.
----
-
-## my-workflow.reviewer
-
-Review the task.
-`);
-
 		const all = discoverAgentsAll(dir);
 		const packagedAgent = all.package.find((agent) => agent.name === "my-workflow.reviewer");
 		assert.ok(packagedAgent);
@@ -991,10 +929,6 @@ Review the task.
 		assert.equal(packagedAgent.filePath, path.join(workflowRoot, "agents", "reviewer.md"));
 		assert.equal(discoverAgents(dir, "both").agents.find((agent) => agent.name === "my-workflow.reviewer")?.source, "package");
 
-		const packagedChain = all.chains.find((chain) => chain.name === "my-workflow.review");
-		assert.ok(packagedChain);
-		assert.equal(packagedChain.source, "package");
-		assert.equal(packagedChain.steps[0]?.agent, "my-workflow.reviewer");
 	}));
 
 	it("loads packages referenced from Pi settings", () => withTempHome(() => {
@@ -1264,7 +1198,6 @@ Agent prompt
 			pi: {
 				subagents: {
 					agents: ["."],
-					chains: ["."],
 				},
 			},
 		});
@@ -1274,15 +1207,6 @@ description: Root package agent
 ---
 
 Root prompt
-`);
-		writeAgent(path.join(dir, "root.chain.md"), `---
-name: root-chain
-description: Root package chain
----
-
-## root-agent
-
-Run root agent
 `);
 		writeAgent(path.join(dir, "node_modules", "bad-agent.md"), `---
 name: node-modules-agent
@@ -1314,23 +1238,12 @@ description: Should not be discovered
 Ignored
 `);
 		fs.mkdirSync(path.join(dir, "packages", "app", ".pi"), { recursive: true });
-		writeAgent(path.join(dir, "node_modules", "bad.chain.md"), `---
-name: node-modules-chain
-description: Should not be discovered
----
-
-## root-agent
-
-Ignored
-`);
 
 		const all = discoverAgentsAll(dir);
 		assert.ok(all.package.find((agent) => agent.name === "root-agent" && agent.filePath === path.join(dir, "root-agent.md")));
 		for (const name of ["node-modules-agent", "git-agent", "submodule-agent", "nested-project-agent"]) {
 			assert.equal(all.package.some((agent) => agent.name === name), false, `${name} should be pruned`);
 		}
-		assert.ok(all.chains.find((chain) => chain.name === "root-chain" && chain.filePath === path.join(dir, "root.chain.md")));
-		assert.equal(all.chains.some((chain) => chain.name === "node-modules-chain"), false);
 	}));
 
 	it("keeps package definitions below user and project overrides", () => withTempHome((home) => {
@@ -1341,7 +1254,6 @@ Ignored
 			name: "override-workflow",
 			"pi-cciotti": {
 				agents: ["./agents"],
-				chains: ["./chains"],
 			},
 		});
 		writeAgent(path.join(packageRoot, "agents", "scout.md"), `---
@@ -1350,15 +1262,6 @@ description: Package scout
 ---
 
 Package scout.
-`);
-		writeAgent(path.join(packageRoot, "chains", "shared.chain.md"), `---
-name: shared
-description: Package chain
----
-
-## scout
-
-Package chain.
 `);
 		writeAgent(path.join(home, ".pi", "agent", "agents", "scout.md"), `---
 name: scout
@@ -1374,29 +1277,9 @@ description: Project scout
 
 Project scout.
 `);
-		writeAgent(path.join(home, ".pi", "agent", "chains", "shared.chain.md"), `---
-name: shared
-description: User chain
----
-
-## scout
-
-User chain.
-`);
-		writeAgent(path.join(dir, ".pi", "chains", "shared.chain.md"), `---
-name: shared
-description: Project chain
----
-
-## scout
-
-Project chain.
-`);
 
 		assert.equal(discoverAgents(dir, "user").agents.find((agent) => agent.name === "scout")?.source, "user");
 		assert.equal(discoverAgents(dir, "project").agents.find((agent) => agent.name === "scout")?.source, "project");
-		const chainByName = new Map(discoverAgentsAll(dir).chains.map((chain) => [chain.name, chain]));
-		assert.equal(chainByName.get("shared")?.source, "project");
 	}));
 
 	it("does not allow management updates to package agents", () => withTempHome(() => {
@@ -1943,14 +1826,12 @@ Do work
 	});
 });
 
-describe("packaged agent and chain discovery", () => {
-	it("recursively discovers nested project agents while keeping chain files separate", () => {
+describe("packaged agent discovery", () => {
+	it("recursively discovers nested project agents", () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-recursive-agent-discovery-"));
 		tempDirs.push(dir);
 		const nestedDir = path.join(dir, ".pi", "agents", "code-analysis", "deep");
-		const nestedChainDir = path.join(dir, ".pi", "chains", "code-analysis", "deep");
 		fs.mkdirSync(nestedDir, { recursive: true });
-		fs.mkdirSync(nestedChainDir, { recursive: true });
 		fs.writeFileSync(path.join(nestedDir, "scout.md"), `---
 name: scout
 description: Nested scout
@@ -1958,20 +1839,9 @@ description: Nested scout
 
 Inspect code
 `, "utf-8");
-		fs.writeFileSync(path.join(nestedChainDir, "review.chain.md"), `---
-name: review-flow
-description: Review flow
----
-
-## scout
-
-Review
-`, "utf-8");
 
 		const result = discoverAgentsAll(dir);
 		assert.ok(result.project.find((agent) => agent.name === "scout" && agent.filePath === path.join(nestedDir, "scout.md")));
-		assert.ok(result.chains.find((chain) => chain.name === "review-flow" && chain.filePath === path.join(nestedChainDir, "review.chain.md")));
-		assert.equal(result.project.some((agent) => agent.filePath.endsWith("review.chain.md")), false);
 	});
 
 	it("registers packaged agents by runtime name and serializes local name plus package", () => {
@@ -1998,34 +1868,7 @@ Inspect code
 		assert.doesNotMatch(serialized, /^name: code-analysis\.scout$/m);
 	});
 
-	it("recursively discovers packaged chains by runtime name and preserves package on serialize", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-packaged-chain-"));
-		tempDirs.push(dir);
-		const nestedDir = path.join(dir, ".pi", "chains", "flows");
-		fs.mkdirSync(nestedDir, { recursive: true });
-		const content = `---
-name: review-flow
-package: code-analysis
-description: Review flow
----
 
-## code-analysis.scout
-
-Inspect {task}
-`;
-		fs.writeFileSync(path.join(nestedDir, "review.chain.md"), content, "utf-8");
-
-		const chain = discoverAgentsAll(dir).chains.find((candidate) => candidate.name === "code-analysis.review-flow");
-		assert.ok(chain);
-		assert.equal(chain.localName, "review-flow");
-		assert.equal(chain.packageName, "code-analysis");
-		assert.equal(chain.steps[0]?.agent, "code-analysis.scout");
-		const serialized = serializeChain(chain);
-		assert.match(serialized, /^name: review-flow$/m);
-		assert.match(serialized, /^package: code-analysis$/m);
-		assert.match(serialized, /^## code-analysis\.scout$/m);
-		assert.doesNotMatch(serialized, /^name: code-analysis\.review-flow$/m);
-	});
 
 	it("keeps packaged and un-packaged runtime names distinct while preserving un-packaged precedence", () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-packaged-collisions-"));
@@ -2063,31 +1906,13 @@ Packaged
 		assert.equal(packaged?.description, "Packaged scout");
 	});
 
-	it("parses packaged chains directly from serializer helpers", () => {
-		const parsed = parseChain(`---
-name: review-flow
-package: code-analysis
-description: Review flow
----
 
-## code-analysis.scout
 
-Inspect
-`, "project", "/tmp/review.chain.md");
-
-		assert.equal(parsed.name, "code-analysis.review-flow");
-		assert.equal(parsed.localName, "review-flow");
-		assert.equal(parsed.packageName, "code-analysis");
-		assert.match(serializeChain(parsed), /^name: review-flow$/m);
-	});
-
-	it("normalizes package frontmatter consistently for agents and chains", () => {
+	it("normalizes package frontmatter consistently for agents", () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-package-normalize-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
-		const chainsDir = path.join(dir, ".pi", "chains");
 		fs.mkdirSync(agentsDir, { recursive: true });
-		fs.mkdirSync(chainsDir, { recursive: true });
 		fs.writeFileSync(path.join(agentsDir, "scout.md"), `---
 name: scout
 package: Code Analysis!
@@ -2096,29 +1921,16 @@ description: Fast recon
 
 Inspect
 `, "utf-8");
-		fs.writeFileSync(path.join(chainsDir, "review.chain.md"), `---
-name: review-flow
-package: Code Analysis!
-description: Review flow
----
-
-## code-analysis.scout
-
-Review
-`, "utf-8");
 
 		const result = discoverAgentsAll(dir);
 		assert.ok(result.project.find((agent) => agent.name === "code-analysis.scout"));
-		assert.ok(result.chains.find((chain) => chain.name === "code-analysis.review-flow"));
 	});
 
 	it("skips invalid package frontmatter that cannot be normalized", () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-invalid-package-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
-		const chainsDir = path.join(dir, ".pi", "chains");
 		fs.mkdirSync(agentsDir, { recursive: true });
-		fs.mkdirSync(chainsDir, { recursive: true });
 		fs.writeFileSync(path.join(agentsDir, "scout.md"), `---
 name: scout
 package: !!!
@@ -2127,21 +1939,10 @@ description: Fast recon
 
 Inspect
 `, "utf-8");
-		fs.writeFileSync(path.join(chainsDir, "review.chain.md"), `---
-name: review-flow
-package: !!!
-description: Review flow
----
-
-## scout
-
-Review
-`, "utf-8");
 
 		const result = discoverAgentsAll(dir);
 		assert.equal(result.project.some((agent) => agent.filePath.endsWith("scout.md")), false);
 		assert.match(result.agentDiagnostics?.find((diagnostic) => diagnostic.filePath.endsWith("scout.md"))?.error ?? "", /Agent 'scout' package is invalid after sanitization/);
-		assert.equal(result.chains.some((chain) => chain.filePath.endsWith("review.chain.md")), false);
 	});
 });
 
@@ -2274,83 +2075,7 @@ Canonical prompt
 		assert.equal(result.projectDir, path.join(dir, ".pi", "agents"));
 	});
 
-	it("discovers project chains from .pi/chains", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-project-chain-dirs-"));
-		tempDirs.push(dir);
-		fs.mkdirSync(path.join(dir, ".pi", "agents"), { recursive: true });
-		fs.mkdirSync(path.join(dir, ".pi", "chains", "flows"), { recursive: true });
-		fs.writeFileSync(path.join(dir, ".pi", "agents", "ignored.chain.md"), `---
-name: ignored-chain
-description: Ignored chain
----
 
-## scout
 
-Ignore
-`, "utf-8");
-		fs.writeFileSync(path.join(dir, ".pi", "chains", "flows", "canonical.chain.md"), `---
-name: canonical-chain
-description: Canonical chain
----
 
-## worker
-
-Inspect canonical
-`, "utf-8");
-
-		const result = discoverAgentsAll(dir);
-		assert.equal(result.chains.some((chain) => chain.name === "ignored-chain"), false);
-		assert.ok(result.chains.find((chain) => chain.name === "canonical-chain" && chain.filePath === path.join(dir, ".pi", "chains", "flows", "canonical.chain.md")));
-		assert.equal(result.projectDir, path.join(dir, ".pi", "agents"));
-		assert.equal(result.projectChainDir, path.join(dir, ".pi", "chains"));
-	});
-
-	it("prefers project .pi/chains over user chains on name collisions", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-project-chain-collision-"));
-		const home = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-user-chain-home-"));
-		tempDirs.push(dir, home);
-		const oldHome = process.env.HOME;
-		const oldUserProfile = process.env.USERPROFILE;
-		process.env.HOME = home;
-		process.env.USERPROFILE = home;
-		try {
-			const userChainsDir = path.join(home, ".pi", "agent", "chains");
-			fs.mkdirSync(userChainsDir, { recursive: true });
-			fs.mkdirSync(path.join(dir, ".pi", "chains"), { recursive: true });
-			fs.writeFileSync(path.join(userChainsDir, "shared.chain.md"), `---
-name: shared-chain
-description: User chain
----
-
-## scout
-
-Inspect user
-`, "utf-8");
-			fs.writeFileSync(path.join(dir, ".pi", "chains", "shared.chain.md"), `---
-name: shared-chain
-description: Project chain
----
-
-## worker
-
-Inspect project
-`, "utf-8");
-
-			const sharedChains = discoverAgentsAll(dir).chains.filter((chain) => chain.name === "shared-chain");
-			assert.equal(sharedChains.length, 2);
-			assert.deepEqual(sharedChains.map((chain) => chain.source), ["user", "project"]);
-			const savedChainLookup = new Map(sharedChains.map((chain) => [chain.name, chain]));
-			const shared = savedChainLookup.get("shared-chain");
-			assert.ok(shared);
-			assert.equal(shared.filePath, path.join(dir, ".pi", "chains", "shared.chain.md"));
-			assert.equal(shared.description, "Project chain");
-			assert.equal(shared.steps[0]?.agent, "worker");
-			assert.equal(shared.steps[0]?.task, "Inspect project");
-		} finally {
-			if (oldHome === undefined) delete process.env.HOME;
-			else process.env.HOME = oldHome;
-			if (oldUserProfile === undefined) delete process.env.USERPROFILE;
-			else process.env.USERPROFILE = oldUserProfile;
-		}
-	});
 });

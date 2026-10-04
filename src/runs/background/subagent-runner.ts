@@ -4,7 +4,6 @@ import * as path from "node:path";
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 import type { Message } from "@earendil-works/pi-ai";
-import { arbitrateCompletionGuardRescue, createTaskMutationArbiter } from "../shared/llm-intent-arbiter.ts";
 import { installRunnerHttpDispatcher } from "./runner-http-dispatcher.ts";
 
 const isRunnerEntrypoint = Boolean(process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href);
@@ -98,7 +97,7 @@ import { formatSubagentModelVerificationError, isContextOverflow } from "../shar
 import { markProcessTerminalCandidateLeaseRelease, processTerminalPath, writeProcessTerminalCandidate, type ProcessTerminalCandidate } from "./process-terminal.ts";
 import { createSteeringStatus, recordSteeringRequest, steeringStatus, terminalSteeringNoticeState, unconsumedSteerReason, updateSteeringTarget } from "./steering.ts";
 import { PROMPT_REDACTED, detectSubagentError, extractTextFromContent, extractToolArgsPreview, formatEmptyTerminalAssistantResponseError, getAgentDir, getFinalOutput, hasEmptyTerminalAssistantResponse, readStatus } from "../../shared/utils.ts";
-import { evaluateCompletionMutationGuard, expectsImplementationMutation, hasMutationToolCapability, validateImplementationToolContract } from "../shared/completion-guard.ts";
+import { completionGuardEnabled, evaluateCompletionMutationGuard, hasMutationToolCapability, validateImplementationToolContract } from "../shared/completion-guard.ts";
 import { planCompletionEvidence, projectSettlementDiagnostic } from "../shared/completion-evidence.ts";
 import { planAbortRecovery } from "../shared/abort-recovery.ts";
 import {
@@ -775,12 +774,10 @@ export async function runSingleStepInner(
 		const contractTools = resolvedTaskToolPlan.explicitToolAllowlist ? resolvedTaskToolPlan.effectiveToolAllowlist : undefined;
 		const contractError = validateImplementationToolContract({
 			agent: step.agent,
-			task: taskForCompletionGuard,
 			tools: contractTools,
 			mcpDirectTools: resolvedTaskToolPlan.effectiveMcpTools,
 			configuredExtensions: resolvedTaskToolPlan.configuredExtensions,
 			requestedTools: resolvedTaskToolPlan.requestedBuiltinTools,
-			acceptanceRole: step.acceptanceRole,
 			completionGuard: step.completionGuard,
 		});
 		if (contractError) {
@@ -1187,16 +1184,15 @@ export async function runSingleStepInner(
 			&& (!hiddenError?.hasError || hasEmptyTerminalAssistantResponse(run.messages))
 			? formatEmptyTerminalAssistantResponseError(run.messages)
 			: undefined;
-		const completionGuardEnabled = isAgentContract(step.agentContract) ? step.completionGuard === true : step.completionGuard !== false;
+		const completionGuardOn = completionGuardEnabled(step.agent, step.completionGuard);
 		const completionToolPlan = resolvedTaskToolPlan;
 		const completionTools = completionToolPlan ? (completionToolPlan.explicitToolAllowlist ? completionToolPlan.effectiveToolAllowlist : undefined) : step.tools;
 		const mutationEvidence = collectTrackedMutationEvidence(mutationSnapshot, step.cwd ?? ctx.cwd);
 		finalMutationEvidence = mutationEvidence;
 		const completionMutationEvidence = ctx.trackedMutationEvidenceForCompletionGuard === false ? undefined : mutationEvidence;
-		const completionGuard = completionDiagnosticsEligible && run.exitCode === 0 && !run.error && !structuredError && !hiddenError?.hasError && !midToolExitError && !emptyOutputError && completionGuardEnabled
+		const completionGuard = completionDiagnosticsEligible && run.exitCode === 0 && !run.error && !structuredError && !hiddenError?.hasError && !midToolExitError && !emptyOutputError && completionGuardOn
 			? evaluateCompletionMutationGuard(omitUndefinedProperties({
-				agent: step.agent,
-				task: taskForCompletionGuard,
+				expectsMutation: completionGuardOn,
 				messages: run.messages,
 				tools: completionTools,
 				mcpDirectTools: completionToolPlan?.effectiveMcpTools ?? step.mcpDirectTools,
@@ -1206,24 +1202,12 @@ export async function runSingleStepInner(
 			}))
 			: undefined;
 		const mutationAttemptObserved = run.observedMutationAttempt === true || completionMutationEvidence?.attemptedMutation === true;
-		let arbitration = { triggered: completionGuard?.triggered === true && !mutationAttemptObserved, rescued: false };
-		if (arbitration.triggered) {
-			const modelContext = launch.capture.completionIntentContext?.();
-			arbitration = await arbitrateCompletionGuardRescue({
-				guardTriggered: true,
-				task: taskForCompletionGuard,
-				// Construct lazily too: the shared gate refuses overlength tasks before
-				// registry/auth/model work. The child has already shut down normally.
-				arbiter: modelContext ? async (task) => createTaskMutationArbiter(modelContext)?.(task) ?? "unavailable" : undefined,
-			});
-		}
+		const completionGuardTriggered = completionGuard?.triggered === true && !mutationAttemptObserved;
 		const completionEvidence = planCompletionEvidence({
 			guard: completionGuard,
-			guardTriggered: arbitration.triggered,
-			arbiterRescued: arbitration.rescued,
-			completionGuardEnabled,
+			guardTriggered: completionGuardTriggered,
+			completionGuardEnabled: completionGuardOn,
 			mutationCapable: hasMutationToolCapability(completionTools, completionToolPlan?.effectiveMcpTools ?? step.mcpDirectTools),
-			implementationMutationExpected: expectsImplementationMutation(step.agent, taskForCompletionGuard),
 			mutationAttemptObserved,
 			mutationEvidence: completionMutationEvidence,
 			agentContractEnabled: isAgentContract(step.agentContract),

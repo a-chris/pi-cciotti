@@ -392,7 +392,7 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 		const launch = executeAsyncSingle(id, {
 			agent: "worker",
 			task: "Implement the requested source fix",
-			agentConfig: makeAgent("worker", { tools: ["read", "grep", "find", "ls"] }),
+			agentConfig: makeAgent("worker", { tools: ["read", "grep", "find", "ls"], completionGuard: true }),
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
@@ -620,7 +620,7 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 		const launch = executeAsyncSingle(id, {
 			agent: "worker",
 			task: "Implement the requested source fix",
-			agentConfig: makeAgent("worker", { tools: ["read", "write"] }),
+			agentConfig: makeAgent("worker", { tools: ["read", "write"], completionGuard: true }),
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
@@ -640,7 +640,7 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 		const launch = executeAsyncChain(id, {
 			chain: [{ agent: "worker", task: "Implement the requested source fix" }],
 			resultMode: "chain",
-			agents: [makeAgent("worker", { tools: ["read", "grep", "find", "ls"] })],
+			agents: [makeAgent("worker", { tools: ["read", "grep", "find", "ls"], completionGuard: true })],
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
@@ -664,7 +664,7 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			resultMode: "chain",
 			agents: [
 				makeAgent("producer", { completionGuard: false }),
-				makeAgent("worker", { tools: ["read", "grep", "find", "ls"] }),
+				makeAgent("worker", { tools: ["read", "grep", "find", "ls"], completionGuard: true }),
 			],
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
@@ -672,12 +672,9 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 			acceptance: false,
 		});
 
-		assert.equal(launch.isError, undefined);
-		const resultPath = await waitForAsyncResultFile(id, 10_000);
-		const payload = JSON.parse(fs.readFileSync(resultPath, "utf-8")) as AsyncResultPayload;
-		assert.equal(payload.success, false);
-		assert.match(payload.results[1]?.error ?? "", /no mutation-capable tools/);
-		assert.equal(mockPi.callCount(), 1);
+		assert.equal(launch.isError, true);
+		assert.match(launch.content[0]?.text ?? "", /no mutation-capable tools/);
+		assert.equal(mockPi.callCount(), 0);
 	});
 
 	it("routes async artifacts to the configured session directory", { skip: !isAsyncAvailable() || !createSubagentExecutor ? "jiti or executor not available" : undefined }, async () => {

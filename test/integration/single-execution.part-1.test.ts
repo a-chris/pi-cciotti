@@ -2521,7 +2521,7 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 
 	it("rejects workflowScript implementation children under a read-only capability ceiling before spawn", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
 		mockPi.onCall({ output: "completed without edits" });
-		const executor = makeExecutor([makeAgent("worker")]);
+		const executor = makeExecutor([makeAgent("worker", { completionGuard: true })]);
 
 		const result = await executor.execute(
 			"workflow-readonly-implementation-contract",

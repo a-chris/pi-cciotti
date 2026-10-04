@@ -52,9 +52,8 @@ import {
 } from "../../shared/utils.ts";
 import { resolveSkillsWithFallback } from "../../agents/skills.ts";
 import { effectiveToolTimeoutMs, formatToolTimeoutMessage, resolveToolTimeoutMs, toolTimeoutCallKey, toolTimeoutFromEnv } from "../shared/tool-timeout.ts";
-import { evaluateCompletionMutationGuard, expectsImplementationMutation, hasMutationToolCapability, validateImplementationToolContract } from "../shared/completion-guard.ts";
+import { completionGuardEnabled, evaluateCompletionMutationGuard, hasMutationToolCapability, validateImplementationToolContract } from "../shared/completion-guard.ts";
 import { planCompletionEvidence } from "../shared/completion-evidence.ts";
-import { arbitrateCompletionGuardRescue } from "../shared/llm-intent-arbiter.ts";
 import { preflightLaunchCwd } from "../shared/launch-cwd.ts";
 import { createJsonlWriter } from "../../shared/jsonl-writer.ts";
 import { createOrcaProgressTab, type OrcaProgressTab } from "../shared/orca-progress-tabs.ts";
@@ -410,12 +409,10 @@ async function runSingleAttempt(
 	const contractTools = toolPlan.explicitToolAllowlist ? toolPlan.effectiveToolAllowlist : undefined;
 	const contractError = validateImplementationToolContract({
 		agent: agent.name,
-		task: shared.originalTask ?? task,
 		tools: contractTools,
 		mcpDirectTools: toolPlan.effectiveMcpTools,
 		configuredExtensions: toolPlan.configuredExtensions,
 		requestedTools: toolPlan.requestedBuiltinTools,
-		acceptanceRole: agent.acceptanceRole,
 		completionGuard: agent.completionGuard,
 	});
 	if (contractError) {
@@ -1410,11 +1407,10 @@ async function runSingleAttempt(
 			? `${timeoutMessage}\n\n${result.timeoutRecovery.message}\n\nPartial output before timeout:\n${fullOutput}`
 			: `${timeoutMessage}\n\n${result.timeoutRecovery.message}`;
 	}
-	const completionGuardEnabled = isAgentContract(options.agentContract) ? agent.completionGuard === true : agent.completionGuard !== false;
-	const completionGuard = ((result.exitCode === 0 && !result.error) || toolAvailabilityError) && completionGuardEnabled
+	const completionGuardOn = completionGuardEnabled(agent.name, agent.completionGuard);
+	const completionGuard = ((result.exitCode === 0 && !result.error) || toolAvailabilityError) && completionGuardOn
 		? evaluateCompletionMutationGuard({
-			agent: agent.name,
-			task: shared.originalTask ?? task,
+			expectsMutation: completionGuardOn,
 			messages: result.messages ?? [],
 			tools: contractTools,
 			mcpDirectTools: toolPlan.effectiveMcpTools,
@@ -1424,32 +1420,14 @@ async function runSingleAttempt(
 		})
 		: undefined;
 	const mutationAttemptObserved = observedMutationAttempt || mutationEvidence.attemptedMutation;
-	let completionGuardTriggered = completionGuard?.triggered === true && !mutationAttemptObserved;
-	// The classifier is deliberately narrow, so a read-only review task can
-	// still be misread as implementation. Arbitrate BEFORE any failure side
-	// effect is published (effects, exit code, progress, notifications,
-	// acceptance, output persistence): only a confident read-only verdict
-	// rescues, and the task text alone is evidence — never the child's own
-	// final message.
-	let arbiterRescued = false;
-	if (completionGuardTriggered) {
-		const arbitration = await arbitrateCompletionGuardRescue({
-			guardTriggered: true,
-			task: shared.originalTask ?? task,
-			arbiter: options.llmIntentArbiter,
-		});
-		completionGuardTriggered = arbitration.triggered;
-		arbiterRescued = arbitration.rescued;
-	}
+	const completionGuardTriggered = completionGuard?.triggered === true && !mutationAttemptObserved;
 	const completionEvidence = planCompletionEvidence({
 		guard: completionGuard,
 		guardTriggered: completionGuardTriggered,
-		completionGuardEnabled,
+		completionGuardEnabled: completionGuardOn,
 		mutationCapable: hasMutationToolCapability(contractTools, toolPlan.effectiveMcpTools),
-		implementationMutationExpected: expectsImplementationMutation(agent.name, shared.originalTask ?? task),
 		mutationAttemptObserved,
 		mutationEvidence,
-		arbiterRescued,
 		agentContractEnabled: isAgentContract(options.agentContract),
 	});
 	if (completionEvidence.fileMutation) {

@@ -410,15 +410,15 @@ Sets the native dedicated root directory for `worktree: true` runs. Relative pat
 
 Each native worktree leaf is `{dedicatedRoot}/{projectName}/pi-worktree-{runId}-{index}`, where `{projectName}` is the repository directory name (`basename(repoRoot)`), `{runId}` identifies the run, and `{index}` counts the children within the run. `worktreeBaseDir` and `PI_CCIOTTI_WORKTREE_DIR` override only the dedicated root; the `{projectName}/pi-worktree-{runId}-{index}` nesting under it always applies for native allocation. Unsafe locations are rejected instead of created: setup fails when the dedicated root sits inside the repository checkout or the Pi extensions directory, or when a worktree would land directly inside the repository parent.
 
-## `worktreeProvider`
+## `worktreeBranchPrefix`
 
 ```json
-{ "worktreeProvider": "auto", "worktreeBranchPrefix": "pi-cciotti/" }
+{ "worktreeBranchPrefix": "pi-cciotti/" }
 ```
 
-Selects the managed worktree allocator: `auto` (the default) uses Worktrunk when its machine-readable interface is available and otherwise falls back to Pi's native Git worktrees; `native` always uses Pi's Git implementation; and `worktrunk` fails closed when Worktrunk is unavailable or incompatible. On Windows, pi-cciotti invokes Worktrunk through `git wt` to avoid Windows Terminal's conflicting `wt.exe` alias. A configured `worktreeBaseDir` (or `PI_CCIOTTI_WORKTREE_DIR`) selects native allocation and cannot be combined with explicit `worktrunk`.
+`worktreeBranchPrefix` is normalized as a Git ref namespace and defaults to `pi-cciotti/`. Branch names include readable task identity plus run and fan-out indexes. Pi owns setup hooks, launch, handoff/diff evidence, resume, and cleanup.
 
-`worktreeBranchPrefix` is normalized as a Git ref namespace and defaults to `pi-cciotti/`. Branch names include readable task identity plus run and fan-out indexes. Pi continues to own setup hooks, launch, handoff/diff evidence, resume, and cleanup; Worktrunk is used only to allocate and report the worktree path.
+The single allocator is Pi's native Git worktrees: `worktree: true` runs get a dedicated `git worktree` leaf whose agent cwd is resolved before the child is spawned. There is no provider selection to configure.
 
 Set `worktree` to `true` to make managed worktree isolation the default for launches that omit the per-call `worktree` flag. A per-call value still takes precedence.
 

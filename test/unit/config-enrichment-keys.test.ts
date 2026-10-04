@@ -100,6 +100,13 @@ describe("M4 config-enriched keys: validated and wired", () => {
 		assert.throws(() => loadConfig(), /toolDescriptionMode was removed/);
 	});
 
+	it("rejects the removed worktreeProvider key instead of ignoring it", () => {
+		// An operator who pinned the allocator must see that the choice stopped
+		// applying; silently running native would drop their isolation setting.
+		writeRawConfig('{"worktreeProvider": "worktrunk"}');
+		assert.throws(() => loadConfig(), /worktreeProvider was removed/);
+	});
+
 	it("rejects the removed authorityPolicy.projectOpen key without losing the file", () => {
 		// The key is nested, so the generic fail-closed list cannot see it by name.
 		// Without the explicit check this file would degrade to defaults silently.

@@ -348,7 +348,7 @@ Before a materialized `runs.run` or `runs.all` group dispatches fresh children, 
 
 Use `baseRef` to branch managed worktrees from `HEAD` or a supported named ref such as `refs/heads/release`, `refs/tags/v1`, or `origin/main`. Full 40/64-character commit IDs and revision expressions such as `HEAD~1` are unsupported. For example, `{ source, worktree: true, baseRef: "refs/heads/release" }` applies the release ref to children unless a child supplies its own `baseRef`. If omitted, the default `HEAD` is resolved at worktree allocation, not when the script is validated. The source checkout must still be clean, and the ref must resolve to a commit before any worktree is allocated.
 
-Configure the worktree provider, native path layout, base directory, and setup hook in [configuration.md](configuration.md).
+Configure the native worktree path layout, base directory, and setup hook in [configuration.md](configuration.md).
 
 Setup waits remain nonblocking and cancellable. Normal cleanup, including detached foreground finalization, waits for the same in-process setup turn rather than retaining worktrees merely because another setup is active. This is not a cross-process lock. Hooks must follow the [finite setup contract](configuration.md#worktreesetuphook).
 

@@ -64,7 +64,7 @@ describe("public workflow worktree admission", { skip: !available }, () => {
 		mockPi.onCall({ output: "Inspected" });
 		mockPi.onCall({ output: "Shared cwd inspected" });
 		try {
-			const executor = makeAdmissionExecutor({ worktreeProvider: "native", worktree: true });
+			const executor = makeAdmissionExecutor({ worktree: true });
 			const result = await executor.executePublic("admission-clean", {
 				workflowScript: `const results = await runs.all([{ key: 'isolated', agent: 'worker', task: 'Inspect', cwd: ${JSON.stringify(repo)}, async: false }, { key: 'shared', agent: 'worker', task: 'Inspect shared', worktree: false, async: false }]); return results.map(r => r.ok);`,
 				async: false, worktree: true, output: false,

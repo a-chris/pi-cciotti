@@ -123,7 +123,6 @@ import {
 	findWorktreeTaskCwdConflict,
 	formatWorktreeDiffSummary,
 	formatWorktreeTaskCwdConflict,
-	WORKTREE_AGENT_CWD_PLACEHOLDER,
 	type WorktreeSetup,
 } from "../shared/worktree.ts";
 import { findModelInfo, resolveEffectiveThinking, splitKnownThinkingSuffix } from "../../shared/model-info.ts";
@@ -176,7 +175,6 @@ export interface SubagentRunConfig {
 	worktreeSetupHookTimeoutMs?: number;
 	worktreeBaseDir?: string;
 	baseRef?: string;
-	worktreeProvider?: import("../../shared/types.ts").WorktreeProvider;
 	worktreeBranchPrefix?: string;
 	controlConfig?: ResolvedControlConfig;
 	resultMode?: SubagentRunMode;
@@ -1532,7 +1530,6 @@ function requiredStatusStep(statusPayload: RunnerStatusPayload, index: number): 
 function setStatusWorktreeReference(statusStep: RunnerStatusStep, worktree: WorktreeSetup["worktrees"][number]): void {
 	statusStep.worktreePath = worktree.path;
 	statusStep.branch = worktree.branch;
-	if (worktree.provider) statusStep.provider = worktree.provider;
 	if (worktree.naming) statusStep.naming = worktree.naming;
 }
 
@@ -1617,18 +1614,6 @@ function markParallelGroupRunning(input: {
 	}));
 }
 
-function bindWorktreeCwd(step: SubagentStep, worktreeCwd: string): SubagentStep {
-	const bind = <T extends string | null | undefined>(value: T): T => value === null || value === undefined ? value : value.replaceAll(WORKTREE_AGENT_CWD_PLACEHOLDER, worktreeCwd) as T;
-	return {
-		...step,
-		task: bind(step.task) ?? step.task,
-		...(step.systemPrompt !== undefined ? { systemPrompt: bind(step.systemPrompt) } : {}),
-		...(step.outputPath !== undefined ? { outputPath: bind(step.outputPath) } : {}),
-		...(step.launchBindingTask !== undefined ? { launchBindingTask: bind(step.launchBindingTask) } : {}),
-		...(step.requestedCwd !== undefined ? { requestedCwd: bind(step.requestedCwd) } : {}),
-	};
-}
-
 function prepareParallelTaskRun(
 	task: SubagentStep,
 	cwd: string,
@@ -1637,9 +1622,8 @@ function prepareParallelTaskRun(
 ): { taskForRun: SubagentStep; taskCwd: string } {
 	if (!worktreeSetup) return { taskForRun: task, taskCwd: cwd };
 	const { cwd: _taskCwd, ...taskForRun } = task;
-	const boundTask = bindWorktreeCwd(taskForRun, worktreeSetup.worktrees[taskIndex]!.agentCwd);
 	return {
-		taskForRun: boundTask,
+		taskForRun,
 		taskCwd: worktreeSetup.worktrees[taskIndex]!.agentCwd,
 	};
 }
@@ -3050,7 +3034,7 @@ export async function runSubagent(
 				mode: (config.resultMode ?? statusPayload.mode) === "parallel" ? "parallel" : (config.resultMode ?? statusPayload.mode) === "single" ? "single" : "chain",
 				source: "async", cwd, stepIndex, flatStartIndex, setup, diffs: [], results: [],
 				cleanup: { state: "partial", pruned: false, errors: [reason], tasks: setup.worktrees.map((worktree) => ({
-					index: worktree.index, path: worktree.path, branch: worktree.branch, provider: worktree.provider, naming: worktree.naming,
+					index: worktree.index, path: worktree.path, branch: worktree.branch, naming: worktree.naming,
 					worktreeRemoved: false, branchRemoved: false, preserved: true, reason,
 				})) },
 			});
@@ -3741,7 +3725,6 @@ export async function runSubagent(
 						agents: group.parallel.map((task) => task.agent),
 						labels: group.parallel.map((task) => config.workflowKey ?? task.outputName ?? task.label),
 						tasks: group.parallel.map((task) => task.task),
-						provider: config.worktreeProvider,
 						baseRef: config.baseRef,
 						branchPrefix: config.worktreeBranchPrefix,
 						setupHook: config.worktreeSetupHook
@@ -4158,7 +4141,6 @@ export async function runSubagent(
 						agents: [seqStep.agent],
 						labels: [config.workflowKey ?? seqStep.outputName ?? seqStep.label],
 						tasks: [seqStep.task],
-						provider: config.worktreeProvider,
 						baseRef: config.baseRef,
 						branchPrefix: config.worktreeBranchPrefix,
 						setupHook: config.worktreeSetupHook
@@ -4244,7 +4226,7 @@ export async function runSubagent(
 
 			flushPendingStepSteers(flatIndex);
 			const executionStep = singleWorktreeSetup
-				? bindWorktreeCwd({ ...seqStep, cwd: singleCwd }, singleCwd)
+				? { ...seqStep, cwd: singleCwd }
 				: seqStep;
 			let singleResult: Awaited<ReturnType<typeof runSingleStepWithTimeout>>;
 			try {

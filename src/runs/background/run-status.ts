@@ -76,7 +76,7 @@ function formatWorkflowDebug(status: AsyncStatus): string[] {
 		status.mode === "workflow" ? `Workflow children: ${(status.steps ?? []).length}` : undefined,
 	].filter((line): line is string => line !== undefined);
 	for (const [index, step] of (status.steps ?? []).entries()) {
-		lines.push(`  ${index + 1}. key ${step.workflowKey ?? "n/a"} · ${runStatusStepDisplayName(step)} · ${step.status} · async ${step.async === undefined ? "unknown" : step.async ? "yes" : "no"}${step.runId ? ` · run ${step.runId}` : ""}${step.worktreePath ? ` · worktree ${step.worktreePath} · branch ${step.branch ?? "unknown"}${step.provider ? ` · provider ${step.provider}` : ""}` : ""}`);
+		lines.push(`  ${index + 1}. key ${step.workflowKey ?? "n/a"} · ${runStatusStepDisplayName(step)} · ${step.status} · async ${step.async === undefined ? "unknown" : step.async ? "yes" : "no"}${step.runId ? ` · run ${step.runId}` : ""}${step.worktreePath ? ` · worktree ${step.worktreePath} · branch ${step.branch ?? "unknown"}` : ""}`);
 	}
 	return lines;
 }

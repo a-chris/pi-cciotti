@@ -16,7 +16,6 @@ export interface MissionLaunchParams {
 	mission?: unknown;
 	task?: string;
 	tasks?: Array<{ task?: string }>;
-	chain?: Array<{ task?: string; parallel?: Array<{ task?: string }> | { task?: string } }>;
 }
 
 export interface MissionLaunchBinding {
@@ -37,16 +36,9 @@ interface PersistedMissionBinding {
 }
 
 function workflowObjective(params: MissionLaunchParams): string | undefined {
-	const objective = params.task?.trim()
+	return params.task?.trim()
 		|| params.tasks?.find((task) => task.task?.trim())?.task?.trim()
-		|| params.chain?.find((step) => step.task?.trim())?.task?.trim();
-	if (objective) return objective;
-	for (const step of params.chain ?? []) {
-		const parallel = Array.isArray(step.parallel) ? step.parallel : step.parallel ? [step.parallel] : [];
-		const task = parallel.find((child) => child.task?.trim())?.task?.trim();
-		if (task) return task;
-	}
-	return undefined;
+		|| undefined;
 }
 
 export function prepareMissionLaunch(input: {
@@ -94,8 +86,6 @@ function missionRunModeForResult(mode: Details["mode"]): MissionRunMode {
 
 function missionModeForEvent(mode: unknown): MissionRunMode {
 	if (mode === "single" || mode === "workflow") return mode;
-	// Legacy chain/parallel modes were removed; coerce persisted values to single.
-	if (mode === "chain" || mode === "parallel") return "single";
 	return "external";
 }
 

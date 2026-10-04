@@ -14,7 +14,7 @@ import { createAtomicJsonWriter, writePrivateAtomicJson } from "../../shared/ato
 import { childCacheRetentionEnv } from "../../shared/child-cache-retention.ts";
 import { buildEffectiveSystemPrompt } from "../shared/effective-system-prompt.ts";
 import { currentCompletionOwnerId } from "../../shared/completion-owner.ts";
-import { planChildLaunch, projectChainOutputSchemas, resolveStepBehavior, suppressProgressForReadOnlyTask, type ResolvedStepBehavior } from "../shared/child-launch-plan.ts";
+import { planChildLaunch, resolveStepBehavior, suppressProgressForReadOnlyTask, type ResolvedStepBehavior } from "../shared/child-launch-plan.ts";
 import { applyThinkingSuffix, getHostBuiltinToolNames, projectLaunchResolvedChildExtensions, resolvePiLaunchToolPlan } from "../shared/child-tool-plan.ts";
 import { injectSingleOutputInstruction, normalizeSingleOutputOverride, resolveSingleOutputPath, validateFileOnlyOutputMode } from "../shared/single-output.ts";
 import { resolveExistingReadInstructionPaths, resolveExistingReadPaths, writeInitialProgressFile } from "../../shared/settings.ts";

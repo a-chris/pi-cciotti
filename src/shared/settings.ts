@@ -167,17 +167,17 @@ export function expandHomePath(filePath: string): string {
 
 /**
  * Resolve a file path: `~`/`~/` expand to home first, then absolute paths pass
- * through and relative paths get chainDir prepended.
+ * through and relative paths get baseDir prepended.
  */
-export function resolveChainPath(filePath: string, chainDir: string): string {
+export function resolveTaskFilePath(filePath: string, baseDir: string): string {
 	const expanded = expandHomePath(filePath);
-	return path.isAbsolute(expanded) ? expanded : path.join(chainDir, expanded);
+	return path.isAbsolute(expanded) ? expanded : path.join(baseDir, expanded);
 }
 
 export function resolveExistingReadInstructionPaths(reads: readonly string[], instructionCwd: string, existenceCwd = instructionCwd): string[] {
 	return reads.flatMap((filePath) => {
-		const instructionPath = resolveChainPath(filePath, instructionCwd);
-		const existencePath = resolveChainPath(filePath, existenceCwd);
+		const instructionPath = resolveTaskFilePath(filePath, instructionCwd);
+		const existencePath = resolveTaskFilePath(filePath, existenceCwd);
 		return fs.existsSync(existencePath) ? [instructionPath] : [];
 	});
 }

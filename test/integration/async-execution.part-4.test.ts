@@ -23,140 +23,13 @@ import { waitForSubagents } from "../../src/runs/background/subagent-wait.ts";
 import type { AsyncResultPayload, AsyncStatusPayload } from "../support/async-execution-fixture.ts";
 import {
 	installAsyncExecutionHooks,
-	available, isAsyncAvailable, executeAsyncSingle,
-	executeAsyncChain, ASYNC_DIR, RESULTS_DIR, TEMP_ROOT_DIR, escapeRegExp,
+	available, isAsyncAvailable, executeAsyncSingle, ASYNC_DIR, RESULTS_DIR, TEMP_ROOT_DIR, escapeRegExp,
 	createRepo, waitForAsyncResultFile, waitForAsyncState, tempDir, mockPi,
 	readAsyncPayload, waitForMockPiCall,
 } from "../support/async-execution-fixture.ts";
 
 describe("async execution utilities", { skip: !available ? "pi packages not available" : undefined }, () => {
 	installAsyncExecutionHooks();
-
-	it("coalesces ordinary background status while publishing per-child activity transitions", { timeout: 30_000, skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async (t) => {
-		const id = `async-coalescing-${Date.now().toString(36)}`;
-		const statusPath = path.join(ASYNC_DIR, id, "status.json");
-		const reportPath = path.join(tempDir, `${id}-report.json`);
-		const factoryPath = path.join(tempDir, `${id}-factory.mjs`);
-		// Exercise the detached production runner through its child-session boundary.
-		// Only external time and successful filesystem publications are instrumented.
-		fs.writeFileSync(factoryPath, `
-import fs from "node:fs";
-import { syncBuiltinESMExports } from "node:module";
-import { mock } from "node:test";
-const statusPath = ${JSON.stringify(statusPath)};
-const reportPath = ${JSON.stringify(reportPath)};
-const children = [];
-const report = { samples: [], transitions: [], terminal: [] };
-process.once("exit", () => {
-  fs.writeFileSync(reportPath + ".tmp", JSON.stringify(report));
-  fs.renameSync(reportPath + ".tmp", reportPath);
-});
-let writes = 0, bytes = 0, replayed = false, finished = false;
-const read = () => JSON.parse(fs.readFileSync(statusPath, "utf8"));
-const rename = fs.renameSync;
-fs.renameSync = function(source, target) {
-  rename.call(this, source, target);
-  if (target === statusPath) {
-    writes++;
-    bytes += fs.statSync(target).size;
-    if (replayed && !finished && read().state !== "running") {
-      finished = true;
-      queueMicrotask(() => {
-        report.terminal.push(read());
-        mock.timers.tick(100);
-        report.terminal.push(read());
-        mock.timers.reset();
-      });
-    }
-  }
-};
-syncBuiltinESMExports();
-function replay() {
-  mock.timers.enable({ apis: ["Date", "setTimeout"], now: Date.now() });
-  const emit = (index, event) => children[index].listener(event);
-  const stream = () => emit(1, { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "x" } });
-  const transition = (index, event) => {
-    const before = writes;
-    emit(index, event);
-    report.transitions.push({ writes: writes - before, status: read() });
-  };
-  const sample = (state) => {
-    const beforeWrites = writes, beforeBytes = bytes;
-    for (let i = 0; i < 1000; i++) { stream(); mock.timers.tick(10); }
-    mock.timers.tick(100);
-    report.samples.push({ state, writes: writes - beforeWrites, bytes: bytes - beforeBytes, now: Date.now(), status: read() });
-  };
-  const start = { type: "tool_execution_start", toolName: "read", toolCallId: "decision", args: { path: "x" } };
-  const end = { type: "tool_execution_end", toolName: "read", toolCallId: "decision" };
-  sample("unset");
-  transition(1, { type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "working" }], stopReason: "tool_use" } });
-  sample("active_long_running");
-  transition(0, start);
-  sample("needs_attention");
-  transition(1, start); // Aggregate attention is unchanged by either sibling transition.
-  transition(1, end);
-  transition(0, end);
-  const beforePending = writes;
-  stream(); // Leave an ordinary update pending when both children fail.
-  report.pendingWrites = writes - beforePending;
-  replayed = true;
-  for (const child of children) child.reject(new Error("scripted terminal failure"));
-}
-export default function() {
-  return {
-    async create() {
-      const child = {};
-      children.push(child);
-      return {
-        sessionId: "coalescing-" + children.length, sessionFile: undefined, modelId: undefined, messages: [],
-        subscribe(listener) { child.listener = listener; return () => {}; },
-        prompt() { return new Promise((resolve, reject) => { child.reject = reject; if (children.length === 2 && children.every(c => c.reject)) replay(); }); },
-        async steer() {}, async followUp() {}, async abort() {}, async dispose() {},
-      };
-    },
-    async dispose() {},
-  };
-}
-`);
-		const reportReady = new Promise<void>((resolve) => {
-			// libuv compares expanded event paths against the watched directory (Windows 8.3 aliases differ).
-			const watcher = fs.watch(fs.realpathSync.native(tempDir), () => {
-				if (fs.existsSync(reportPath)) resolve();
-			});
-			t.after(() => watcher.close());
-		});
-		setChildSessionFactoryModule(factoryPath);
-		t.after(() => setChildSessionFactoryModule(fileURLToPath(new URL("../support/runner-child-session-factory.ts", import.meta.url))));
-		const launched = executeAsyncChain(id, {
-			chain: [{ parallel: [{ agent: "worker", task: "A" }, { agent: "worker", task: "B" }] }],
-			agents: [makeAgent("worker")],
-			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
-			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-			shareEnabled: false,
-			sessionRoot: path.join(tempDir, "sessions"),
-			controlConfig: { enabled: true, needsAttentionAfterMs: 999_999, activeNoticeAfterTurns: 1, activeNoticeAfterMs: 999_999, activeNoticeAfterTokens: 999_999, failedToolAttemptsBeforeAttention: 3, notifyOn: ["active_long_running", "needs_attention"], notifyChannels: ["event", "async"] },
-		});
-		assert.notEqual(launched.isError, true);
-		await reportReady;
-		const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-		t.diagnostic(JSON.stringify(report.samples.map(({ state, writes, bytes }: { state: string; writes: number; bytes: number }) => ({ state, writes, bytes }))));
-		assert.deepEqual(report.samples.map((sample: { writes: number }) => sample.writes), [100, 100, 100]);
-		for (const sample of report.samples) {
-			assert.equal(sample.status.lastActivityAt, sample.now - 110);
-			assert.equal(sample.status.steps[1].lastActivityAt, sample.now - 110);
-		}
-		assert.deepEqual(report.transitions.map((entry: { writes: number }) => entry.writes), [1, 0, 0, 0, 0]);
-		assert.deepEqual(report.transitions.map((entry: { status: AsyncStatusPayload }) => entry.status.steps?.map(step => step.activityState)), [
-			[undefined, "active_long_running"], [undefined, "active_long_running"],
-			[undefined, "active_long_running"], [undefined, "active_long_running"], [undefined, "active_long_running"],
-		]);
-		assert.equal(report.samples[2].status.steps[1].turnCount, 1);
-		assert.equal(report.transitions[2].status.activityState, "active_long_running");
-		assert.equal(report.transitions[3].status.activityState, "active_long_running");
-		assert.equal(report.pendingWrites, 0);
-		assert.equal(report.terminal[0].state, "failed");
-		assert.deepEqual(report.terminal[1], report.terminal[0]);
-	});
 
 	for (const mode of ["success", "stop", "pause", "deadline", "failure-before-JSON"] as const) {
 		it(`background setup lifecycle: ${mode}`, { skip: !isAsyncAvailable() || process.platform === "win32" ? "requires real POSIX setup executable" : undefined, timeout: 25_000 }, async (t) => {
@@ -204,9 +77,11 @@ setTimeout(() => process.exit(90), 15000).unref();
 			try {
 				mockPi.onCall({ output: "finite setup completed", writeFiles: [{ path: marker, content: "launched" }] });
 				const connection = once(server, "connection", { signal: AbortSignal.timeout(20_000) });
-				const receipt = executeAsyncChain(id, {
-					chain: [{ agent: "worker", task: "Do work", worktree: true }],
-					agents: [makeAgent("worker", { completionGuard: false })],
+				const receipt = executeAsyncSingle(id, {
+					agent: "worker",
+					task: "Do work",
+					worktree: true,
+					agentConfig: makeAgent("worker", { completionGuard: false }),
 					ctx: { pi: { events: bus }, cwd: repo, currentSessionId: "session-1" },
 					artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 					shareEnabled: false, sessionRoot: path.join(tempDir, "sessions"), acceptance: false,
@@ -376,27 +251,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 		assert.match(singleResult.content[0]?.text ?? "", /Failed to start async run/);
 		assert.match(singleResult.content[0]?.text ?? "", /cwd does not exist/);
 
-		const chainId = `async-missing-cwd-chain-${Date.now().toString(36)}`;
-		const chainResult = executeAsyncChain(chainId, {
-			chain: [{ agent: "worker", task: "Do work" }],
-			agents: [makeAgent("worker")],
-			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
-			cwd: missingCwd,
-			artifactConfig: {
-				enabled: false,
-				includeInput: false,
-				includeOutput: false,
-				includeJsonl: false,
-				includeMetadata: false,
-				cleanupDays: 7,
-			},
-			shareEnabled: false,
-			sessionRoot: path.join(tempDir, "sessions"),
-		});
-
-		assert.equal(chainResult.isError, true);
-		assert.match(chainResult.content[0]?.text ?? "", /Failed to start async chain/);
-		assert.match(chainResult.content[0]?.text ?? "", /cwd does not exist/);
 	});
 
 	it("returns a tool error when the async runner process cannot spawn", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, () => {
@@ -437,32 +291,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 		}
 	});
 
-	it("returns a tool error when an async chain cannot write its detached runner config", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, () => {
-		const id = `async-chain-write-fail-${Date.now().toString(36)}`;
-		assert.ok(TEMP_ROOT_DIR, "TEMP_ROOT_DIR should be available for async tests");
-		fs.mkdirSync(TEMP_ROOT_DIR, { recursive: true });
-		fs.mkdirSync(path.join(TEMP_ROOT_DIR, `async-cfg-${id}.json`), { recursive: true });
-
-		const result = executeAsyncChain(id, {
-			chain: [{ agent: "worker", task: "Do work" }],
-			agents: [makeAgent("worker")],
-			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
-			artifactConfig: {
-				enabled: false,
-				includeInput: false,
-				includeOutput: false,
-				includeJsonl: false,
-				includeMetadata: false,
-				cleanupDays: 7,
-			},
-			shareEnabled: false,
-			sessionRoot: path.join(tempDir, "sessions"),
-		});
-
-		assert.equal(result.isError, true);
-		assert.match(result.content[0]?.text ?? "", /Failed to start async chain/);
-		assert.match(result.content[0]?.text ?? "", /async-cfg-/);
-	});
 	it("background does not abort when a steer arrives after the final stop and turn_start is delayed", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
 		mockPi.onCall({
 			jsonl: [events.assistantMessage("before steer")],
@@ -826,101 +654,6 @@ setTimeout(() => process.exit(90), 15000).unref();
 			await new Promise((resolve) => setTimeout(resolve, 50));
 		}
 		assert.ok(fs.readFileSync(logPath, "utf-8").includes(`## Summary\noracle:\n${diagnostic}`));
-	});
-
-	it("preserves partial imported async roots with mutation evidence", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
-		const sourceId = `partial-source-${Date.now().toString(36)}`;
-		const sourceDir = path.join(ASYNC_DIR, sourceId);
-		const message = "Required file-only output was not produced: report.md";
-		const effects = { fileMutation: { status: "observed", expected: true, attempted: true, evidence: { source: "tracked-files", trackedOnly: true, cwd: tempDir, changedFiles: ["input.md"], attemptedMutation: true } } };
-		fs.mkdirSync(sourceDir, { recursive: true });
-		fs.writeFileSync(path.join(sourceDir, "status.json"), JSON.stringify({
-			runId: sourceId,
-			mode: "single",
-			state: "partial",
-			activityState: "needs_attention",
-			startedAt: Date.now(),
-			error: message,
-			steps: [{ agent: "worker", status: "failed", activityState: "needs_attention", error: message, effects }],
-		}), "utf-8");
-
-		const id = `async-imported-partial-${Date.now().toString(36)}`;
-		executeAsyncChain(id, {
-			chain: [],
-			attachRoot: { runId: sourceId, asyncDir: sourceDir, resultPath: path.join(RESULTS_DIR, `${sourceId}.json`), index: 0, agent: "worker" },
-			agents: [makeAgent("worker")],
-			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
-			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-			shareEnabled: false,
-			sessionRoot: path.join(tempDir, "sessions"),
-		});
-
-		const resultPath = await waitForAsyncResultFile(id);
-		const payload = JSON.parse(fs.readFileSync(resultPath, "utf-8")) as AsyncResultPayload;
-		assert.equal(payload.success, false);
-		assert.equal(payload.state, "partial");
-		assert.equal(payload.summary, message);
-		assert.equal(payload.results[0]?.execution?.status, "partial");
-		assert.deepEqual(payload.results[0]?.effects?.fileMutation?.evidence?.changedFiles, ["input.md"]);
-
-		const status = await waitForAsyncState(id, (candidate) => candidate.state === "partial");
-		assert.equal(status.activityState, "needs_attention");
-		assert.equal(status.steps?.[0]?.activityState, "needs_attention");
-	});
-
-	it("keeps concrete sibling failures above partial mutation evidence", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
-		const repo = createRepo("pi-cciotti-partial-sibling-failure-");
-		const outputPath = path.join(repo, "missing-report.md");
-		mockPi.onCall({
-			matchArgIncludes: "Write required report",
-			jsonl: [
-				events.assistantMessage("I changed the file but did not hand off the report."),
-				{
-					type: "message_end",
-					message: {
-						role: "assistant",
-						content: [],
-						model: "mock/test-model",
-						stopReason: "aborted",
-						usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } },
-					},
-				},
-			],
-			writeFiles: [{ path: "input.md", content: "changed before missing report\n" }],
-		});
-		mockPi.onCall({ matchArgIncludes: "Fail normally", stderr: "ordinary sibling failure", exitCode: 1 });
-
-		const id = `async-partial-sibling-failure-${Date.now().toString(36)}`;
-		try {
-			executeAsyncChain(id, {
-				chain: [{
-					parallel: [
-						{ agent: "partial", task: "Write required report" },
-						{ agent: "failure", task: "Fail normally" },
-					],
-					concurrency: 2,
-				}],
-				resultMode: "parallel",
-				agents: [makeAgent("partial", { output: outputPath, outputMode: "file-only" }), makeAgent("failure", { completionGuard: false })],
-				ctx: { pi: { events: { emit() {} } }, cwd: repo, currentSessionId: "session-1" },
-				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-				shareEnabled: false,
-			});
-
-			const payload = await readAsyncPayload(id);
-			assert.equal(payload.success, false);
-			assert.equal(payload.state, "failed");
-			assert.match(payload.summary, /ordinary sibling failure/);
-			assert.equal(payload.results[0]?.effects?.fileMutation?.status, "observed");
-			assert.equal(payload.results[0]?.effects?.settlementDiagnostic?.requiredOutput?.missing, true);
-			assert.match(payload.results[1]?.error ?? "", /ordinary sibling failure/);
-
-			const status = await waitForAsyncState(id, (candidate) => candidate.state === "failed");
-			assert.equal(status.activityState, undefined);
-			assert.match(status.error ?? "", /ordinary sibling failure/);
-		} finally {
-			removeTempDir(repo);
-		}
 	});
 
 	it("background runs emit active-long-running control events from child turns", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {

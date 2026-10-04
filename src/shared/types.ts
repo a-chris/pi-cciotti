@@ -1529,7 +1529,6 @@ export interface AsyncStartedEvent {
 	task?: string;
 	/** Workflow-level caller task, falling back to the first child task. */
 	goal?: string;
-	chain?: string[];
 	chainStepCount?: number;
 	parallelGroups?: AsyncParallelGroupStatus[];
 	workflowGraph?: WorkflowGraphSnapshot;

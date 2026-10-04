@@ -109,10 +109,26 @@ export interface ParallelStepGroup {
 	worktree?: boolean;
 }
 
+export interface DynamicExpandSpec {
+	from: {
+		output: string;
+		path: string;
+	};
+	item?: string;
+	key?: string;
+	maxItems?: number;
+	onEmpty?: "skip" | "fail";
+}
+
+export interface DynamicCollectSpec {
+	as: string;
+	outputSchema?: import("../../shared/types.ts").JsonSchemaObject;
+}
+
 export interface DynamicRunnerGroup {
-	expand: import("../../shared/settings.ts").DynamicExpandSpec;
+	expand: DynamicExpandSpec;
 	parallel: RunnerSubagentStep;
-	collect: import("../../shared/settings.ts").DynamicCollectSpec;
+	collect: DynamicCollectSpec;
 	concurrency?: number;
 	failFast?: boolean;
 	phase?: string;

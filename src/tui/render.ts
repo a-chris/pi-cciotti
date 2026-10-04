@@ -1564,6 +1564,7 @@ function widgetStepActivity(step: NonNullable<AsyncJobState["steps"]>[number], s
 
 function widgetParallelAgentDetails(job: AsyncJobState, theme: Theme, expanded = false, width = getTermWidth(), frame?: number): string[] {
 	if (!job.steps?.length) return [];
+	if (!job.activeParallelGroup && !job.hasParallelGroups) return [];
 	const total = job.stepsTotal ?? job.steps.length;
 	const lines: string[] = [];
 	for (const [index, step] of job.steps.entries()) {
@@ -1715,6 +1716,7 @@ function parallelWidgetStepRows(steps: AsyncJobStep[], total: number, prioritize
 function activeParallelWidgetGroup(job: AsyncJobState): ParallelWidgetGroup | undefined {
 	const steps = job.steps ?? [];
 	if (!steps.length) return undefined;
+	if (!job.activeParallelGroup && !job.hasParallelGroups) return undefined;
 	return { steps, total: job.stepsTotal ?? steps.length };
 }
 

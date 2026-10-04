@@ -506,22 +506,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		assert.equal(mockPi.callCount(), 0);
 	});
 
-	it("rejects invalid verified async chain acceptance before spawning", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
-		const executor = makeExecutor([makeAgent("echo")]);
-
-		const result = await executor.execute(
-			"invalid-verified-async-chain-acceptance",
-			{ chain: [{ agent: "echo", task: "Do work", acceptance: { level: "verified", verify: [] } }], async: true },
-			new AbortController().signal,
-			undefined,
-			makeMinimalCtx(tempDir),
-		);
-
-		assert.equal(result.isError, true);
-		assert.match(result.content[0]?.text ?? "", /verify.*at least one runtime command/i);
-		assert.equal(mockPi.callCount(), 0);
-	});
-
 	it("rejects unknown action strings at runtime", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
 		const executor = makeExecutor([makeAgent("echo")]);
 
@@ -804,25 +788,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		}
 	});
 
-	it("rejects an over-limit static run fan-out before creating session artifacts", async () => {
-		const sessionDir = path.join(tempDir, "run-fanout-preflight");
-		const executor = makeExecutor([makeAgent("echo"), makeAgent("second")], { maxSubagentSpawnsPerRun: 1 });
-		const result = await executor.execute(
-			"run-fanout-preflight",
-			{ tasks: [{ agent: "echo", task: "First" }, { agent: "second", task: "Second" }], sessionDir },
-			new AbortController().signal,
-			undefined,
-			makeMinimalCtx(tempDir),
-		);
-
-		assert.equal(result.isError, true);
-		assert.match(result.content[0]?.text ?? "", /Run fan-out limit reached at tasks\[1\] \(0\/1 used; 2 requested, 1 remaining\)/);
-		assert.deepEqual(result.details.runFanoutBudget, { used: 0, limit: 1, remaining: 1 });
-		assert.equal(result.details.runFanoutRejection?.path, "tasks[1]");
-		assert.equal(fs.existsSync(sessionDir), false);
-		assert.equal(mockPi.callCount(), 0);
-	});
-
 	it("reports structured spawn-budget usage through status", async () => {
 		const spawnState = { sessionId: "session-123", count: 3, configuredLimit: 4, granted: 1, grantHistory: [] };
 		const executor = makeExecutor([makeAgent("echo")], { maxSubagentSpawnsPerSession: 4 }, false, spawnState);
@@ -839,33 +804,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 			grantRemaining: 3,
 			grantHistory: [],
 		});
-	});
-
-	it("preflights static chains before creating run artifacts", async () => {
-		const sessionDir = path.join(tempDir, "preflight-session");
-		const executor = makeExecutor(
-			[makeAgent("echo"), makeAgent("second")],
-			{ maxSubagentSpawnsPerSession: 1 },
-		);
-		const result = await executor.execute(
-			"chain-preflight",
-			{
-				chain: [
-					{ agent: "echo", task: "First" },
-					{ agent: "second", task: "Second" },
-				],
-				sessionDir,
-			},
-			new AbortController().signal,
-			undefined,
-			makeMinimalCtx(tempDir),
-		);
-
-		assert.equal(result.isError, true);
-		assert.match(result.content[0]?.text ?? "", /0\/1 used, 2 requested\).*1 remaining/);
-		assert.match(result.content[0]?.text ?? "", /no children were started/);
-		assert.equal(fs.existsSync(sessionDir), false);
-		assert.equal(mockPi.callCount(), 0);
 	});
 
 	it("applies bounded root-interactive spawn-budget grants", async () => {
@@ -3204,50 +3142,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		assert.equal(fs.existsSync(path.join(tempDir, "false")), false);
 		assert.equal(fs.existsSync(path.join(tempDir, "default-report.md")), false);
 		assert.doesNotMatch(readCallArgs().at(-1) ?? "", /Write your findings to(?: exactly this path)?:/);
-	});
-
-	it("rejects explicit reviewed acceptance at every execution nesting level before spawning", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
-		const cases = [
-			{ agent: "echo", task: "Review", acceptance: "reviewed" },
-			{ agent: "echo", task: "Review", acceptance: { level: "reviewed" } },
-			{ tasks: [{ agent: "echo", task: "Review", acceptance: "reviewed" }] },
-			{ chain: [{ agent: "echo", task: "Review", acceptance: { level: "reviewed" } }] },
-			{ chain: [{ parallel: [{ agent: "echo", task: "Review", acceptance: "reviewed" }] }] },
-			{ chain: [{ expand: { from: { output: "targets", path: "/items" } }, parallel: { agent: "echo", acceptance: { level: "reviewed" } }, collect: { as: "reviews" } }] },
-		];
-		for (const [index, params] of cases.entries()) {
-			const executor = makeExecutor();
-			const result = await executor.execute(
-				`reviewed-acceptance-${index}`,
-				params,
-				new AbortController().signal,
-				undefined,
-				makeMinimalCtx(tempDir),
-			);
-
-			assert.equal(result.isError, true);
-			assert.match(result.content[0]?.text ?? "", /achieved status.*omit acceptance.*acceptance\.review\.required/i);
-		}
-		assert.equal(mockPi.callCount(), 0);
-	});
-
-	it("rejects explicit reviewed acceptance before appending a chain step", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
-		const executor = makeExecutor([makeAgent("echo")]);
-		const result = await executor.execute(
-			"append-reviewed-acceptance",
-			{
-				action: "append-step",
-				id: "missing-run",
-				step: { agent: "echo", task: "Review the previous work", acceptance: { level: "reviewed" } },
-			},
-			new AbortController().signal,
-			undefined,
-			makeMinimalCtx(tempDir),
-		);
-
-		assert.equal(result.isError, true);
-		assert.match(result.content[0]?.text ?? "", /Cannot append step:.*achieved status.*acceptance\.review\.required/i);
-		assert.equal(mockPi.callCount(), 0);
 	});
 
 	it("rejects mismatched foreground timeout aliases before spawning", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {

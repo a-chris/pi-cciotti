@@ -115,7 +115,7 @@ function discoverSlashAgents(pi: ExtensionAPI, cwd: string, scope: AgentScope): 
 		const discovered = discoverAgents(cwd, scope);
 		return { ...discovered, unknownAgentDiagnosticContext: unknownAgentDiagnosticContext(discovered) };
 	}
-	const snapshot = discoverAgentSnapshot(cwd, scope, undefined, { includeChains: false });
+	const snapshot = discoverAgentSnapshot(cwd, scope, undefined);
 	const discovered = snapshot.effective;
 	const all = snapshot.all;
 	const configuredAgents: AgentConfig[] = [

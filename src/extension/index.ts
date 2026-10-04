@@ -493,7 +493,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 	};
 	const discoverAgentsForRuntime = (cwd: string, scope: AgentScope, preferredModelProvider?: string) => {
 		if (listRuntimeAgentConfigs(pi).length === 0) return discoverAgents(cwd, scope, preferredModelProvider);
-		const snapshot = discoverAgentSnapshot(cwd, scope, preferredModelProvider, { includeChains: false });
+		const snapshot = discoverAgentSnapshot(cwd, scope, preferredModelProvider);
 		const discovered = snapshot.effective;
 		const all = snapshot.all;
 		const configuredAgents: AgentConfig[] = [

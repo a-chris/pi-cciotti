@@ -268,7 +268,7 @@ export async function resolveSubagentLaunchContract(input: SubagentLaunchContrac
 	}
 	const scope = resolveExecutionAgentScope(input.agentScope);
 	const parentProvider = input.preferredProvider ?? input.parentModel?.provider;
-	const discovery = discoverAgentSnapshot(effectiveCwd, scope, parentProvider, { includeChains: false });
+	const discovery = discoverAgentSnapshot(effectiveCwd, scope, parentProvider);
 	const discovered = discovery.effective;
 	const resolvedAgent = resolveAgentName(input.agent, discovered.agents);
 	const ambiguousCandidates = resolvedAgent.error

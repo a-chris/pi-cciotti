@@ -137,32 +137,26 @@ export function normalizePublicSubagentExecution<T extends PublicSubagentExecuti
 	if (params.clarify !== undefined) {
 		return { ok: false, error: "Public workflowScript execution does not support clarify UI.", mode: "workflow" };
 	}
-	if (params.chainName !== undefined) {
-		return { ok: false, error: "Durable chain management was removed; use workflowScript or /prompt-workflow for repeatable workflows.", mode: "management" };
-	}
-	if (params.config && typeof params.config === "object" && !Array.isArray(params.config) && Object.prototype.hasOwnProperty.call(params.config, "steps")) {
-		return { ok: false, error: "Durable chain definitions were removed; use workflowScript or /prompt-workflow for repeatable workflows.", mode: "management" };
-	}
-	if (params.resume !== undefined) {
-		return { ok: false, error: "Top-level resume execution is not available. Put resume on a workflowScript runs.run/runs.all item.", mode: "workflow" };
-	}
-	const hasLegacyOrchestration = params.tasks !== undefined || params.chain !== undefined || params.parallel !== undefined || params.concurrency !== undefined || params.chainDir !== undefined;
-	if (hasLegacyOrchestration) {
-		return { ok: false, error: "Legacy top-level chain and parallel inputs were removed; use workflowScript.", mode: normalizedAction ? "management" : "workflow" };
+	const hasUnsupportedTopLevelParams =
+		params.chainName !== undefined ||
+		params.chain !== undefined ||
+		params.tasks !== undefined ||
+		params.parallel !== undefined ||
+		params.concurrency !== undefined ||
+		params.chainDir !== undefined ||
+		params.resume !== undefined ||
+		params.step !== undefined ||
+		(params.config !== undefined && typeof params.config === "object" && !Array.isArray(params.config) && Object.prototype.hasOwnProperty.call(params.config, "steps"));
+	if (hasUnsupportedTopLevelParams) {
+		return { ok: false, error: "Unknown or unsupported top-level parameter. Public execution supports only { agent, task? } for one child, workflow / workflowScript / workflowScriptPath for orchestration, and the current control actions.", mode: normalizedAction ? "management" : "workflow" };
 	}
 	if (normalizedAction !== undefined) {
 		const legacyAction = normalizedAction.toLowerCase();
-		if (legacyAction === "append-step") {
-			return { ok: false, error: "Legacy append-step control was removed from the public subagent tool; use current workflowScript orchestration.", mode: "management" };
+		if (legacyAction === "append-step" || legacyAction === "approve-checkpoint" || legacyAction === "reject-checkpoint") {
+			return { ok: false, error: "Unknown or unsupported control action. Public execution supports only the current management actions; legacy chain orchestration actions were removed.", mode: "management" };
 		}
-		if (legacyAction === "approve-checkpoint" || legacyAction === "reject-checkpoint") {
-			return { ok: false, error: "Legacy checkpoint approval controls were removed from the public subagent tool; use current workflowScript orchestration.", mode: "management" };
-		}
-		if (legacyAction === "single") {
-			return { ok: false, error: "action='single' is not supported. Omit action and pass { agent, task } for one child.", mode: "workflow" };
-		}
-		if (legacyAction === "parallel" || legacyAction === "tasks" || legacyAction === "chain") {
-			return { ok: false, error: "Legacy top-level chain and parallel inputs were removed; use workflowScript.", mode: "workflow" };
+		if (legacyAction === "single" || legacyAction === "parallel" || legacyAction === "tasks" || legacyAction === "chain") {
+			return { ok: false, error: "Legacy chain and parallel orchestration was removed. Omit action and pass { agent, task } for one child, or use workflowScript for orchestration.", mode: "workflow" };
 		}
 		if (normalizedAction === "validate") {
 			if (params.agent !== undefined || params.task !== undefined || params.step !== undefined) {
@@ -180,9 +174,6 @@ export function normalizePublicSubagentExecution<T extends PublicSubagentExecuti
 			return { ok: false, error: "Structured single-child task cannot be combined with a management/control action.", mode: "management" };
 		}
 		return { ok: true, params: { ...params, action: normalizedAction } };
-	}
-	if (params.step !== undefined) {
-		return { ok: false, error: "step is not a public execution field; use workflowScript for orchestration.", mode: "workflow" };
 	}
 	if (hasWorkflowInput && (params.agent !== undefined || params.task !== undefined)) {
 		return { ok: false, error: "Structured single-child execution cannot be combined with workflow, workflowScript, or workflowScriptPath.", mode: "workflow" };

@@ -1,3 +1,15 @@
+const PROMPT_REDACTED_LABEL = "[prompt redacted]";
+
+const MAX_STATUS_STEP_DESCRIPTION_CHARS = 160;
+
+/** Bounded one-line per-step task description persisted into status.json for fleet display. */
+export function statusStepDescription(task: string | undefined): string | undefined {
+	if (!task?.trim()) return undefined;
+	return PROMPT_REDACTED_LABEL.length > MAX_STATUS_STEP_DESCRIPTION_CHARS
+		? `${PROMPT_REDACTED_LABEL.slice(0, MAX_STATUS_STEP_DESCRIPTION_CHARS - 1)}…`
+		: PROMPT_REDACTED_LABEL;
+}
+
 export type ResolvedRunnerConfig = import("../../shared/types.ts").AgentRunnerConfig;
 
 export interface RunnerSubagentStep {

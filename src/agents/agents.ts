@@ -13,7 +13,6 @@ import { parseExternalCliCapabilityNarrowing } from "../runs/shared/external-cli
 import { getAgentDir, getProjectConfigDir } from "../shared/utils.ts";
 import { expandHomePath } from "../shared/settings.ts";
 import { KNOWN_FIELDS } from "./agent-serializer.ts";
-import { parseChain, parseJsonChain } from "./chain-serializer.ts";
 import { mergeAgentsForScope } from "./agent-selection.ts";
 import { parseFrontmatter, parseFrontmatterList } from "./frontmatter.ts";
 import { buildRuntimeName, parsePackageName } from "./identity.ts";
@@ -353,9 +352,6 @@ export function formatUnknownAgentError(name: string, context: UnknownAgentDiagn
 	].join("\n");
 }
 
-function getUserChainDir(): string {
-	return path.join(getAgentDir(), "chains");
-}
 
 type PackageScope = "root" | "user" | "project";
 type PackageSettingsScope = Exclude<PackageScope, "root">;
@@ -370,15 +366,9 @@ interface PackageSubagentPath {
 	packageRoot: string;
 }
 
-interface PackageChainPath {
-	dir: string;
-	scope: Set<PackageScope>;
-	packageRoot: string;
-}
 
 interface PackageSubagentPaths {
 	agents: PackageSubagentPath[];
-	chains: PackageChainPath[];
 	watchPaths: string[];
 	settingsErrors: Partial<Record<PackageSettingsScope, Error>>;
 }
@@ -519,7 +509,7 @@ function packageMetadata(pkg: Record<string, unknown>, packageRoot: string): Omi
 function extractSubagentPathsFromPackageRoot(packageRoot: string, scope: Set<PackageScope>): PackageSubagentPaths {
 	const packageJsonPath = path.join(packageRoot, "package.json");
 	const pkg = readJsonFileBestEffort(packageJsonPath);
-	if (!pkg || typeof pkg !== "object" || Array.isArray(pkg)) return { agents: [], chains: [], watchPaths: [packageJsonPath], settingsErrors: {} };
+	if (!pkg || typeof pkg !== "object" || Array.isArray(pkg)) return { agents: [], watchPaths: [packageJsonPath], settingsErrors: {} };
 	const pkgRecord = pkg as Record<string, unknown>;
 	const metadata = packageMetadata(pkgRecord, packageRoot);
 
@@ -538,12 +528,10 @@ function extractSubagentPathsFromPackageRoot(packageRoot: string, scope: Set<Pac
 	}
 
 	const agents: PackageSubagentPath[] = [];
-	const chains: PackageChainPath[] = [];
 	for (const root of roots) {
 		for (const entry of stringArray(root.agents)) agents.push({ dir: path.resolve(packageRoot, entry), scope, ...metadata });
-		for (const entry of stringArray(root.chains)) chains.push({ dir: path.resolve(packageRoot, entry), scope, packageRoot });
 	}
-	return { agents, chains, watchPaths: [packageJsonPath], settingsErrors: {} };
+	return { agents, watchPaths: [packageJsonPath], settingsErrors: {} };
 }
 
 function collectPackageRootsFromNodeModules(nodeModulesDir: string, watchPaths?: string[]): string[] {
@@ -646,9 +634,7 @@ function collectPackageSubagentPaths(cwd: string, options: { includeUser: boolea
 
 	const seenRoots = new Map<string, Set<PackageScope>>();
 	const seenAgents = new Map<string, PackageSubagentPath>();
-	const seenChains = new Map<string, PackageChainPath>();
 	const agents: PackageSubagentPath[] = [];
-	const chains: PackageChainPath[] = [];
 	for (const { root: packageRoot, scope } of packageRoots) {
 		const resolvedRoot = path.resolve(packageRoot);
 		const scopes = seenRoots.get(resolvedRoot);
@@ -670,18 +656,8 @@ function collectPackageSubagentPaths(cwd: string, options: { includeUser: boolea
 			seenAgents.set(agentKey, agentPath);
 			agents.push(agentPath);
 		}
-		for (const chainDir of paths.chains) {
-			const chainKey = `${chainDir.dir}\u0000${chainDir.packageRoot}`;
-			const existing = seenChains.get(chainKey);
-			if (existing) {
-				for (const packageScope of chainDir.scope) existing.scope.add(packageScope);
-				continue;
-			}
-			seenChains.set(chainKey, chainDir);
-			chains.push(chainDir);
-		}
 	}
-	return { agents, chains, watchPaths, settingsErrors };
+	return { agents, watchPaths, settingsErrors };
 }
 
 function normalizeAgentAliases(rawAliases: string[] | undefined, agentName: string): string[] | undefined {
@@ -1776,6 +1752,8 @@ function listFilesRecursive(
 
 export interface AgentDefinitionInspection {
 	files: string[];
+	/** Removed chain-definition files (.chain.md/.chain.json) and chains/ dirs found in this scan. */
+	chainFiles: string[];
 	state: AgentDefinitionDirectoryState;
 }
 
@@ -1812,14 +1790,15 @@ const DEFAULT_AGENT_DEFINITION_INSPECTION_FS: AgentDefinitionInspectionFs = {
  */
 export function inspectAgentDefinitionDirectory(dir: string, operations: AgentDefinitionInspectionFs = DEFAULT_AGENT_DEFINITION_INSPECTION_FS, isExcluded: (filePath: string) => boolean = () => false): AgentDefinitionInspection {
 	const root = path.resolve(dir);
-	if (isExcluded(root)) return rememberAgentDefinitionInspection({ files: [], state: "empty" }, []);
+	if (isExcluded(root)) return rememberAgentDefinitionInspection({ files: [], chainFiles: [], state: "empty" }, []);
 	try {
-		if (!operations.existsSync(root)) return rememberAgentDefinitionInspection({ files: [], state: "absent" }, [root]);
-		if (!operations.statSync(root).isDirectory()) return rememberAgentDefinitionInspection({ files: [], state: "not-directory" }, [root]);
+		if (!operations.existsSync(root)) return rememberAgentDefinitionInspection({ files: [], chainFiles: [], state: "absent" }, [root]);
+		if (!operations.statSync(root).isDirectory()) return rememberAgentDefinitionInspection({ files: [], chainFiles: [], state: "not-directory" }, [root]);
 	} catch {
-		return rememberAgentDefinitionInspection({ files: [], state: "unreadable" }, [root]);
+		return rememberAgentDefinitionInspection({ files: [], chainFiles: [], state: "unreadable" }, [root]);
 	}
 	const files: string[] = [];
+	const chainFiles: string[] = [];
 	let unreadable = false;
 	const visitedDirectories = new Set<string>();
 	const inspectedDirectories = new Set<string>();
@@ -1854,14 +1833,19 @@ export function inspectAgentDefinitionDirectory(dir: string, operations: AgentDe
 				}
 			}
 			if (isDirectory) {
+				if (entry.name === "chains") {
+					chainFiles.push(filePath);
+					continue;
+				}
 				if (!shouldPruneDiscoveryDir(root, filePath, entry.name)) visit(filePath);
 				continue;
 			}
 			if ((entry.isFile() || entry.isSymbolicLink()) && entry.name.endsWith(".md") && !entry.name.endsWith(".chain.md") && !isLegacyAgentSkillPath(root, filePath)) files.push(filePath);
+			if ((entry.isFile() || entry.isSymbolicLink()) && (entry.name.endsWith(".chain.md") || entry.name.endsWith(".chain.json"))) chainFiles.push(filePath);
 		}
 	};
 	visit(root);
-	return rememberAgentDefinitionInspection({ files, state: unreadable ? "unreadable" : files.length ? "candidates" : "empty" }, inspectedDirectories);
+	return rememberAgentDefinitionInspection({ files, chainFiles, state: unreadable ? "unreadable" : files.length ? "candidates" : "empty" }, inspectedDirectories);
 }
 
 function isLegacyAgentSkillPath(rootDir: string, filePath: string): boolean {
@@ -2207,7 +2191,11 @@ function loadAgentsFromDefinitionFiles(files: AgentDefinitionFile[], source: Age
 }
 
 function loadAgentsFromDir(dir: string, source: AgentSource, discoveryPriority?: number, packageSource?: Omit<PackageSubagentPath, "dir" | "scope">, inspection = inspectAgentDefinitionDirectory(dir)): { agents: AgentConfig[]; diagnostics: AgentDiscoveryDiagnostic[] } {
-	return loadAgentsFromDefinitionFiles(readAgentDefinitionFiles(dir, inspection), source, discoveryPriority, packageSource);
+	const loaded = loadAgentsFromDefinitionFiles(readAgentDefinitionFiles(dir, inspection), source, discoveryPriority, packageSource);
+	for (const filePath of inspection.chainFiles) {
+		loaded.diagnostics.push({ source, filePath, error: "Chain definitions (.chain.md/.chain.json) were removed; convert to workflowScript (see /prompt-workflow)" });
+	}
+	return loaded;
 }
 
 function reportAgentDefinitionDirectory(source: AgentSource, dir: string, inspection: AgentDefinitionInspection): AgentDefinitionDirectoryReport {
@@ -2219,33 +2207,6 @@ function reportAgentDefinitionDirectory(source: AgentSource, dir: string, inspec
 	};
 }
 
-function loadChainsFromDir(dir: string, source: AgentSource): { chains: ChainConfig[]; diagnostics: ChainDiscoveryDiagnostic[]; files: string[]; directories: string[] } {
-	const chains = new Map<string, ChainConfig>();
-	const diagnostics: ChainDiscoveryDiagnostic[] = [];
-	const directories = new Set<string>();
-	const files = listFilesRecursive(dir, (fileName) => fileName.endsWith(".chain.md") || fileName.endsWith(".chain.json"), dir, new Set<string>(), directories);
-
-	for (const filePath of files) {
-		let content: string;
-		try {
-			content = fs.readFileSync(filePath, "utf-8");
-		} catch {
-			continue;
-		}
-
-		try {
-			const chain = filePath.endsWith(".chain.json") ? parseJsonChain(content, source, filePath) : parseChain(content, source, filePath);
-			const existing = chains.get(chain.name);
-			if (existing && existing.filePath.endsWith(".chain.json") && filePath.endsWith(".chain.md")) continue;
-			chains.set(chain.name, chain);
-		} catch (error) {
-			diagnostics.push({ source, filePath, error: error instanceof Error ? error.message : String(error) });
-			continue;
-		}
-	}
-
-	return { chains: Array.from(chains.values()), diagnostics, files, directories: [...directories] };
-}
 
 function isDirectory(p: string): boolean {
 	try {
@@ -2269,16 +2230,6 @@ function resolveNearestProjectAgentDirs(cwd: string): { readDirs: string[]; cand
 	return { readDirs, candidateDirs, preferredDir };
 }
 
-function resolveNearestProjectChainDirs(cwd: string): { readDirs: string[]; preferredDir: string | null } {
-	const projectRoot = findConfiguredProjectRoot(cwd);
-	if (!projectRoot) return { readDirs: [], preferredDir: null };
-
-	const preferredDir = path.join(getProjectConfigDir(projectRoot), "chains");
-	return {
-		readDirs: isDirectory(preferredDir) ? [preferredDir] : [],
-		preferredDir,
-	};
-}
 const BUILTIN_AGENTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "agents");
 // Candidate files and inspection state must describe the same cached builtin scan.
 const BUILTIN_AGENT_DEFINITION_INSPECTION = inspectAgentDefinitionDirectory(BUILTIN_AGENTS_DIR);
@@ -2390,12 +2341,8 @@ export interface AgentDiscoveryAllResult {
 	user: AgentConfig[];
 	project: AgentConfig[];
 	agentDiagnostics?: AgentDiscoveryDiagnostic[];
-	chains: ChainConfig[];
-	chainDiagnostics: ChainDiscoveryDiagnostic[];
 	userDir: string;
 	projectDir: string | null;
-	userChainDir: string;
-	projectChainDir: string | null;
 	userSettingsPath: string;
 	projectSettingsPath: string | null;
 	maxThinking?: ThinkingLevel;
@@ -2425,12 +2372,9 @@ interface AgentDiscoverySources {
 	userDir: string;
 	userDirOld: string;
 	userDirNew: string;
-	userChainDir: string;
 	projectAgentDirs: string[];
 	projectCandidateDirs: string[];
 	projectAgentsDir: string | null;
-	projectChainDirs: string[];
-	projectChainDir: string | null;
 	userSettingsPath: string;
 	projectSettingsPath: string | null;
 	userSettings?: SubagentSettings;
@@ -2441,13 +2385,9 @@ interface AgentDiscoverySources {
 	projectLoaded: LoadedAgentDirectory[];
 	projectInspections: Map<string, AgentDefinitionInspection>;
 	packageLoaded: LoadedAgentDirectory[];
-	userChains?: ReturnType<typeof loadChainsFromDir>;
-	projectChainLoaded?: Array<{ dir: string; loaded: ReturnType<typeof loadChainsFromDir> }>;
-	packageChainLoaded?: Array<{ entry: PackageChainPath; loaded: ReturnType<typeof loadChainsFromDir> }>;
 	isExcluded: (filePath: string) => boolean;
 	exclusionRoots: Array<{ resolved: string; real: string }>;
 	identityWatchPaths: string[];
-	chainWatchPaths?: Set<string>;
 	watchPaths: string[];
 }
 
@@ -2507,7 +2447,7 @@ function discoveryFingerprint(sources: AgentDiscoverySources): string {
 	if (exclusionIdentity !== JSON.stringify(sources.exclusionRoots)) return exclusionIdentity;
 	const rootIdentities = JSON.stringify(sources.identityWatchPaths.map((root) => [root, canonicalAgentPath(root)]));
 	// Package metadata can redirect agents outside an excluded tree without chains.
-	const unfilteredPaths = new Set([...sources.packageSubagentPaths.watchPaths, ...(sources.chainWatchPaths ?? [])]);
+	const unfilteredPaths = new Set([...sources.packageSubagentPaths.watchPaths]);
 	return exclusionIdentity + "\n" + rootIdentities + "\n" + [...new Set([...sources.watchPaths, ...unfilteredPaths])]
 		.filter((filePath) => unfilteredPaths.has(filePath) || filePath === sources.userSettingsPath || filePath === sources.projectSettingsPath || !sources.isExcluded(filePath))
 		.sort((left, right) => left.localeCompare(right))
@@ -2551,9 +2491,7 @@ function buildAgentDiscoverySources(cwd: string, preferredModelProvider?: string
 	const effectiveCwd = path.resolve(cwd);
 	const userDirOld = path.join(getAgentDir(), "agents");
 	const userDirNew = path.join(os.homedir(), ".agents");
-	const userChainDir = getUserChainDir();
 	const { readDirs: projectAgentDirs, candidateDirs: projectCandidateDirs, preferredDir: projectAgentsDir } = resolveNearestProjectAgentDirs(effectiveCwd);
-	const { readDirs: projectChainDirs, preferredDir: projectChainDir } = resolveNearestProjectChainDirs(effectiveCwd);
 	const userSettingsPath = getUserAgentSettingsPath();
 	const projectSettingsPath = getProjectAgentSettingsPath(effectiveCwd);
 	const packageSubagentPaths = collectPackageSubagentPaths(effectiveCwd);
@@ -2601,12 +2539,9 @@ function buildAgentDiscoverySources(cwd: string, preferredModelProvider?: string
 		userDir,
 		userDirOld,
 		userDirNew,
-		userChainDir,
 		projectAgentDirs,
 		projectCandidateDirs: projectCandidateDirs.filter((dir) => !isExcluded(dir)),
 		projectAgentsDir,
-		projectChainDirs,
-		projectChainDir,
 		userSettingsPath,
 		projectSettingsPath,
 		packageSubagentPaths,
@@ -2629,27 +2564,10 @@ function buildAgentDiscoverySources(cwd: string, preferredModelProvider?: string
 	};
 }
 
-function ensureDiscoveryChains(sources: AgentDiscoverySources): boolean {
-	if (sources.userChains) return false;
-	sources.packageChainLoaded = sources.packageSubagentPaths.chains.map((entry) => ({ entry, loaded: loadChainsFromDir(entry.dir, "package") }));
-	sources.userChains = loadChainsFromDir(sources.userChainDir, "user");
-	sources.projectChainLoaded = sources.projectChainDirs.map((dir) => ({ dir, loaded: loadChainsFromDir(dir, "project") }));
-	const watchPaths = new Set(sources.packageSubagentPaths.watchPaths);
-	addDirectoryWatchPaths(watchPaths, sources.userChainDir, sources.userChains.files, sources.userChains.directories);
-	for (const chain of sources.projectChainLoaded) addDirectoryWatchPaths(watchPaths, chain.dir, chain.loaded.files, chain.loaded.directories);
-	for (const chain of sources.packageChainLoaded) addDirectoryWatchPaths(watchPaths, chain.entry.dir, chain.loaded.files, chain.loaded.directories);
-	sources.chainWatchPaths = watchPaths;
-	sources.watchPaths = [...new Set([...sources.watchPaths, ...watchPaths])];
-	return true;
-}
-
-function getAgentDiscoverySources(cwd: string, preferredModelProvider?: string, includeChains = false): AgentDiscoverySources {
+function getAgentDiscoverySources(cwd: string, preferredModelProvider?: string): AgentDiscoverySources {
 	const key = discoveryCacheKey(cwd, preferredModelProvider);
 	const cached = agentDiscoveryCache.get(key);
 	if (cached && cached.fingerprint === discoveryFingerprint(cached.sources)) {
-		if (includeChains && ensureDiscoveryChains(cached.sources)) {
-			cached.fingerprint = discoveryFingerprint(cached.sources);
-		}
 		return cached.sources;
 	}
 	const sources = buildAgentDiscoverySources(cwd, preferredModelProvider);
@@ -2658,10 +2576,6 @@ function getAgentDiscoverySources(cwd: string, preferredModelProvider?: string, 
 	if (agentDiscoveryCache.size > MAX_DISCOVERY_CACHE_ENTRIES) {
 		const oldest = agentDiscoveryCache.keys().next().value;
 		if (oldest !== undefined) agentDiscoveryCache.delete(oldest);
-	}
-	if (includeChains) {
-		ensureDiscoveryChains(sources);
-		entry.fingerprint = discoveryFingerprint(sources);
 	}
 	return sources;
 }
@@ -2787,26 +2701,8 @@ function buildEffectiveDiscovery(sources: AgentDiscoverySources, scope: AgentSco
 	};
 }
 
-function buildAllDiscovery(sources: AgentDiscoverySources, includeChains: boolean, settingsScope: AgentScope): AgentDiscoveryAllResult {
-	if (includeChains) ensureDiscoveryChains(sources);
+function buildAllDiscovery(sources: AgentDiscoverySources, settingsScope: AgentScope): AgentDiscoveryAllResult {
 	const configured = configuredAgentsForScope(sources, "both", settingsScope);
-	const packageChainMap = new Map<string, ChainConfig>();
-	const packageChainDiagnostics: ChainDiscoveryDiagnostic[] = [];
-	for (const chain of sources.packageChainLoaded ?? []) {
-		packageChainDiagnostics.push(...chain.loaded.diagnostics);
-		for (const definition of chain.loaded.chains) if (!packageChainMap.has(definition.name)) packageChainMap.set(definition.name, definition);
-	}
-	const projectChainMap = new Map<string, ChainConfig>();
-	const projectChainDiagnostics: ChainDiscoveryDiagnostic[] = [];
-	for (const chain of sources.projectChainLoaded ?? []) {
-		projectChainDiagnostics.push(...chain.loaded.diagnostics);
-		for (const definition of chain.loaded.chains) projectChainMap.set(definition.name, definition);
-	}
-	const chains = [
-		...Array.from(packageChainMap.values()),
-		...(sources.userChains?.chains ?? []),
-		...Array.from(projectChainMap.values()),
-	];
 	return {
 		builtin: applySubagentMaxThinking(configured.builtin, configured.maxThinking),
 		package: applySubagentMaxThinking(configured.package, configured.maxThinking),
@@ -2818,12 +2714,8 @@ function buildAllDiscovery(sources: AgentDiscoverySources, includeChains: boolea
 			...sources.packageLoaded.flatMap((loaded) => loaded.loaded.diagnostics),
 			...sources.projectLoaded.flatMap((loaded) => loaded.loaded.diagnostics),
 		],
-		chains,
-		chainDiagnostics: [...packageChainDiagnostics, ...(sources.userChains?.diagnostics ?? []), ...projectChainDiagnostics],
 		userDir: sources.userDir,
 		projectDir: sources.projectAgentsDir,
-		userChainDir: sources.userChainDir,
-		projectChainDir: sources.projectChainDir,
 		userSettingsPath: sources.userSettingsPath,
 		projectSettingsPath: sources.projectSettingsPath,
 		...(configured.maxThinking !== undefined ? { maxThinking: configured.maxThinking } : {}),
@@ -2834,11 +2726,9 @@ export function discoverAgentSnapshot(
 	cwd: string,
 	scope: AgentScope,
 	preferredModelProvider?: string,
-	options: { includeChains?: boolean } = {},
 ): AgentDiscoverySnapshot {
-	const includeChains = options.includeChains !== false;
-	const sources = getAgentDiscoverySources(cwd, preferredModelProvider, includeChains);
-	return { effective: buildEffectiveDiscovery(sources, scope), all: buildAllDiscovery(sources, includeChains, scope) };
+	const sources = getAgentDiscoverySources(cwd, preferredModelProvider);
+	return { effective: buildEffectiveDiscovery(sources, scope), all: buildAllDiscovery(sources, scope) };
 }
 
 function discoverAgentsUncached(cwd: string, scope: AgentScope, preferredModelProvider?: string): AgentDiscoveryResult {

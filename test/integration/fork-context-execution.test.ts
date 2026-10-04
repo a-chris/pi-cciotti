@@ -334,7 +334,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		const { manager } = makeSessionManagerRecorder({ sessionFile: undefined, leafId: "leaf-current" });
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork" },
 			],
 			projectAgentsDir: null,
 		}));
@@ -362,7 +362,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		const { manager, openedPaths, branchedLeafIds } = makeForkingSessionManagerRecorder({ sessionFile: parentSessionFile, leafId: "leaf-current" });
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork" },
 			],
 			projectAgentsDir: null,
 		}));
@@ -384,7 +384,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 
 	it("treats legacy profile context input as absent when the agent declares no defaultContext", async () => {
 		const executor = makeExecutorWithDiscoverAgents(() => ({
-			agents: [{ name: "worker", description: "Worker" }],
+			agents: [{ name: "worker", description: "Worker", completionGuard: false }],
 			projectAgentsDir: null,
 		}));
 
@@ -405,7 +405,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		const parentSessionFile = path.join(tempDir, "parent.jsonl");
 		const { manager, openedPaths, branchedLeafIds } = makeForkingSessionManagerRecorder({ sessionFile: parentSessionFile, leafId: "leaf-current" });
 		const executor = makeExecutorWithDiscoverAgents(() => ({
-			agents: [{ name: "worker", description: "Worker", defaultContext: "fork" }],
+			agents: [{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork" }],
 			projectAgentsDir: null,
 		}));
 
@@ -450,7 +450,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 	it("omits the prequel when summary resolution falls back to fresh", async () => {
 		const { manager } = makeSessionManagerRecorder({ sessionFile: undefined, leafId: "leaf-current" });
 		const executor = makeExecutorWithDiscoverAgents(() => ({
-			agents: [{ name: "worker", description: "Worker", defaultContext: "summary" }],
+			agents: [{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "summary" }],
 			projectAgentsDir: null,
 		}));
 
@@ -488,7 +488,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		};
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork", model: "anthropic/claude-sonnet-4-5:high", thinking: "high" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork", model: "anthropic/claude-sonnet-4-5:high", thinking: "high" },
 			],
 			projectAgentsDir: null,
 		}));
@@ -530,7 +530,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		};
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork", model: "openai/gpt-5-mini:high", thinking: "high" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork", model: "openai/gpt-5-mini:high", thinking: "high" },
 			],
 			projectAgentsDir: null,
 		}));
@@ -582,7 +582,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		};
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork", model: "openai/gpt-5-mini:high", thinking: "high" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork", model: "openai/gpt-5-mini:high", thinking: "high" },
 			],
 			projectAgentsDir: null,
 		}));
@@ -616,7 +616,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		const manager = makeSignedThinkingSessionManager(childSessionFile);
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork", model: "openai/gpt-5-mini:high", thinking: "high" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork", model: "openai/gpt-5-mini:high", thinking: "high" },
 			],
 			projectAgentsDir: null,
 			modelScope: { enforce: true, allow: ["anthropic/*"] },
@@ -654,7 +654,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		const manager = makeSignedThinkingSessionManager(childSessionFile);
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork", model: "openai/gpt-5-mini", thinking: "high" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork", model: "openai/gpt-5-mini", thinking: "high" },
 			],
 			projectAgentsDir: null,
 			modelScope: { enforce: true, allow: ["anthropic/*"] },
@@ -712,7 +712,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		};
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork", model: "anthropic/claude-sonnet-4-5:high", thinking: "high" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork", model: "anthropic/claude-sonnet-4-5:high", thinking: "high" },
 			],
 			projectAgentsDir: null,
 		}));
@@ -743,7 +743,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		const manager = makeSignedThinkingSessionManager(childSessionFile);
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork", thinking: "high" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork", thinking: "high" },
 			],
 			projectAgentsDir: null,
 		}));
@@ -774,7 +774,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 			leafId: "leaf-123",
 		});
 		const executor = makeExecutorWithDiscoverAgents(() => ({
-			agents: [{ name: "worker", description: "Worker", defaultContext: "fork" }],
+			agents: [{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork" }],
 			projectAgentsDir: null,
 		}));
 		const ctx = {
@@ -818,7 +818,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		const manager = makeSignedThinkingSessionManager(childSessionFile);
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork", model: "anthropic/claude-sonnet-4-5:high", thinking: "high" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork", model: "anthropic/claude-sonnet-4-5:high", thinking: "high" },
 			],
 			projectAgentsDir: null,
 		}));
@@ -847,7 +847,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		const { manager } = makeForkingSessionManagerRecorder({ sessionFile: parentSessionFile, leafId: "leaf-current" });
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork" },
 			],
 			projectAgentsDir: null,
 		}));
@@ -918,7 +918,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
 				{ name: "scout", description: "Scout", defaultContext: "fresh" },
-				{ name: "worker", description: "Worker", defaultContext: "fork" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork" },
 			],
 			projectAgentsDir: null,
 		}));
@@ -942,7 +942,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 	it("reports unknown top-level parallel agents before default-fork preconditions", async () => {
 		const { manager } = makeSessionManagerRecorder({ sessionFile: undefined, leafId: "leaf-current" });
 		const executor = makeExecutorWithDiscoverAgents(() => ({
-			agents: [{ name: "worker", description: "Worker", defaultContext: "fork" }],
+			agents: [{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork" }],
 			projectAgentsDir: null,
 		}));
 
@@ -980,7 +980,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		const { manager } = makeSessionManagerRecorder({ sessionFile: parentSessionFile, leafId: "leaf-current" });
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork" },
 			],
 			projectAgentsDir: null,
 		}));
@@ -1005,7 +1005,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		const { manager } = makeSessionManagerRecorder({ sessionFile: parentSessionFile, leafId: null });
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork" },
 			],
 			projectAgentsDir: null,
 		}));
@@ -1028,7 +1028,7 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		const { manager } = makeSessionManagerRecorder({ sessionFile: undefined, leafId: "leaf-current" });
 		const executor = makeExecutorWithDiscoverAgents(() => ({
 			agents: [
-				{ name: "worker", description: "Worker", defaultContext: "fork" },
+				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork" },
 			],
 			projectAgentsDir: null,
 		}));

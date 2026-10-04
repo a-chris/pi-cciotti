@@ -91,6 +91,7 @@ describe("Orca progress-tab observer", () => {
 			sessionId: "session-orca-native",
 			steps: [{
 				agent: "worker",
+				completionGuard: false,
 				task: "Read the repository",
 				systemPrompt: "Use native Pi",
 				systemPromptMode: "replace",

@@ -401,7 +401,7 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 		executeAsyncSingle(id, {
 			agent: "worker",
 			task: "Implement the requested source fix",
-			agentConfig: makeAgent("worker", { tools: ["read", "fixture_search"] }),
+			agentConfig: makeAgent("worker", { tools: ["read", "fixture_search"], completionGuard: true }),
 			ctx: { pi: { events: { emit() {} }, getAllTools: () => [{ name: "read", sourceInfo: { source: "builtin" } }] }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,

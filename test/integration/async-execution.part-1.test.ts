@@ -392,7 +392,7 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 		const launch = executeAsyncSingle(id, {
 			agent: "worker",
 			task: "Implement the requested source fix",
-			agentConfig: makeAgent("worker", { tools: ["read", "grep", "find", "ls"] }),
+			agentConfig: makeAgent("worker", { tools: ["read", "grep", "find", "ls"], completionGuard: true }),
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
@@ -583,7 +583,7 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 		const launch = executeAsyncSingle(id, {
 			agent: "worker",
 			task: "Implement the requested source fix",
-			agentConfig: makeAgent("worker", { tools: ["read", "write"] }),
+			agentConfig: makeAgent("worker", { tools: ["read", "write"], completionGuard: true }),
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
@@ -596,6 +596,25 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 		assert.match(launch.content[0]?.text ?? "", /no mutation-capable tools/);
 		assert.equal(mockPi.callCount(), 0);
 	});
+
+	it("rejects async single implementation workers without mutation-capable tools before spawn", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, () => {
+		const id = `async-single-readonly-worker-contract-${Date.now().toString(36)}`;
+		mockPi.onCall({ output: "should not spawn" });
+		const launch = executeAsyncSingle(id, {
+			agent: "worker",
+			task: "Implement the requested source fix",
+			agentConfig: makeAgent("worker", { tools: ["read", "grep", "find", "ls"], completionGuard: true }),
+			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
+			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
+			shareEnabled: false,
+			acceptance: false,
+		});
+
+		assert.equal(launch.isError, true);
+		assert.match(launch.content[0]?.text ?? "", /no mutation-capable tools/);
+		assert.equal(mockPi.callCount(), 0);
+	});
+
 
 	it("routes async artifacts to the configured session directory", { skip: !isAsyncAvailable() || !createSubagentExecutor ? "jiti or executor not available" : undefined }, async () => {
 		mockPi.onCall({ output: "async session artifact" });

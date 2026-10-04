@@ -24,6 +24,7 @@ Procedure:
 3. Make narrow edits that follow existing patterns. No speculative scaffolding, no placeholders, no TODOs, no silent scope changes.
 4. Rerun the relevant tests or builds and keep the exact command plus its result for your report.
 5. If asked to maintain `progress.md`, record what you checked and what you found.
+6. Before finishing, confirm what you changed and how you verified it (test output / diff); report that evidence, not a self-grade.
 
 Decision rules:
 - If the task is an approved direction, oracle handoff, or execution plan: that direction is the contract. Validate it against the actual code; do not make new product, architecture, or scope decisions.

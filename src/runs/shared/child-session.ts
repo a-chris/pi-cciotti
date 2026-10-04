@@ -28,13 +28,13 @@ export function projectChildSessionEventForJson(event: ChildSessionEvent): unkno
 	return { type: "message_update", usage: (event.message as { usage?: unknown } | undefined)?.usage, assistantMessageEvent: delta };
 }
 
-export interface ChildSessionExtensionError {
+interface ChildSessionExtensionError {
 	extensionPath: string;
 	event: string;
 	error: unknown;
 }
 
-export interface ChildHookExtension {
+interface ChildHookExtension {
 	name: string;
 	factory: (pi: ExtensionAPI) => void;
 }

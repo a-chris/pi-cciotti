@@ -557,8 +557,8 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		const literalJsonText = '{"looks":"json"}';
 		mockPi.onCall({
 			steps: [
-				{ jsonl: [events.toolStart("read", { path: "package.json" })], delay: 20 },
-				{ jsonl: [events.toolEnd("read"), events.toolResult("read", "{}")], delay: 20 },
+				{ jsonl: [events.toolStart("edit", { path: "package.json" })], delay: 20 },
+				{ jsonl: [events.toolEnd("edit"), events.toolResult("edit", "{}")], delay: 20 },
 				{
 					jsonl: [{
 						type: "message_end",
@@ -1043,7 +1043,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 
 	it("rejects implementation runs without mutation-capable tools before spawn", async () => {
 		mockPi.onCall({ output: "should not spawn" });
-		const agents = [makeAgent("worker", { tools: ["read", "grep", "find", "ls"] })];
+		const agents = [makeAgent("worker", { tools: ["read", "grep", "find", "ls"], completionGuard: true })];
 
 		const result = await runSync(tempDir, agents, "worker", "Implement the approved file changes", {
 			runId: "readonly-contract-run",
@@ -1056,7 +1056,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 
 	it("fails implementation runs that complete without mutation attempts", async () => {
 		mockPi.onCall({ output: "Validation:\nlet rawFilename = params.filename.trim();" });
-		const agents = [makeAgent("worker")];
+		const agents = [makeAgent("worker", { completionGuard: true })];
 		const controlEvents: Array<{ message: string }> = [];
 
 		const result = await runSync(tempDir, agents, "worker", "Implement the approved file changes", {
@@ -1496,11 +1496,25 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 	});
 
 	it("preserves failed foreground resume errors and transcript metadata", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
-		const executor = makeExecutor([makeAgent("echo")]);
-		mockPi.onCall({ output: "first report" });
+		const executor = makeExecutor([makeAgent("worker", { completionGuard: true })]);
+		mockPi.onCall({
+			jsonl: [
+				{
+					type: "message_end",
+					message: {
+						role: "assistant",
+						content: [{ type: "toolCall", name: "edit", arguments: { path: "src/first.ts", oldText: "a", newText: "b" } }],
+						model: "mock/test-model",
+						stopReason: "toolUse",
+						usage: { input: 100, output: 50, cacheRead: 0, cacheWrite: 0, cost: { total: 0.001 } },
+					},
+				},
+				events.assistantMessage("first report"),
+			],
+		});
 		const firstResult = await executor.execute(
 			"workflow-resume-failure-first",
-			{ async: false, workflowScript: `return runs.run("first", { agent: "echo", task: "First" });` },
+			{ async: false, workflowScript: `return runs.run("first", { agent: "worker", task: "First" });` },
 			new AbortController().signal,
 			undefined,
 			makeMinimalCtx(tempDir),
@@ -1799,7 +1813,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 
 	it("returns captured output when the foreground executor fails an implementation run", async () => {
 		mockPi.onCall({ output: "Oracle review:\n- finding one\n- finding two" });
-		const executor = makeExecutor([makeAgent("oracle")]);
+		const executor = makeExecutor([makeAgent("oracle", { completionGuard: true })]);
 
 		const result = await executor.execute(
 			"failed-single-output",
@@ -1818,7 +1832,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 
 	it("fails future-tense implementation summaries when no mutation attempt occurred", async () => {
 		mockPi.onCall({ output: "I’ll do that now and report back after implementing." });
-		const agents = [makeAgent("worker")];
+		const agents = [makeAgent("worker", { completionGuard: true })];
 
 		const result = await runSync(tempDir, agents, "worker", "Implement the approved fixes", {
 			runId: "guard-future-tense",
@@ -1845,7 +1859,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		mockPi.onCall({ output: "cold start test after patch" });
 		mockPi.onCall({ output: "cold start test after patch" });
 		const agents = [
-			makeAgent("test-runner", { tools: ["read", "grep", "bash", "ls"] }),
+			makeAgent("test-runner", { tools: ["read", "grep", "bash", "ls"], completionGuard: true }),
 			makeAgent("test-runner-optout", { tools: ["read", "grep", "bash", "ls"], completionGuard: false }),
 		];
 
@@ -3558,7 +3572,7 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 
 	it("records blocked mutation effects when foreground implementation tools are missing", async () => {
 		mockPi.onCall({ output: "I cannot edit because fixture_search is missing", missingTools: ["fixture_search"] });
-		const agents = [makeAgent("worker", { tools: ["read", "fixture_search"] })];
+		const agents = [makeAgent("worker", { tools: ["read", "fixture_search"], completionGuard: true })];
 
 		const result = await runSync(tempDir, agents, "worker", "Implement the requested source fix", { runId: "missing-implementation-tool" });
 

@@ -503,7 +503,6 @@ export interface FileMutationEffect {
 	expected: boolean;
 	attempted: boolean;
 	message?: string;
-	resolvedBy?: "llm-intent-arbiter";
 	evidence?: TrackedMutationEvidence;
 }
 
@@ -2229,8 +2228,6 @@ export interface RunSyncOptions {
 	modelOverrideFromParent?: boolean;
 	/** How the launch model was selected: explicit per-call, configured agent primary, or inherited parent. */
 	modelOrigin?: "explicit" | "inherited" | "configured";
-	/** LLM intent arbiter for the completion mutation guard (rescues read-only review runs). */
-	llmIntentArbiter?: import("../runs/shared/llm-intent-arbiter.ts").TaskMutationArbiter;
 	/** Override the agent's default thinking level for this run */
 	thinkingOverride?: AgentConfig["thinking"];
 	thinkingCeiling?: ThinkingLevel;

@@ -998,12 +998,10 @@ export function executeAsyncSingle(
 		const contractTools = toolPlan.explicitToolAllowlist ? toolPlan.effectiveToolAllowlist : undefined;
 		const contractError = validateImplementationToolContract({
 			agent: agentConfig.name,
-			task: taskText,
 			tools: contractTools,
 			mcpDirectTools: toolPlan.effectiveMcpTools,
 			configuredExtensions: toolPlan.configuredExtensions,
 			requestedTools: toolPlan.requestedBuiltinTools,
-			acceptanceRole: agentConfig.acceptanceRole,
 			completionGuard: agentConfig.completionGuard,
 		});
 		if (contractError) return formatAsyncStartError("single", contractError);

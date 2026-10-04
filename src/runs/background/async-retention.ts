@@ -24,7 +24,7 @@ const RUN_TOMBSTONE_PREFIX = ".deleting-run-";
 const RESULT_TOMBSTONE_PREFIX = ".deleting-result-";
 const RUN_TOMBSTONE_MARKERS_DIR = "async-retention-run-tombstones";
 const LOCK_STALE_MS = 24 * 60 * 60 * 1000;
-const RUN_MODES = new Set<AsyncStatus["mode"]>(["single", "parallel", "chain", "workflow"]);
+const RUN_MODES = new Set<AsyncStatus["mode"]>(["single", "workflow"]);
 const TERMINAL_STATES = new Set<AsyncStatus["state"]>(["complete", "failed", "stopped", "rejected"]);
 const RESULT_TIMESTAMP_FIELDS = ["endedAt", "completedAt", "createdAt", "writtenAt", "expiresAt", "timestamp"] as const;
 

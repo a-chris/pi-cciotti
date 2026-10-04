@@ -25,7 +25,7 @@ import type { SubagentState } from "../../src/shared/types.ts";
 import type { AsyncExecutionResult, AsyncResultPayload, AsyncStatusPayload, MockPiCallRecord } from "../support/async-execution-fixture.ts";
 import {
 	installAsyncExecutionHooks, mockAssistantMessage, available, isAsyncAvailable,
-	executeAsyncSingle, executeAsyncChain, resolveTargetedAsyncRun, ASYNC_DIR,
+	executeAsyncSingle, resolveTargetedAsyncRun, ASYNC_DIR,
 	RESULTS_DIR, createSubagentExecutor, readIfExists, waitForAsyncResultFile,
 	waitForAsyncState, waitForMockPiCall, readMockPiArgs, readMockPiRequiredTools,
 	tempDir, mockPi, makeAsyncExecutor, readAsyncPayload, launchProtocolTest,
@@ -577,43 +577,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 		assert.deepEqual(getActiveAsyncCapacitySnapshot(parentSessionId, 1), { used: 0, limit: 1 });
 	});
 
-	it("lets explicit fast false opt out async external chains from inherited fast mode", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
-		const agent = makeAgent("external", {
-			fast: true,
-			runner: { type: "external-cli", command: process.execPath, args: ["-e", "process.stdout.write('external chain fast false')"] },
-		} as never);
-
-		const rejected = executeAsyncChain(`async-chain-external-fast-inherited-${Date.now().toString(36)}`, {
-			chain: [{ agent: "external", task: "Run external" }],
-			resultMode: "chain",
-			agents: [agent],
-			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
-			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-			shareEnabled: false,
-			acceptance: false,
-		});
-		assert.equal(rejected.isError, true);
-		assert.match(rejected.content[0]?.text ?? "", /does not support: fast mode/);
-
-		const id = `async-chain-external-fast-false-${Date.now().toString(36)}`;
-		const launch = executeAsyncChain(id, {
-			chain: [{ agent: "external", task: "Run external" }],
-			resultMode: "chain",
-			agents: [agent],
-			fast: false,
-			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
-			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-			shareEnabled: false,
-			acceptance: false,
-		});
-
-		assert.equal(launch.isError, undefined, launch.content[0]?.text ?? "launch failed");
-		const payload = await readAsyncPayload(id);
-		assert.equal(payload.success, true);
-		assert.match(payload.results[0]?.output ?? "", /external chain fast false/);
-		assert.equal(mockPi.callCount(), 0);
-	});
-
 	it("rejects implementation workers when a capability ceiling removes mutation tools before spawn", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, () => {
 		const id = `async-ceiling-readonly-worker-contract-${Date.now().toString(36)}`;
 		mockPi.onCall({ output: "should not spawn" });
@@ -634,13 +597,13 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 		assert.equal(mockPi.callCount(), 0);
 	});
 
-	it("rejects workflow implementation workers without mutation-capable tools before spawn", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, () => {
-		const id = `async-workflow-readonly-worker-contract-${Date.now().toString(36)}`;
+	it("rejects async single implementation workers without mutation-capable tools before spawn", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, () => {
+		const id = `async-single-readonly-worker-contract-${Date.now().toString(36)}`;
 		mockPi.onCall({ output: "should not spawn" });
-		const launch = executeAsyncChain(id, {
-			chain: [{ agent: "worker", task: "Implement the requested source fix" }],
-			resultMode: "chain",
-			agents: [makeAgent("worker", { tools: ["read", "grep", "find", "ls"], completionGuard: true })],
+		const launch = executeAsyncSingle(id, {
+			agent: "worker",
+			task: "Implement the requested source fix",
+			agentConfig: makeAgent("worker", { tools: ["read", "grep", "find", "ls"], completionGuard: true }),
 			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
 			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
 			shareEnabled: false,
@@ -652,30 +615,6 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 		assert.equal(mockPi.callCount(), 0);
 	});
 
-	it("rejects workflow read-only workers after previous-output templates resolve to implementation tasks", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
-		const id = `async-workflow-resolved-readonly-worker-contract-${Date.now().toString(36)}`;
-		mockPi.onCall({ output: "Implement the requested source fix" });
-		mockPi.onCall({ output: "should not spawn" });
-		const launch = executeAsyncChain(id, {
-			chain: [
-				{ agent: "producer", task: "Return the next instruction" },
-				{ agent: "worker", task: "{previous}" },
-			],
-			resultMode: "chain",
-			agents: [
-				makeAgent("producer", { completionGuard: false }),
-				makeAgent("worker", { tools: ["read", "grep", "find", "ls"], completionGuard: true }),
-			],
-			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
-			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-			shareEnabled: false,
-			acceptance: false,
-		});
-
-		assert.equal(launch.isError, true);
-		assert.match(launch.content[0]?.text ?? "", /no mutation-capable tools/);
-		assert.equal(mockPi.callCount(), 0);
-	});
 
 	it("routes async artifacts to the configured session directory", { skip: !isAsyncAvailable() || !createSubagentExecutor ? "jiti or executor not available" : undefined }, async () => {
 		mockPi.onCall({ output: "async session artifact" });

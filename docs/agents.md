@@ -243,7 +243,7 @@ Field notes:
 | `async` | Default a single-agent launch to background (`true`) or foreground (`false`) when the call omits `async`. Explicit call values and `forceTopLevelAsync` win. |
 | `timeoutMs` | Positive integer default runtime deadline in milliseconds for single-agent launches. Foreground launches use 30 minutes when neither the call nor agent provides a timeout; explicit `timeoutMs`/`maxRuntimeMs` and agent defaults win. |
 | `toolTimeoutMs` | Optional positive integer hard per-tool-call deadline in milliseconds. An explicit call value wins, then this agent default, global `toolTimeoutMs`, and `PI_SUBAGENT_TOOL_TIMEOUT_MS`. When omitted, known-fast built-in tools get a five-minute default; long-running tools get attention notices but no hard default. It does not extend the run-level deadline; `bg_wait` is exempt. |
-| `acceptance` | Acceptance default for single-agent launches. Use a scalar level such as `checked` or an inline/block YAML map such as `{ level: "none", reason: "lightweight lookup" }`. Explicit call values win; chain and parallel acceptance remains task/step configuration. |
+| `acceptance` | Acceptance default for single-agent launches. Use a scalar level such as `checked` or an inline/block YAML map such as `{ level: "none", reason: "lightweight lookup" }`. Explicit call values win; parallel task and workflow-step acceptance remains per-item configuration. |
 | `acceptanceRole` | Optional `read-only` or `writer` role for automatic acceptance inference. Explicit task mutation or no-edit intent wins; otherwise the declared role replaces agent-name guessing. This does not grant or revoke tools. |
 | `mutationTools` | Comma-separated extension tool names whose calls count as mutation attempts for the completion guard. This declares evidence only; list and load each tool through `tools` and its extension provider as usual. |
 | `completionGuard` | The explicit expects-mutation flag. Default `true` for the builtin `worker` (and agents resolved to `worker`), `false` for every other agent. Set `true` when delegating a task that should change files to a custom agent; set `false` for read-only or bash-enabled validators/advisors that mention implementation words. When enabled, an agent whose tool allowlist has no mutation-capable tools gets an explicit launch error. |
@@ -347,7 +347,7 @@ Use `subagentOnlyExtensions` when a custom extension tool should exist only insi
 
 To apply the same `extensions` allowlist to every agent that does not declare its own, set `subagents.defaultExtensions` in user or project settings (see [configuration.md](configuration.md)).
 
-Before the first model turn, the child runtime compares every explicit tool name with Pi's final filtered registry. A missing provider fails the run with the unavailable names and concrete `subagentOnlyExtensions`/`extensions` guidance, instead of letting a direct or chained child silently continue without its requested tools.
+Before the first model turn, the child runtime compares every explicit tool name with Pi's final filtered registry. A missing provider fails the run with the unavailable names and concrete `subagentOnlyExtensions`/`extensions` guidance, instead of letting a direct or nested child silently continue without its requested tools.
 
 ## Skills
 
@@ -371,7 +371,7 @@ Use agent defaults, override them at runtime, or disable them:
 { source: `return runs.run("main", { agent: "scout", task: "...", skill: false })` }
 ```
 
-For chains, `skill` at the top level is additive. A step-level `skill` overrides that step; `false` disables skills for that step.
+`skill` is additive across an agent's configuration; `false` disables skills.
 
 Available skills use this shape in the child prompt:
 

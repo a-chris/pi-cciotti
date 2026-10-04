@@ -6,8 +6,8 @@ import { spawnSync } from "node:child_process";
 import { describe, it } from "node:test";
 import {
 	ASYNC_DIR,
-	CHAIN_RUNS_DIR,
 	RESULTS_DIR,
+	WORKFLOW_RUNS_DIR,
 	TEMP_ARTIFACTS_DIR,
 	TEMP_ROOT_DIR,
 	getAsyncConfigPath,
@@ -98,7 +98,7 @@ fs.writeFileSync(path.join(profilesDir, "isolated.json"), JSON.stringify({ subag
 const result = applySubagentProfile("isolated");
 console.log(JSON.stringify({ agentDir: getAgentDir(), profilePath: path.join(profilesDir, "isolated.json"), settingsPath: result.settingsPath }));
 `;
-			const env = {
+			const env: NodeJS.ProcessEnv = {
 				...process.env,
 				PI_CODING_AGENT_DIR: callerAgentDir,
 				PI_CCIOTTI_TEMP_ROOT: tempRoot,
@@ -131,12 +131,12 @@ console.log(JSON.stringify({ agentDir: getAgentDir(), profilePath: path.join(pro
 	it("anchors shared temp directories under one scoped root", () => {
 		assert.equal(path.dirname(RESULTS_DIR), TEMP_ROOT_DIR);
 		assert.equal(path.dirname(ASYNC_DIR), TEMP_ROOT_DIR);
-		assert.equal(path.dirname(CHAIN_RUNS_DIR), TEMP_ROOT_DIR);
+		assert.equal(path.dirname(WORKFLOW_RUNS_DIR), TEMP_ROOT_DIR);
 		assert.equal(path.dirname(TEMP_ARTIFACTS_DIR), TEMP_ROOT_DIR);
 		assert.match(path.basename(TEMP_ROOT_DIR), /^pi-cciotti-/);
 		assert.equal(path.basename(RESULTS_DIR), "async-subagent-results");
 		assert.equal(path.basename(ASYNC_DIR), "async-subagent-runs");
-		assert.equal(path.basename(CHAIN_RUNS_DIR), "chain-runs");
+		assert.equal(path.basename(WORKFLOW_RUNS_DIR), "workflow-runs");
 		assert.equal(path.basename(TEMP_ARTIFACTS_DIR), "artifacts");
 	});
 

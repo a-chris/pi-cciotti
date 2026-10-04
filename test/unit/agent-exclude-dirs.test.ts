@@ -205,19 +205,15 @@ describe("settings subagents.agentExcludeDirs", () => {
 		assert.equal(reads.includes(path.join(user, "agents", "kept.md")), false, "excluded changes must not force a source reload");
 	});
 
-	it("does not re-include excluded package roots or change chain discovery", () => {
+	it("does not re-include excluded package roots", () => {
 		const pkg = path.join(root, "pkg");
 		writeAgent(path.join(pkg, "agents"), "package-hidden");
-		fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "exclude-fixture", "pi-cciotti": { agents: ["./agents"], chains: ["./agents"] } }));
-		fs.writeFileSync(path.join(pkg, "agents", "kept.chain.json"), JSON.stringify({ name: "kept-chain", description: "Retained chain", chain: [{ agent: "scout", task: "Inspect" }] }));
+		fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "exclude-fixture", "pi-cciotti": { agents: ["./agents"] } }));
 		settings(user, {}, { packages: [pkg] });
 		assert.equal(discoverAgentsAll(project).package.some((agent) => agent.name === "package-hidden"), true);
 		settings(user, { agentExcludeDirs: [path.join(pkg, "agents")] }, { packages: [pkg] });
 		const all = discoverAgentsAll(project);
 		assert.equal(all.package.some((agent) => agent.name === "package-hidden"), false);
-		assert.equal(all.chains.some((chain) => chain.name === "kept-chain"), true);
-		fs.writeFileSync(path.join(pkg, "agents", "late.chain.json"), JSON.stringify({ name: "late-chain", description: "New chain", chain: [{ agent: "scout", task: "Inspect" }] }));
-		assert.equal(discoverAgentsAll(project).chains.some((chain) => chain.name === "late-chain"), true);
 	});
 
 	it("invalidates agent-only discovery when an excluded package declares an allowed external root", () => {

@@ -137,7 +137,7 @@ Capability advertisements on `ping`:
 - `statusProjection: { version: 1, untargeted: "in-memory-when-ready", targeted: "executor" }` — untargeted status may use restored bounded projections; targeted or rich status remains executor-backed.
 - `fleetStatus: { version: 1 }` — successful `status` replies additionally include `data.fleet`.
 
-Structured delegation progress updates carry `runId` as soon as foreground execution allocates it, so a caller can retain the package-owned revival target even if its own tool turn is interrupted before the terminal response. Foreground `details.results[]` rows also include a numeric `index` that is unique within the run and stable across partial progress snapshots and the final result; use `(runId, index)` instead of row position to correlate single, counted parallel, and chain children.
+Structured delegation progress updates carry `runId` as soon as foreground execution allocates it, so a caller can retain the package-owned revival target even if its own tool turn is interrupted before the terminal response. Foreground `details.results[]` rows also include a numeric `index` that is unique within the run and stable across partial progress snapshots and the final result; use `(runId, index)` instead of row position to correlate single, counted parallel, and workflow children.
 
 ### Fleet status DTO
 
@@ -484,8 +484,8 @@ The main runtime files in this repository:
 |------|---------|
 | `src/extension/index.ts` | Extension registration, tool registration, message/render wiring. |
 | `src/integrations/pi-web-session-liveness.ts` | Optional pi-web idle-eviction liveness bridge. |
-| `src/agents/agents.ts` | Agent and chain discovery, frontmatter parsing. |
-| `src/runs/foreground/subagent-executor.ts` | Main execution routing for single, parallel, chain, management, status, interrupt, and doctor actions. |
+| `src/agents/agents.ts` | Agent discovery and frontmatter parsing. |
+| `src/runs/foreground/subagent-executor.ts` | Main execution routing for single, workflow, management, status, interrupt, and doctor actions. |
 | `src/runs/foreground/execution.ts` | Core foreground `runSync` handling: drives one in-process child session per attempt. |
 | `src/runs/shared/child-session.ts` | In-process child session factory (`createAgentSession` behind an injectable seam) and the shared model runtime; used by both launch paths. |
 | `src/runs/shared/child-launch.ts` | Builds the tool plan, typed child runtime config, and session launch for a child in either host process. |
@@ -498,7 +498,7 @@ The main runtime files in this repository:
 | `src/runs/background/async-execution.ts` | Background launch support. |
 | `src/runs/background/async-status.ts` | Status discovery and formatting for async runs. |
 | `src/workflows/scripted-workflow.ts` / `src/runs/foreground/subagent-executor.ts` | Scripted workflow orchestration and child launch routing. |
-| `src/shared/settings.ts` | Chain behavior, instructions, and config helpers. |
+| `src/shared/settings.ts` | Settings, read-path resolution, and config helpers. |
 | `src/runs/shared/worktree.ts` | Git worktree isolation. |
 
 | `src/extension/schemas.ts` / `src/shared/types.ts` | Tool schemas, shared types, and event constants. |

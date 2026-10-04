@@ -65,42 +65,6 @@ describe("nested widget rendering", () => {
 		assert.match(epoch, /↳ └─ \[\d{2}:\d{2}:\d{2}\] . epoch · running/);
 	});
 
-	it("shows four direct leaves and one overflow row while retaining completed siblings", () => {
-		const root = nested("parallel-owner", "root-run", "running", {
-			mode: "parallel",
-			steps: ["one", "two", "three", "four", "five"].map((agent, index) => ({
-				agent,
-				status: index === 0 ? "complete" as const : "running" as const,
-				model: index === 0 ? "gpt-5.6-luna:medium" : "gpt-5.6-luna",
-				thinking: "medium",
-			})),
-		});
-		const collapsed = buildWidgetLines([job(root)], theme as any, 160, false).join("\n");
-		assert.match(collapsed, /parallel-owner · running/);
-		for (const [agent, state] of [["one", "complete"], ["two", "running"], ["three", "running"], ["four", "running"]] as const) {
-			const line = collapsed.split("\n").find((candidate) => candidate.includes(` ${agent} ·`));
-			assert.ok(line);
-			assert.match(line!, /\[\d{2}:\d{2}:\d{2}\] /);
-			assert.match(line!, /gpt-5.6-luna/);
-			assert.match(line!, /thinking medium/);
-			assert.match(line!, new RegExp(state));
-		}
-		assert.doesNotMatch(collapsed, /five · running/);
-
-		const chain = nested("chain-owner", "root-run", "running", {
-			mode: "chain",
-			steps: ["first", "second"].map((agent) => ({ agent, status: "running" as const })),
-		});
-		const chainCollapsed = buildWidgetLines([job(chain)], theme as any, 160, false).join("\n");
-		for (const agent of ["first", "second"]) {
-			const line = chainCollapsed.split("\n").find((candidate) => candidate.includes(` ${agent} ·`));
-			assert.ok(line);
-			assert.match(line!, /\[\d{2}:\d{2}:\d{2}\] /);
-		}
-		assert.match(collapsed, /\+1 more nested leaves/);
-		assert.equal((collapsed.match(/thinking medium/g) ?? []).length, 4);
-	});
-
 	it("collapses descendants beyond the nested depth budget", () => {
 		const root = nested("nested-root", "root-run", "running", {
 			children: [nested("nested-child", "nested-root", "running", {

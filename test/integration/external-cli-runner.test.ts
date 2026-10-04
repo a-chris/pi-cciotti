@@ -5,7 +5,6 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { resultFilesForSession } from "../../src/runs/background/result-files.ts";
-import { enqueueChainAppendRequest } from "../../src/runs/background/chain-append.ts";
 import { deliverStopRequest } from "../../src/runs/background/control-channel.ts";
 import { type AsyncStatus, TEMP_ROOT_DIR } from "../../src/shared/types.ts";
 import { writeNodeCommand } from "../support/node-command.ts";
@@ -342,69 +341,6 @@ describe("external CLI async lifecycle", () => {
 		const exitCode = await startRunner(configPath, path.resolve(import.meta.dirname, "../.."), { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH ?? ""}` });
 		assert.equal(exitCode, 0);
 		assert.equal(fs.existsSync(gitCalled), false);
-	});
-
-	it("applies external idle attention to runtime-appended chain steps", async () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-external-appended-"));
-		tempDirs.push(dir);
-		const firstReady = path.join(dir, "first-ready");
-		const releaseFirst = path.join(dir, "release-first");
-		const appendedReady = path.join(dir, "appended-ready");
-		const finish = path.join(dir, "finish");
-		const firstScript = `const fs=require('fs');fs.writeFileSync(${JSON.stringify(firstReady)},'');const hold=setInterval(()=>{if(fs.existsSync(${JSON.stringify(releaseFirst)})){clearInterval(hold);process.exit(0)}},10)`;
-		const { asyncDir, configPath } = writeExternalConfig(dir, "external-appended", firstScript, attentionControl);
-		const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-		config.resultMode = "chain";
-		fs.writeFileSync(configPath, JSON.stringify(config));
-		const runnerDone = startRunner(configPath, path.resolve(import.meta.dirname, "../.."));
-		await waitForFile(firstReady);
-		const appendedScript = `const fs=require('fs');fs.writeFileSync(${JSON.stringify(appendedReady)},'');const hold=setInterval(()=>{if(fs.existsSync(${JSON.stringify(finish)})){clearInterval(hold);process.exit(0)}},10)`;
-		enqueueChainAppendRequest({
-			asyncDir,
-			runId: "external-appended",
-			steps: [{ agent: "appended", task: "Stay silent", runner: { type: "external-cli", command: process.execPath, args: ["-e", appendedScript] } }],
-		});
-		fs.writeFileSync(releaseFirst, "");
-		await waitForFile(appendedReady);
-		let attentionError: unknown;
-		try {
-			await waitForStatus(path.join(asyncDir, "status.json"), (status) => status.steps?.[1]?.activityState === "needs_attention", 7_000);
-		} catch (error) {
-			attentionError = error;
-		}
-		fs.writeFileSync(finish, "");
-		assert.equal(await runnerDone, 0);
-		if (attentionError) throw attentionError;
-	});
-
-	it("coalesces same-worktree cold Git probes across external fanout", async () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-external-probe-fanout-"));
-		tempDirs.push(dir);
-		const gitDir = await createGitRepo(dir);
-		const calls = path.join(dir, "git-calls");
-		const ready = [path.join(dir, "ready-0"), path.join(dir, "ready-1")];
-		const finish = path.join(dir, "finish");
-		const tasks = ready.map((marker, index) => ({
-			agent: `external-${index}`,
-			task: "Stay silent",
-			runner: { type: "external-cli", command: process.execPath, args: ["-e", `const fs=require('fs');fs.writeFileSync(${JSON.stringify(marker)},'');const hold=setInterval(()=>{if(fs.existsSync(${JSON.stringify(finish)})){clearInterval(hold);process.exit(0)}},10)`] },
-			inheritProjectContext: false,
-			inheritSkills: false,
-		}));
-		const asyncDir = path.join(dir, "async");
-		fs.mkdirSync(asyncDir);
-		const configPath = path.join(dir, "config.json");
-		fs.writeFileSync(configPath, JSON.stringify({ id: "external-probe-fanout", sessionId: "session-fanout", steps: [{ parallel: tasks }], resultPath: path.join(dir, "result.json"), cwd: gitDir, placeholder: "{previous}", artifactConfig: { enabled: false }, asyncDir, resultMode: "chain", controlConfig: attentionControl }));
-		const runnerDone = startRunner(configPath, path.resolve(import.meta.dirname, "../.."), { ...process.env, GIT_TRACE2_EVENT: calls });
-		await Promise.all(ready.map((file) => waitForFile(file)));
-		fs.writeFileSync(path.join(gitDir, "tracked.txt"), "changed\n");
-		await waitForStatus(path.join(asyncDir, "status.json"), (status) => status.steps?.length === 2 && status.steps.every((step) => Boolean(step.startedAt && step.lastActivityAt && step.lastActivityAt > step.startedAt)), 7_000);
-		const gitCommands = fs.readFileSync(calls, "utf-8").trim().split("\n")
-			.map((line) => JSON.parse(line))
-			.filter((event) => event.event === "start" && (event.argv?.[1] === "rev-parse" || event.argv?.[1] === "status"));
-		assert.deepEqual(gitCommands.map((event) => event.argv[1]).sort(), ["rev-parse", "rev-parse", "rev-parse", "status", "status", "status"]);
-		fs.writeFileSync(finish, "");
-		assert.equal(await runnerDone, 0);
 	});
 
 	for (const stream of ["stdout", "stderr"] as const) {

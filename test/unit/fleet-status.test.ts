@@ -46,7 +46,7 @@ const theme = {
 };
 
 describe("below-editor subagent FleetView", () => {
-	for (const source of ["workflow", "nested-run", "nested-step"] as const) {
+	for (const source of ["workflow", "nested-run"] as const) {
 		it(`advances only running ${source} detail elapsed and freezes terminal evidence`, () => {
 			const cases = [
 				{ status: "running", startedAt: 1_000, durationMs: 0, expected: ["9s", "19s"] },
@@ -801,104 +801,6 @@ describe("below-editor subagent FleetView", () => {
 		}
 	});
 
-	it("counts hidden nested leaves across multiple parallel children", () => {
-		const state = stateForTest();
-		state.asyncJobs.set("supervisor", {
-			asyncId: "supervisor",
-			asyncDir: "/tmp/supervisor",
-			status: "running",
-			mode: "single",
-			startedAt: 10,
-			updatedAt: 20,
-			steps: [{ agent: "supervisor", index: 0, status: "running" }],
-			nestedChildren: [
-				{
-					id: "nested-a",
-					parentRunId: "supervisor",
-					parentStepIndex: 0,
-					depth: 1,
-					path: [{ runId: "supervisor", stepIndex: 0 }],
-					state: "running",
-					mode: "parallel",
-					steps: [0, 1, 2, 3].map((index) => ({ agent: `child-a-${index}`, index, status: "running" as const })),
-				},
-				{
-					id: "nested-b",
-					parentRunId: "supervisor",
-					parentStepIndex: 0,
-					depth: 1,
-					path: [{ runId: "supervisor", stepIndex: 0 }],
-					state: "running",
-					mode: "parallel",
-					steps: [0, 1].map((index) => ({ agent: `child-b-${index}`, index, status: "running" as const })),
-				},
-			],
-		});
-		let widgetFactory: ((tui: unknown, theme: typeof theme) => { render(width: number): string[] }) | undefined;
-		const ctx = {
-			hasUI: true,
-			ui: {
-				setWidget(_key: string, content: typeof widgetFactory | undefined) { if (content) widgetFactory = content; },
-				onTerminalInput() { return () => {}; },
-				getEditorText() { return ""; },
-				requestRender() {},
-				notify() {},
-				theme,
-			},
-		} as unknown as ExtensionContext;
-		const fleet = new SubagentFleetStatus(state, () => {}, { refreshMs: 60_000 });
-		try {
-			fleet.setContext(ctx);
-			const tui = { requestRender() {}, focusedComponent: Object.create(Editor.prototype) as Editor };
-			const component = widgetFactory!(tui, theme);
-			assert.equal(component.render(120).length, 1, "parallel nested activity should stay compact until activated");
-			assert.deepEqual(fleet.handleKey("\x1b[B"), { consume: true });
-			const lines = component.render(120).join("\n");
-			for (const index of [0, 1, 2, 3]) assert.match(lines, new RegExp(`child-a-${index}`));
-			assert.doesNotMatch(lines, /child-b-[01]/);
-			assert.match(lines, /\+2 nested leaves/);
-		} finally {
-			fleet.dispose();
-		}
-	});
-
-	it("shows only the current sequential chain step while retaining active parallel siblings", () => {
-		const state = stateForTest();
-		state.asyncJobs.set("sequential", {
-			asyncId: "sequential",
-			asyncDir: "/tmp/sequential",
-			status: "running",
-			mode: "chain",
-			currentStep: 1,
-			startedAt: 50,
-			updatedAt: 200,
-			steps: [
-				{ agent: "scout", index: 0, status: "complete" },
-				{ agent: "worker", index: 1, status: "running" },
-				{ agent: "reviewer", index: 2, status: "pending" },
-			],
-		});
-		state.asyncJobs.set("parallel-group", {
-			asyncId: "parallel-group",
-			asyncDir: "/tmp/parallel-group",
-			status: "running",
-			mode: "chain",
-			currentStep: 3,
-			activeParallelGroup: true,
-			startedAt: 100,
-			updatedAt: 200,
-			steps: [
-				{ agent: "reviewer", index: 3, status: "running" },
-				{ agent: "tester", index: 4, status: "pending" },
-			],
-		});
-		assert.deepEqual(collectFleetStatusEntries(state).map((entry) => entry.key), [
-			"async:sequential:1",
-			"async:parallel-group:3",
-			"async:parallel-group:4",
-		]);
-	});
-
 	it("shows every active foreground parallel child", () => {
 		const state = stateForTest();
 		state.foregroundControls.set("parallel", {
@@ -1310,75 +1212,6 @@ describe("below-editor subagent FleetView", () => {
 			assert.match(lines, /ci: CI checks · running · .*provider:github-ci.*PR #1614/);
 			assert.match(lines, /gate: Review gate · inconclusive · .*provider:greptile.*stale.*out:gate.json/);
 			assert.doesNotMatch(lines, /agent: CI checks/);
-		} finally {
-			fleet.dispose();
-		}
-	});
-
-	it("renders recursive nested runs and steps within the existing row budget", () => {
-		const state = stateForTest();
-		state.asyncJobs.set("supervisor", {
-			asyncId: "supervisor",
-			asyncDir: "/tmp/supervisor",
-			status: "running",
-			mode: "single",
-			startedAt: 10,
-			updatedAt: 20,
-			steps: [{ agent: "supervisor", index: 0, status: "running" }],
-			nestedChildren: [{
-				id: "level-one",
-				parentRunId: "supervisor",
-				parentStepIndex: 0,
-				depth: 1,
-				path: [{ runId: "supervisor", stepIndex: 0 }],
-				state: "running",
-				agent: "level-one",
-				children: [{
-					id: "level-two",
-					parentRunId: "level-one",
-					depth: 2,
-					path: [{ runId: "supervisor", stepIndex: 0 }, { runId: "level-one" }],
-					state: "running",
-					mode: "parallel",
-					steps: [{
-						agent: "level-two",
-						status: "running",
-						children: [0, 1, 2, 3].map((index) => ({
-							id: `leaf-${index}`,
-							parentRunId: "level-two",
-							depth: 3,
-							path: [{ runId: "level-two" }],
-							state: "running" as const,
-							agent: `leaf-${index}`,
-						})),
-					}],
-				}],
-			}],
-		});
-		let widgetFactory: ((tui: unknown, theme: typeof theme) => { render(width: number): string[] }) | undefined;
-		const ctx = {
-			hasUI: true,
-			ui: {
-				setWidget(_key: string, content: typeof widgetFactory | undefined) { if (content) widgetFactory = content; },
-				onTerminalInput() { return () => {}; },
-				getEditorText() { return ""; },
-				requestRender() {},
-				notify() {},
-				theme,
-			},
-		} as unknown as ExtensionContext;
-		const fleet = new SubagentFleetStatus(state, () => {}, { refreshMs: 60_000 });
-		try {
-			fleet.setContext(ctx);
-			const component = widgetFactory!({ requestRender() {}, focusedComponent: Object.create(Editor.prototype) as Editor }, theme);
-			assert.deepEqual(fleet.handleKey("\x1b[B"), { consume: true });
-			const lines = component.render(140).join("\n");
-			assert.match(lines, /level-one/);
-			assert.match(lines, /level-two/);
-			assert.match(lines, /leaf-0/);
-			assert.match(lines, /leaf-1/);
-			assert.doesNotMatch(lines, /leaf-[23]/);
-			assert.match(lines, /\+2 nested leaves/);
 		} finally {
 			fleet.dispose();
 		}

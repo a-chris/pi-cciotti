@@ -173,7 +173,7 @@ function missingDiff(input: { manifestPath: string; stepIndex: number; taskIndex
 export function writeParallelHandoffGroup(input: {
 	manifestPath: string;
 	runId: string;
-	mode: "single" | "parallel" | "chain";
+	mode: "single" | "workflow";
 	source: "foreground" | "async";
 	cwd: string;
 	stepIndex: number;

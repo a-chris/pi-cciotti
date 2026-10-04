@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { CHAIN_RUNS_DIR, TEMP_ARTIFACTS_DIR, type ArtifactPaths, type ArtifactDirPreference } from "./types.ts";
+import { WORKFLOW_RUNS_DIR, TEMP_ARTIFACTS_DIR, type ArtifactPaths, type ArtifactDirPreference } from "./types.ts";
 import { getAgentDir } from "./utils.ts";
 const CLEANUP_MARKER_FILE = ".last-cleanup";
 export const PROJECT_SUBAGENTS_RELATIVE_DIR = ".pi/subagents";
@@ -15,7 +15,7 @@ const PROJECT_ARTIFACT_PATHS = [
 	`${PROJECT_SUBAGENTS_RELATIVE_DIR}/artifacts/progress/run/progress.md`,
 	`${PROJECT_SUBAGENTS_RELATIVE_DIR}/artifacts/outputs/output.md`,
 	`${PROJECT_SUBAGENTS_RELATIVE_DIR}/artifacts/outputs/run/output.md`,
-	`${PROJECT_SUBAGENTS_RELATIVE_DIR}/chain-runs/run.json`,
+	`${PROJECT_SUBAGENTS_RELATIVE_DIR}/workflow-runs/run.json`,
 ];
 
 function globMatchesPath(pattern: string, filePath: string): boolean {
@@ -134,20 +134,20 @@ export function getProjectArtifactsDir(cwd: string): string {
 	return path.join(getProjectSubagentsDir(cwd), "artifacts");
 }
 
-export function getProjectChainRunsDir(cwd: string): string {
-	return path.join(getProjectSubagentsDir(cwd), "chain-runs");
+export function getProjectWorkflowRunsDir(cwd: string): string {
+	return path.join(getProjectSubagentsDir(cwd), "workflow-runs");
 }
 
-export function getChainRunsDir(
+export function getWorkflowRunsDir(
 	projectCwd: string,
 	dirPreference: ArtifactDirPreference = "session",
 ): string {
 	switch (dirPreference) {
 		case "project":
-			return getProjectChainRunsDir(projectCwd);
+			return getProjectWorkflowRunsDir(projectCwd);
 		case "session":
 		case "temp":
-			return CHAIN_RUNS_DIR;
+			return WORKFLOW_RUNS_DIR;
 		default:
 			throw new Error(`Unsupported artifactDir ${JSON.stringify(dirPreference)}; expected "project", "session", or "temp".`);
 	}

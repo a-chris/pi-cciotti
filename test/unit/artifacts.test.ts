@@ -6,12 +6,12 @@ import { afterEach, describe, it } from "node:test";
 import {
 	getArtifactsDir,
 	getProjectArtifactPackagingWarning,
-	getChainRunsDir,
+	getWorkflowRunsDir,
 	getProjectArtifactsDir,
-	getProjectChainRunsDir,
+	getProjectWorkflowRunsDir,
 	getProjectSubagentsDir,
 } from "../../src/shared/artifacts.ts";
-import { CHAIN_RUNS_DIR, TEMP_ARTIFACTS_DIR } from "../../src/shared/types.ts";
+import { WORKFLOW_RUNS_DIR, TEMP_ARTIFACTS_DIR } from "../../src/shared/types.ts";
 
 describe("project-local artifact paths", () => {
 	const tempDirs: string[] = [];
@@ -49,24 +49,24 @@ describe("project-local artifact paths", () => {
 		assert.match(getProjectArtifactPackagingWarning(packageDir({ name: "progress-included", files: [".pi/subagents/artifacts/progress/**"] })) ?? "", /artifactDir/);
 		assert.match(getProjectArtifactPackagingWarning(packageDir({ name: "outputs-included", files: [".pi/subagents/artifacts/outputs/**"] })) ?? "", /artifactDir/);
 		assert.match(getProjectArtifactPackagingWarning(packageDir({ name: "nested-output-included", files: [".pi/subagents/artifacts/outputs/*/*.md"] })) ?? "", /artifactDir/);
-		assert.match(getProjectArtifactPackagingWarning(packageDir({ name: "chain-runs-included", files: [".pi/subagents/chain-runs/**"] })) ?? "", /artifactDir/);
-		assert.match(getProjectArtifactPackagingWarning(packageDir({ name: "chain-runs-directory-included", files: [".pi/subagents/chain-runs"] })) ?? "", /artifactDir/);
+		assert.match(getProjectArtifactPackagingWarning(packageDir({ name: "workflow-runs-included", files: [".pi/subagents/workflow-runs/**"] })) ?? "", /artifactDir/);
+		assert.match(getProjectArtifactPackagingWarning(packageDir({ name: "workflow-runs-directory-included", files: [".pi/subagents/workflow-runs"] })) ?? "", /artifactDir/);
 	});
 
 	it("keeps project-scoped paths available as an explicit opt-in", () => {
 		const cwd = path.join("tmp", "repo");
 		assert.equal(getProjectSubagentsDir(cwd), path.join(cwd, ".pi/subagents"));
 		assert.equal(getProjectArtifactsDir(cwd), path.join(cwd, ".pi/subagents", "artifacts"));
-		assert.equal(getProjectChainRunsDir(cwd), path.join(cwd, ".pi/subagents", "chain-runs"));
+		assert.equal(getProjectWorkflowRunsDir(cwd), path.join(cwd, ".pi/subagents", "workflow-runs"));
 		assert.equal(getArtifactsDir(null, cwd, "project"), path.join(cwd, ".pi/subagents", "artifacts"));
 	});
 
-	it("routes chain scratch files according to the artifact preference", () => {
+	it("routes workflow scratch files according to the artifact preference", () => {
 		const cwd = path.join("tmp", "repo");
-		assert.equal(getChainRunsDir(cwd), CHAIN_RUNS_DIR);
-		assert.equal(getChainRunsDir(cwd, "project"), getProjectChainRunsDir(cwd));
-		assert.equal(getChainRunsDir(cwd, "session"), CHAIN_RUNS_DIR);
-		assert.equal(getChainRunsDir(cwd, "temp"), CHAIN_RUNS_DIR);
+		assert.equal(getWorkflowRunsDir(cwd), WORKFLOW_RUNS_DIR);
+		assert.equal(getWorkflowRunsDir(cwd, "project"), getProjectWorkflowRunsDir(cwd));
+		assert.equal(getWorkflowRunsDir(cwd, "session"), WORKFLOW_RUNS_DIR);
+		assert.equal(getWorkflowRunsDir(cwd, "temp"), WORKFLOW_RUNS_DIR);
 	});
 
 	it("defaults artifacts to the session directory and falls back to temp", () => {

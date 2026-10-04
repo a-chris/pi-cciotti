@@ -666,7 +666,7 @@ export function createAsyncJobTracker(pi: Pick<ExtensionAPI, "events">, state: S
 		if (typeof state.currentSessionId === "string" && info.sessionId !== state.currentSessionId) return;
 		const now = Date.now();
 		const asyncDir = info.asyncDir ?? path.join(asyncDirRoot, info.id);
-		const rawAgents = info.agents?.length ? info.agents : info.chain && info.chain.length > 0 ? info.chain : info.agent ? [info.agent] : undefined;
+		const rawAgents = info.agents?.length ? info.agents : info.agent ? [info.agent] : undefined;
 		const validParallelGroups = normalizeParallelGroups(info.parallelGroups, Number.MAX_SAFE_INTEGER, info.chainStepCount ?? Number.MAX_SAFE_INTEGER);
 		const firstGroup = validParallelGroups.find((group) => group.start === 0);
 		const firstGroupCount = firstGroup?.count;
@@ -686,7 +686,7 @@ export function createAsyncJobTracker(pi: Pick<ExtensionAPI, "events">, state: S
 			pid: typeof info.pid === "number" ? info.pid : undefined,
 			...(typeof info.sessionId === "string" ? { sessionId: info.sessionId } : {}),
 			...(typeof info.completionOwnerId === "string" ? { completionOwnerId: info.completionOwnerId } : {}),
-			mode: info.mode ?? (info.chain ? "chain" : "single"),
+			mode: info.mode ?? (info.workflowGraph ? "workflow" : "single"),
 			description: info.goal ?? info.task,
 			agents,
 			chainStepCount: info.chainStepCount,

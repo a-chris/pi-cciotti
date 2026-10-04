@@ -27,29 +27,18 @@ import { normalizePublicSubagentExecution, validateWorkflowCapacityOverrides } f
 import { runSync } from "./execution.ts";
 import { normalizeParentModel, resolveEffectiveSubagentModel, resolveModelOrigin, type ModelOrigin, type ParentModel } from "../shared/model-resolution.ts";
 import { getHostBuiltinToolNames } from "../shared/child-tool-plan.ts";
-import { projectChainOutputSchemas, resolveEffectiveOutputSchema } from "../shared/child-launch-plan.ts";
+import { resolveEffectiveOutputSchema } from "../shared/child-launch-plan.ts";
 import { formatRetainedChildren, listRetainedChildren } from "../background/retained-children.ts";
 import { resolveModelScopesForAgent, type ModelScopeConfig } from "../shared/model-scope.ts";
 import { recordRun } from "../shared/run-history.ts";
-import {
-	getStepAgents,
-	isParallelStep,
-	isDynamicParallelStep,
-	resolveExistingReadPaths,
-	type ChainStep,
-	type DynamicParallelStep,
-	type ParallelStep,
-	type ParallelTaskItem,
-	type SequentialStep,
-} from "../../shared/settings.ts";
+import { resolveExistingReadPaths } from "../../shared/settings.ts";
 import { normalizeSkillInput } from "../../agents/skills.ts";
-import { buildAsyncRunnerSteps, DEFAULT_ASYNC_TIMEOUT_MS, executeAsyncChain, executeAsyncSingle, formatAsyncStartedMessage, isAsyncAvailable, workflowAwaitedAsyncResultPath } from "../background/async-execution.ts";
+import { DEFAULT_ASYNC_TIMEOUT_MS, executeAsyncSingle, formatAsyncStartedMessage, isAsyncAvailable, workflowAwaitedAsyncResultPath } from "../background/async-execution.ts";
 import { updateActiveRunIndex } from "../background/active-run-index.ts";
 import { steeringReceipt } from "../background/steering.ts";
 import { acquireActiveAsyncCapacity, ActiveAsyncCapacityError, getActiveAsyncCapacitySnapshot, resolveAbandonedSlotReleaseAfterMs, resolveMaxActiveAsyncRunsPerSession, transferActiveAsyncCapacity, type ActiveAsyncCapacityHandle } from "../background/active-async-capacity.ts";
 import { encodeIndexSegment } from "../background/index-segment.ts";
-import { enqueueChainAppendRequest, readPendingChainAppendRequests, runnerStepOutputNames } from "../background/chain-append.ts";
-import { ChainOutputValidationError, validateChainOutputBindingsWithContext } from "../shared/chain-outputs.ts";
+
 import { normalizeGateAcceptance, resolveAcceptanceReportMode, validateAcceptanceInput, validateExecutionAcceptance, validateExecutionAcceptancePolicy } from "../shared/acceptance.ts";
 import { canPreferFork, createForkContextResolver, resolveSubagentLaunchContext } from "../../shared/fork-context.ts";
 import { createPrunedForkSessionWriter } from "../../shared/pruned-fork.ts";
@@ -82,7 +71,7 @@ import { stopAsyncRun } from "./async-stop-action.ts";
 import { dismissRecoveredWorkflow } from "./async-dismiss-action.ts";
 import { promotePausedWorkflowIfSettled, reconcileDetachedWorkflowChildCompletion } from "./workflow-detach-reconcile.ts";
 import { reconcileAsyncRun } from "../background/stale-run-reconciler.ts";
-import { resolveAsyncRootResultPath, waitForImportedAsyncRoot } from "../background/chain-root-attachment.ts";
+import { resolveAsyncRootResultPath, waitForImportedAsyncRoot } from "../background/async-root-attachment.ts";
 import { fallbackResultPayloadPathForSessionRun, removeResultIndex, resultFilePath, writeAsyncResultFile } from "../background/result-files.ts";
 import { attachRootChildrenToSteps, createNestedRoute, findNestedControlResult, inheritedNestedParentAddressOf, inheritedNestedRouteOf, resolveNestedAsyncDir, snapshotNestedEventFiles, updateForegroundNestedProjection, writeNestedControlRequest, writeNestedEvent, type NestedParentAddress, type NestedRoute, type NestedRunResolutionScope } from "../shared/nested-events.ts";
 import type { ChildRuntimeConfig } from "../shared/child-runtime-config.ts";
@@ -296,7 +285,6 @@ export interface SubagentParamsLike {
 	view?: "fleet" | "transcript";
 	lines?: number;
 	topic?: string;
-	chainName?: string;
 	config?: unknown;
 	name?: string;
 	type?: string;
@@ -316,7 +304,6 @@ export interface SubagentParamsLike {
 	maxSubagentSpawnsPerRun?: number;
 	preflight?: import("../../shared/types.ts").WorkflowPreflight;
 	isolation?: "none" | "worktree";
-	step?: ChainStep;
 	/** Internal workflow ownership metadata; not part of the public schema. */
 	workflowParentRunId?: string;
 	workflowKey?: string;
@@ -334,7 +321,6 @@ export interface SubagentParamsLike {
 	/** Internal inherited tool/agent ceiling for delegated child launches. */
 	capabilityCeiling?: ResolvedSubagentCapabilityCeiling;
 	/** Internal durable-run compatibility fields. Public callers must use workflowScript. */
-	chain?: ChainStep[];
 	tasks?: TaskParam[];
 	concurrency?: number;
 	worktree?: boolean;
@@ -374,12 +360,11 @@ export interface SubagentParamsLike {
 	focus?: boolean;
 	skill?: string | string[] | boolean;
 	output?: string | boolean;
-	/** Internal-only; not part of the public tool schema. Wired for single-run reads (chain steps use their own field). */
+	/** Internal-only; not part of the public tool schema. Wired for single-run reads. */
 	reads?: string[] | false;
 	outputMode?: "inline" | "file-only";
 	outputSchema?: JsonSchemaObject | false;
 	agentScope?: unknown;
-	chainDir?: string;
 	acceptance?: AcceptanceInput;
 	gate?: string;
 	agentContract?: AgentContract;
@@ -576,7 +561,7 @@ function trustedSessionRootsForStatus(ctx: ExtensionContext, deps: ExecutorDeps)
 	return [...new Set(roots)];
 }
 
-function spawnBudgetErrorResult(message: string, mode: "single" | "parallel" | "chain"): AgentToolResult<Details> {
+function spawnBudgetErrorResult(message: string, mode: SubagentRunMode): AgentToolResult<Details> {
 	return {
 		content: [{ type: "text", text: message }],
 		isError: true,
@@ -613,28 +598,15 @@ function hasActiveSubagentChildren(state: SubagentState): boolean {
 	return [...state.asyncJobs.values(), ...(state.fleetJobs?.values() ?? [])].some((job) => isActive(job.status));
 }
 
-function countRequestedSubagentSpawns(params: SubagentParamsLike, config: ExtensionConfig): number {
-	if (params.tasks) return params.tasks.length;
-	if (params.chain) {
-		return params.chain.reduce((total, step) => {
-			if (isDynamicParallelStep(step)) return total + (step.expand.maxItems ?? config.chain?.dynamicFanout?.maxItems ?? 0);
-			return total + getStepAgents(step).length;
-		}, 0);
-	}
+function countRequestedSubagentSpawns(params: SubagentParamsLike, _config: ExtensionConfig): number {
 	return params.agent ? 1 : 0;
 }
 
 function staticRunFanoutPaths(params: SubagentParamsLike): string[] {
-	if (params.tasks) return params.tasks.map((_, index) => `tasks[${index}]`);
-	if (params.chain) return params.chain.flatMap((step, stepIndex) => {
-		if (isDynamicParallelStep(step)) return [];
-		if (isParallelStep(step)) return step.parallel.map((_, itemIndex) => `chain[${stepIndex}].parallel[${itemIndex}]`);
-		return [`chain[${stepIndex}]`];
-	});
 	return params.agent ? ["single"] : [];
 }
 
-function runFanoutErrorResult(error: RunFanoutLimitError, mode: "single" | "parallel" | "chain"): AgentToolResult<Details> {
+function runFanoutErrorResult(error: RunFanoutLimitError, mode: SubagentRunMode): AgentToolResult<Details> {
 	return { content: [{ type: "text", text: error.message }], isError: true, details: { mode, results: [], runFanoutBudget: error.snapshot, runFanoutRejection: error.rejection } };
 }
 
@@ -703,7 +675,7 @@ function foregroundChildActivityFromProgress(progress: SingleResult["progress"] 
 	};
 }
 
-function rememberForegroundRun(state: SubagentState, input: { modelResponseAliases?: Record<string, string[]>; runId: string; mode: "single" | "parallel" | "chain"; cwd: string; sessionId: string | null; results: SingleResult[]; params: SubagentParamsLike; effectiveOutput?: string | boolean; effectiveOutputMode: OutputMode; extensionBindings?: ExtensionBindings; requiredExtensions?: SteeringRecoveryDescriptor["requiredExtensions"] }): void {
+function rememberForegroundRun(state: SubagentState, input: { modelResponseAliases?: Record<string, string[]>; runId: string; mode: SubagentRunMode; cwd: string; sessionId: string | null; results: SingleResult[]; params: SubagentParamsLike; effectiveOutput?: string | boolean; effectiveOutputMode: OutputMode; extensionBindings?: ExtensionBindings; requiredExtensions?: SteeringRecoveryDescriptor["requiredExtensions"] }): void {
 	state.foregroundRuns ??= new Map();
 	const previous = state.foregroundRuns.get(input.runId);
 	const updatedAt = Date.now();
@@ -785,7 +757,7 @@ function applyControlEventToRememberedForegroundRun(state: SubagentState, event:
 	};
 }
 
-function updateRememberedForegroundChild(state: SubagentState, input: { runId: string; mode: "single" | "parallel" | "chain"; cwd: string; sessionId: string | null; index: number; result: SingleResult; events: { emit(channel: string, data: unknown): void }; notify?: boolean }): void {
+function updateRememberedForegroundChild(state: SubagentState, input: { runId: string; mode: SubagentRunMode; cwd: string; sessionId: string | null; index: number; result: SingleResult; events: { emit(channel: string, data: unknown): void }; notify?: boolean }): void {
 	state.foregroundRuns ??= new Map();
 	const updatedAt = Date.now();
 	let run = state.foregroundRuns.get(input.runId);
@@ -1134,240 +1106,6 @@ function duplicateNames(names: string[]): string[] {
 	return [...duplicates];
 }
 
-async function appendStepToAsyncChain(input: {
-	params: SubagentParamsLike;
-	requestCwd: string;
-	ctx: ExtensionContext;
-	deps: ExecutorDeps;
-	parentModel?: ParentModel;
-}): Promise<AgentToolResult<Details>> {
-	const targetRunId = input.params.id ?? input.params.runId;
-	if (!targetRunId) {
-		return {
-			content: [{ type: "text", text: "action='append-step' requires id." }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-	if (!input.params.step) {
-		return {
-			content: [{ type: "text", text: "action='append-step' requires step." }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-	const chain = [input.params.step];
-	const validationParams = { ...input.params, chain } as SubagentParamsLike;
-	const acceptancePolicyErrors = validateExecutionAcceptancePolicy(validationParams);
-	const outputSchemaError = validateLaunchOutputSchemaOverrides(validationParams);
-	const earlyErrors = [...acceptancePolicyErrors];
-	if (outputSchemaError) earlyErrors.push(outputSchemaError);
-	if (earlyErrors.length > 0) {
-		return {
-			content: [{ type: "text", text: `Cannot append step: ${earlyErrors.join(" ")}` }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-
-	let resolved: ResolvedSubagentRunId | undefined;
-	try {
-		resolved = resolveSubagentRunId(targetRunId, omitUndefinedProperties({ state: input.deps.state, nested: nestedResolutionScopeForExecutor(input.deps) }));
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		return { content: [{ type: "text", text: message }], isError: true, details: { mode: "management", results: [] } };
-	}
-	if (!resolved) {
-		return {
-			content: [{ type: "text", text: `No async chain run found for '${targetRunId}'.` }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-	if (resolved.kind !== "async" || !resolved.location.asyncDir) {
-		return {
-			content: [{ type: "text", text: `Run '${resolved.id}' is not an append-capable async chain run.` }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-
-	const status = readStatus(resolved.location.asyncDir);
-	if (!status) {
-		return {
-			content: [{ type: "text", text: `No async run status found for '${resolved.id}'.` }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-	if (status.mode !== "chain") {
-		return {
-			content: [{ type: "text", text: `Run '${resolved.id}' is ${status.mode}; only active chain runs accept appended steps.` }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-	if (status.state !== "running") {
-		return {
-			content: [{ type: "text", text: `Run '${resolved.id}' is ${status.state}; only running chain runs accept appended steps.` }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-	const stillInProgress = (status.steps ?? []).some((step) => step.status === "running" || step.status === "pending") || (status.pendingAppends ?? 0) > 0;
-	if (!stillInProgress) {
-		return {
-			content: [{ type: "text", text: `Run '${resolved.id}' has no running or pending chain steps left; append-step must target an in-progress chain.` }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-
-	const pendingAppendRequests = readPendingChainAppendRequests(resolved.location.asyncDir);
-	const reservedOutputNames = new Set<string>([
-		...Object.keys(status.outputs ?? {}),
-		...(status.steps ?? []).map((step) => step.outputName).filter((name): name is string => Boolean(name)),
-		...pendingAppendRequests.flatMap((request) => runnerStepOutputNames(request.steps)),
-	]);
-	try {
-		validateChainOutputBindingsWithContext(chain, omitUndefinedProperties({ maxItems: input.deps.config.chain?.dynamicFanout?.maxItems }), {
-			priorOutputNames: reservedOutputNames,
-			startStepIndex: status.chainStepCount ?? status.steps?.length ?? 0,
-		});
-	} catch (error) {
-		if (!(error instanceof ChainOutputValidationError)) throw error;
-		return {
-			content: [{ type: "text", text: `Cannot append step to run '${resolved.id}': ${error.message}` }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-
-	const scope: AgentScope = resolveExecutionAgentScope(input.params.agentScope);
-	const discoveredForAppend = input.deps.discoverAgents(input.requestCwd, scope, input.parentModel?.provider);
-	const agents = discoveredForAppend.agents;
-	const acceptanceErrors = validateExecutionAcceptance(projectEffectiveAcceptanceSchemas(validationParams, agents));
-	if (acceptanceErrors.length > 0) {
-		return {
-			content: [{ type: "text", text: `Cannot append step: ${acceptanceErrors.join(" ")}` }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-	let contextPolicy = resolveExplicitContextPolicy(input.params);
-	const summaryBriefs = await loadSummaryBriefsForLaunch({
-		contextPolicy,
-		agentNames: requestedStaticAgentNames({ ...input.params, chain }),
-		ctx: input.ctx,
-		config: input.deps.config,
-		agents,
-	});
-	const originalContextForAgent = contextPolicy.contextForAgent;
-	contextPolicy = {
-		...contextPolicy,
-		contextForAgent: (agentName: string): ContextMode => {
-			const mode = originalContextForAgent(agentName);
-			return mode === "summary" && !summaryBriefs.has(agentName) ? "fresh" : mode;
-		},
-	};
-	const chainSkillInput = normalizeSkillInput(input.params.skill);
-	const chainSkills = chainSkillInput === false ? [] : (chainSkillInput ?? []);
-	const parentModel = input.parentModel;
-	const asyncCtx = compactOptional<Parameters<typeof executeAsyncSingle>[1]["ctx"]>({
-		pi: input.deps.pi,
-		cwd: input.ctx.cwd,
-		currentSessionId: resolveCurrentSessionId(input.ctx.sessionManager),
-		parentSessionId: input.ctx.sessionManager.getSessionId() ?? undefined,
-		currentModelProvider: parentModel?.provider,
-		currentModel: parentModel,
-		modelScope: discoveredForAppend.modelScope,
-		modelResponseAliases: input.deps.config.modelResponseAliases,
-		interactive: input.ctx.hasUI,
-		permissions: input.deps.config.permissions,
-		childRuntime: input.deps.childRuntime,
-	});
-	const built = buildAsyncRunnerSteps(resolved.id, compactOptional<Parameters<typeof buildAsyncRunnerSteps>[1]>({
-		chain: wrapChainTasksForContext(chain, contextPolicy, (agentName: string) => summaryBriefs.get(agentName), input.params.prequel),
-		task: input.params.task,
-		resultMode: "chain",
-		agents,
-		ctx: asyncCtx,
-		availableModels: input.ctx.modelRegistry.getAvailable().map(toModelInfo),
-		unknownAgentDiagnosticContext: diagnosticContextFromDiscovery(discoveredForAppend, input.requestCwd, scope),
-		cwd: status.cwd ?? input.requestCwd,
-		chainSkills,
-		dynamicFanoutMaxItems: input.deps.config.chain?.dynamicFanout?.maxItems,
-		waitToolEnabled: input.deps.waitToolEnabled,
-		waitToolDefaultTimeoutMs: input.deps.waitToolDefaultTimeoutMs,
-		contextForAgent: contextPolicy.contextForAgent,
-		worktreeBaseDir: input.deps.config.worktreeBaseDir,
-		worktreeProvider: input.deps.config.worktreeProvider,
-		worktreeBranchPrefix: input.deps.config.worktreeBranchPrefix,
-		asyncDir: resolved.location.asyncDir,
-		validateOutputBindings: false,
-		capabilityCeiling: intersectSubagentCapabilityCeilings(status.capabilityCeiling, resolveCurrentSubagentCapabilityCeiling(asyncCtx.currentSessionId)),
-	}));
-	if ("error" in built) {
-		return {
-			content: [{ type: "text", text: built.error }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-	const appendedOutputNames = runnerStepOutputNames(built.steps);
-	const duplicateAppendedOutputs = duplicateNames(appendedOutputNames);
-	if (duplicateAppendedOutputs.length > 0) {
-		return {
-			content: [{ type: "text", text: `Cannot append step to run '${resolved.id}': duplicate output name in appended step: ${duplicateAppendedOutputs.join(", ")}.` }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-	const pendingOutputNames = new Set(pendingAppendRequests.flatMap((request) => runnerStepOutputNames(request.steps)));
-	const pendingDuplicateOutputs = appendedOutputNames.filter((name) => pendingOutputNames.has(name));
-	if (pendingDuplicateOutputs.length > 0) {
-		return {
-			content: [{ type: "text", text: `Cannot append step to run '${resolved.id}': output name already belongs to a pending append: ${pendingDuplicateOutputs.join(", ")}.` }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-
-	try {
-		const asyncDir = resolved.location.asyncDir;
-		if (!asyncDir) throw new Error(`Run '${resolved.id}' is missing its async directory.`);
-		const runFanoutBudget = readRunFanoutBudgetDescriptor(asyncDir);
-		if (!runFanoutBudget) throw new Error(`Run '${resolved.id}' is missing its run fan-out budget identity.`);
-		const startIndex = (status.chainStepCount ?? status.steps?.length ?? 0) + pendingAppendRequests.reduce((total, request) => total + request.steps.length, 0);
-		const appendPaths = chain.flatMap((step, localIndex) => {
-			const absoluteIndex = startIndex + localIndex;
-			if (isDynamicParallelStep(step)) return [];
-			if (isParallelStep(step)) return step.parallel.map((_, itemIndex) => `chain[${absoluteIndex}].parallel[${itemIndex}]`);
-			return [`chain[${absoluteIndex}]`];
-		});
-		const result = enqueueChainAppendRequest({
-			asyncDir,
-			runId: resolved.id,
-			steps: built.steps,
-			admit: (persist) => claimRunFanoutBatchWithCommit(runFanoutBudget, appendPaths, persist),
-		});
-		const stepText = built.steps.length === 1 ? "step" : "steps";
-		return {
-			content: [{
-				type: "text",
-				text: `Append queued for chain run ${resolved.id}: ${built.steps.length} ${stepText}. It becomes eligible after the chain's already-queued steps finish. Pending appends: ${result.pendingCount}.${result.bookkeepingError ? ` Bookkeeping warning: ${result.bookkeepingError}` : ""}`,
-			}],
-			details: { mode: "management", results: [], asyncId: resolved.id, asyncDir },
-		};
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		return {
-			content: [{ type: "text", text: `Failed to append step to chain run ${resolved.id}: ${message}` }],
-			isError: true,
-			details: { mode: "management", results: [] },
-		};
-	}
-}
 
 function nestedRunSessionFile(run: NestedRunSummary): string | undefined {
 	return run.sessionFile ?? (run.steps?.length === 1 ? run.steps[0]?.sessionFile : undefined);
@@ -1701,7 +1439,6 @@ function resolveRequestedResumeTarget(params: SubagentParamsLike, deps: Executor
 		if (!isResumeAmbiguity(error) || !message.includes("foreground:") || asyncMatches !== 1) throw error;
 	}
 	if (resolved?.kind === "nested") {
-		if (params.chain?.length) throw new Error("Attaching a running subagent as a chain root is currently available for top-level async runs only.");
 		if (resolved.match.run.state === "running" || resolved.match.run.state === "queued") return { kind: "live-nested", target: resolved };
 		const trustedSessionRoots = [
 			...(deps.config.defaultSessionDir ? [path.resolve(deps.expandTilde(deps.config.defaultSessionDir))] : []),
@@ -1722,8 +1459,7 @@ async function resumeAsyncRun(input: {
 	signal?: AbortSignal;
 }): Promise<AgentToolResult<Details>> {
 	const followUp = (input.params.message ?? input.params.task ?? "").trim();
-	const attachChain = (input.params.chain?.length ?? 0) > 0 ? input.params.chain as ChainStep[] : undefined;
-	if (!followUp && !attachChain) {
+	if (!followUp) {
 		return {
 			content: [{ type: "text", text: "action='resume' requires message." }],
 			isError: true,
@@ -1758,7 +1494,7 @@ async function resumeAsyncRun(input: {
 		return { content: [{ type: "text", text: message }], isError: true, details: { mode: "management", results: [] } };
 	}
 
-	if (target.kind === "live" && !attachChain) {
+	if (target.kind === "live") {
 		return {
 			content: [{
 				type: "text",
@@ -1810,7 +1546,6 @@ async function resumeAsyncRun(input: {
 		return { content: [{ type: "text", text: message }], isError: true, details: { mode: "management", results: [] } };
 	}
 	if (target.source === "async" && target.runner?.type === "external-job") {
-		if (attachChain) return { content: [{ type: "text", text: "External-job follow-up does not support chain attachment. Use action='resume' with message instead." }], isError: true, details: { mode: "management", results: [] } };
 		return resumeExternalJobFollowUp({
 			target,
 			followUp,
@@ -1824,133 +1559,6 @@ async function resumeAsyncRun(input: {
 			parentSessionFile,
 			absoluteDeadlineAt: input.absoluteDeadlineAt,
 		});
-	}
-
-	if (attachChain) {
-		if (target.source !== "async") {
-			return {
-				content: [{ type: "text", text: "Attaching a running subagent as a chain root is currently available for async runs only." }],
-				isError: true,
-				details: { mode: "management", results: [] },
-			};
-		}
-		if (!isAsyncAvailable()) {
-			return {
-				content: [{ type: "text", text: "Async mode requires upstream jiti for TypeScript execution but it could not be found. Ensure the pi-cciotti package dependencies are installed." }],
-				isError: true,
-				details: { mode: "chain", results: [] },
-			};
-		}
-		const acceptanceErrors = validateExecutionAcceptance(projectEffectiveAcceptanceSchemas(input.params, agents));
-		if (acceptanceErrors.length > 0) {
-			return { content: [{ type: "text", text: `Cannot resume: ${acceptanceErrors.join(" ")}` }], isError: true, details: { mode: "chain", results: [] } };
-		}
-		const runId = randomUUID();
-		const topLevelResume = !inheritedNestedRoute(input.deps) && !input.params.workflowParentRunId;
-		let activeAsyncCapacity: ActiveAsyncCapacityHandle | undefined;
-		try {
-			activeAsyncCapacity = topLevelResume ? acquireActiveAsyncCapacity({
-				sessionId: input.deps.state.currentSessionId!,
-				limit: resolveMaxActiveAsyncRunsPerSession(input.deps.config.maxActiveAsyncRunsPerSession),
-				runId,
-				kind: "runner",
-				asyncDir: path.join(DIRS.async, runId),
-			}, { liveWorkflowRunIds: new Set(input.deps.state.workflowControllers?.keys() ?? []), abandonedSlotReleaseAfterMs: resolveAbandonedSlotReleaseAfterMs(input.deps.config.capacity?.abandonedSlotReleaseAfterMs) }) : undefined;
-		} catch (error) {
-			if (error instanceof ActiveAsyncCapacityError) return { content: [{ type: "text", text: error.message }], isError: true, details: { mode: "chain", results: [], activeAsyncCapacity: error.snapshot } };
-			throw error;
-		}
-		const artifactConfig: ArtifactConfig = omitUndefinedProperties({ ...DEFAULT_ARTIFACT_CONFIG, enabled: input.params.artifacts !== false, dir: input.deps.config.artifactDir ?? DEFAULT_ARTIFACT_CONFIG.dir });
-		const availableModels = input.ctx.modelRegistry.getAvailable().map(toModelInfo);
-		let contextPolicy = resolveExplicitContextPolicy(input.params);
-		const workflowTask = (input.params.task ?? followUp) || undefined;
-		const goal = resolveAsyncEventGoal(workflowTask, attachChain);
-		const summaryBriefs = await loadSummaryBriefsForLaunch({
-			contextPolicy,
-			agentNames: requestedStaticAgentNames({ ...input.params, agent: undefined, tasks: undefined, chain: attachChain }),
-			ctx: input.ctx,
-			config: input.deps.config,
-			agents,
-			signal: input.signal,
-		});
-		const originalContextForAgent = contextPolicy.contextForAgent;
-		contextPolicy = {
-			...contextPolicy,
-			contextForAgent: (agentName: string): ContextMode => {
-				const mode = originalContextForAgent(agentName);
-				return mode === "summary" && !summaryBriefs.has(agentName) ? "fresh" : mode;
-			},
-		};
-		const chain = wrapChainTasksForContext(attachChain, contextPolicy, (agentName: string) => summaryBriefs.get(agentName), input.params.prequel);
-		const normalized = normalizeSkillInput(input.params.skill);
-		const parentModel = input.parentModel;
-		const result = executeAsyncChain(runId, compactOptional<Parameters<typeof executeAsyncChain>[1]>({
-			chain,
-			task: workflowTask,
-			goal,
-			attachRoot: {
-				runId: target.runId,
-				asyncDir: target.asyncDir ?? path.join(DIRS.async, target.runId),
-				resultPath: resolveAsyncRootResultPath(DIRS.results, target.runId),
-				index: target.index,
-				agent: target.agent,
-				label: `Attached ${target.runId}`,
-			},
-			agents,
-			unknownAgentDiagnosticContext,
-			ctx: compactOptional<Parameters<typeof executeAsyncSingle>[1]["ctx"]>({
-				pi: input.deps.pi,
-				cwd: input.requestCwd,
-				currentSessionId: input.deps.state.currentSessionId,
-				parentSessionId: input.ctx.sessionManager.getSessionId() ?? undefined,
-				currentModelProvider: parentModel?.provider,
-				currentModel: parentModel,
-				modelScope,
-				modelResponseAliases: input.deps.config.modelResponseAliases,
-				interactive: input.ctx.hasUI,
-		permissions: input.deps.config.permissions,
-		childRuntime: input.deps.childRuntime,
-			}),
-			availableModels,
-			cwd: effectiveCwd,
-			maxOutput: input.params.maxOutput,
-			artifactsDir: getArtifactsDir(parentSessionFile, effectiveCwd, artifactConfig.dir),
-			artifactConfig,
-			shareEnabled: input.params.share === true,
-			sessionRoot: input.deps.getSubagentSessionRoot(parentSessionFile),
-			chainSkills: normalized === false ? [] : (normalized ?? []),
-			agentContract: input.params.agentContract,
-			fast: input.params.fast,
-			dynamicFanoutMaxItems: input.deps.config.chain?.dynamicFanout?.maxItems,
-			waitToolEnabled: input.deps.waitToolEnabled,
-			waitToolDefaultTimeoutMs: input.deps.waitToolDefaultTimeoutMs,
-			worktreeSetupHook: input.deps.config.worktreeSetupHook,
-			worktreeSetupHookTimeoutMs: input.deps.config.worktreeSetupHookTimeoutMs,
-			worktreeBaseDir: input.deps.config.worktreeBaseDir,
-			baseRef: input.params.baseRef ?? target.recoveryDescriptor?.baseRef,
-			...(recoveryDescriptor?.requiredExtensions ? { requiredExtensions: recoveryDescriptor.requiredExtensions } : {}),
-			worktreeProvider: input.deps.config.worktreeProvider,
-			worktreeBranchPrefix: input.deps.config.worktreeBranchPrefix,
-			controlConfig: resolveControlConfig(input.deps.config.control, input.params.control),
-			globalConcurrencyLimit: input.deps.config.globalConcurrencyLimit,
-			runFanoutBudget: createRunFanoutBudget(runId, resolveMaxSubagentSpawnsPerRun(input.deps.config.maxSubagentSpawnsPerRun)),
-			capabilityCeiling: intersectSubagentCapabilityCeilings("capabilityCeiling" in target ? target.capabilityCeiling : undefined, resolveCurrentSubagentCapabilityCeiling(input.deps.state.currentSessionId)),
-			thinkingCeiling: target.thinkingCeiling,
-			activeAsyncCapacity,
-		}));
-		if (result.isError) {
-			activeAsyncCapacity?.rollback();
-			return result;
-		}
-		const attachedId = result.details.asyncId ?? runId;
-		const lines = [
-			`Attached async subagent ${target.runId} as the first step of a new chain.`,
-			`Chain run: ${attachedId}`,
-			`Root: ${target.agent} (step ${target.index + 1})`,
-			result.details.asyncDir ? `Async dir: ${result.details.asyncDir}` : undefined,
-			`Status if needed: subagent_control({ action: "status", id: "${attachedId}" })`,
-		].filter((line): line is string => Boolean(line));
-		return { content: [{ type: "text", text: formatAsyncStartedMessage(lines.join("\n"), input.ctx.hasUI) }], details: result.details };
 	}
 
 	const sourceAsyncDir = target.source === "async" ? target.asyncDir : undefined;
@@ -2265,62 +1873,21 @@ function canonicalizeExecutionParams(params: SubagentParamsLike, agents: AgentCo
 		}
 		params = { ...params, tasks };
 	}
-	if (params.chain) {
-		const chain: ChainStep[] = [];
-		for (let index = 0; index < params.chain.length; index++) {
-			const step = params.chain[index]!;
-			if (isParallelStep(step)) {
-				const parallel: ParallelTaskItem[] = [];
-				for (let taskIndex = 0; taskIndex < step.parallel.length; taskIndex++) {
-					const task = step.parallel[taskIndex]!;
-					const result = resolve(task.agent, `step ${index + 1}, task ${taskIndex + 1}`);
-					if (result.error) return { error: result.error };
-					parallel.push({ ...task, agent: result.name! });
-				}
-				chain.push({ ...step, parallel });
-				continue;
-			}
-			if (isDynamicParallelStep(step)) {
-				const result = resolve(step.parallel.agent, `step ${index + 1}`);
-				if (result.error) return { error: result.error };
-				chain.push({ ...step, parallel: { ...step.parallel, agent: result.name! } });
-				continue;
-			}
-			if ("agent" in step && typeof step.agent === "string") {
-				const result = resolve(step.agent, `step ${index + 1}`);
-				if (result.error) return { error: result.error };
-				chain.push({ ...step, agent: result.name! });
-				continue;
-			}
-			chain.push(step);
-		}
-		params = { ...params, chain };
-	}
 	return { params };
 }
 
 function projectEffectiveAcceptanceSchemas(params: SubagentParamsLike, agents: AgentConfig[]): SubagentParamsLike {
-	const withEffectiveSchema = <T extends { agent: string; outputSchema?: JsonSchemaObject | false }>(step: T): T => {
-		const agent = agents.find((candidate) => candidate.name === step.agent);
-		return agent ? { ...step, outputSchema: resolveEffectiveOutputSchema(agent, step.outputSchema) } : step;
-	};
-	return {
-		...params,
-		...(params.tasks ? { tasks: params.tasks.map(withEffectiveSchema) } : {}),
-		...(params.chain ? { chain: projectChainOutputSchemas(params.chain, agents) as ChainStep[] } : {}),
-	};
+	return params;
 }
 
 function validateExecutionInput(
 	params: SubagentParamsLike,
 	agents: AgentConfig[],
-	hasChain: boolean,
 	hasTasks: boolean,
 	hasSingle: boolean,
-	allowClarifyTaskPrompt: boolean,
 	context: UnknownAgentDiagnosticContext,
 ): AgentToolResult<Details> | null {
-	if (Number(hasChain) + Number(hasTasks) + Number(hasSingle) !== 1) {
+	if (Number(hasTasks) + Number(hasSingle) !== 1) {
 		return {
 			content: [
 				{
@@ -2342,7 +1909,7 @@ function validateExecutionInput(
 		};
 	}
 
-	if (hasSingle && params.agent && !agents.find((agent) => agent.name === params.agent)) {
+	if (params.agent && !agents.find((agent) => agent.name === params.agent)) {
 		return {
 			content: [{ type: "text", text: formatUnknownAgentError(params.agent, context) }],
 			isError: true,
@@ -2350,97 +1917,11 @@ function validateExecutionInput(
 		};
 	}
 
-	if (hasTasks && params.tasks) {
-		for (let i = 0; i < params.tasks.length; i++) {
-			const task = params.tasks[i]!;
-			if (!agents.find((agent) => agent.name === task.agent)) {
-				return {
-					content: [{ type: "text", text: `${formatUnknownAgentError(task.agent, context)} (task ${i + 1})` }],
-					isError: true,
-					details: { mode: "parallel" as const, results: [] },
-				};
-			}
-		}
-	}
-
-	if (hasChain && params.chain) {
-		if (params.chain.length === 0) {
-			return {
-				content: [{ type: "text", text: "Chain must have at least one step" }],
-				isError: true,
-				details: { mode: "chain" as const, results: [] },
-			};
-		}
-		const firstStep = params.chain[0] as ChainStep;
-		if (isParallelStep(firstStep)) {
-			const missingTaskIndex = firstStep.parallel.findIndex((t) => !t.task);
-			if (missingTaskIndex !== -1) {
-				return {
-					content: [{ type: "text", text: `First parallel step: task ${missingTaskIndex + 1} must have a task (no previous output to reference)` }],
-					isError: true,
-					details: { mode: "chain" as const, results: [] },
-				};
-			}
-		} else if (isDynamicParallelStep(firstStep)) {
-			return {
-				content: [{ type: "text", text: "First step in chain cannot be dynamic fanout; expand.from requires a prior structured named output" }],
-				isError: true,
-				details: { mode: "chain" as const, results: [] },
-			};
-		} else if (!(firstStep as SequentialStep).task && !params.task && !allowClarifyTaskPrompt) {
-			return {
-				content: [{ type: "text", text: "First step in chain must have a task" }],
-				isError: true,
-				details: { mode: "chain" as const, results: [] },
-			};
-		}
-		for (let i = 0; i < params.chain.length; i++) {
-			const step = params.chain[i] as ChainStep;
-			const stepAgents = getStepAgents(step);
-			for (const agentName of stepAgents) {
-				if (!agents.find((a) => a.name === agentName)) {
-					return {
-						content: [{ type: "text", text: `${formatUnknownAgentError(agentName, context)} (step ${i + 1})` }],
-						isError: true,
-						details: { mode: "chain" as const, results: [] },
-					};
-				}
-			}
-			if (isParallelStep(step) && step.parallel.length === 0) {
-				return {
-					content: [{ type: "text", text: `Parallel step ${i + 1} must have at least one task` }],
-					isError: true,
-					details: { mode: "chain" as const, results: [] },
-				};
-			}
-		}
-	}
-
-	return null;
-}
-
-function validateExecutionChainBindings(params: SubagentParamsLike, dynamicFanoutMaxItems?: number): AgentToolResult<Details> | null {
-	if ((params.chain?.length ?? 0) === 0) return null;
-	try {
-		validateChainOutputBindingsWithContext(params.chain as ChainStep[], dynamicFanoutMaxItems === undefined ? {} : { maxItems: dynamicFanoutMaxItems });
-	} catch (error) {
-		if (error instanceof ChainOutputValidationError) {
-			return {
-				content: [{ type: "text", text: error.message }],
-				isError: true,
-				details: { mode: "chain" as const, results: [] },
-			};
-		}
-		throw error;
-	}
 	return null;
 }
 
 function getRequestedModeLabel(params: SubagentParamsLike): Details["mode"] {
 	if (params.workflowScript !== undefined) return "workflow";
-	if ((params.chain?.length ?? 0) > 0) return "chain";
-	if ((params.tasks?.length ?? 0) > 0) return "parallel";
-	if (params.agent) return "single";
 	return "single";
 }
 
@@ -2510,7 +1991,6 @@ function collectRequestedAgentNames(params: SubagentParamsLike): string[] {
 	const names: string[] = [];
 	if (params.agent) names.push(params.agent);
 	for (const task of params.tasks ?? []) names.push(task.agent);
-	for (const step of params.chain ?? []) names.push(...getStepAgents(step));
 	return names;
 }
 
@@ -2553,7 +2033,7 @@ function buildRequestedModeError(params: SubagentParamsLike, message: string): A
 }
 
 function applySingleAgentLaunchDefaults(params: SubagentParamsLike, agents: AgentConfig[]): SubagentParamsLike {
-	if ((params.chain?.length ?? 0) > 0 || (params.tasks?.length ?? 0) > 0 || !params.agent) return params;
+	if ((params.tasks?.length ?? 0) > 0 || !params.agent) return params;
 	const agent = agents.find((candidate) => candidate.name === params.agent);
 	if (!agent) return params;
 	const parentTimeoutMs = params.timeoutMs === undefined && params.maxRuntimeMs === undefined && agent.defaultTimeoutMs === undefined && params.workflowParentDeadlineAt !== undefined
@@ -2576,11 +2056,6 @@ function applySingleAgentLaunchDefaults(params: SubagentParamsLike, agents: Agen
 
 function validateLaunchOutputSchemaOverrides(params: SubagentParamsLike): string | undefined {
 	const values: unknown[] = [params.outputSchema, ...(params.tasks ?? []).map((task) => task.outputSchema)];
-	for (const step of params.chain ?? []) {
-		if (isParallelStep(step)) values.push(...step.parallel.map((task) => task.outputSchema));
-		else if (isDynamicParallelStep(step)) values.push(step.parallel.outputSchema);
-		else values.push(step.outputSchema);
-	}
 	for (const value of values) {
 		if (value === undefined || value === false) continue;
 		try {
@@ -2656,7 +2131,7 @@ export function resolveForegroundTimeout(params: SubagentParamsLike, defaultTime
  * deadlines. Exported so the executor wiring is directly testable.
  */
 export function resolveSingleAgentLaunchTimeout(params: SubagentParamsLike, async: boolean, configDefaultTimeoutMs?: number): { timeoutMs?: number; error?: string } {
-	const isComposite = (params.chain?.length ?? 0) > 0 || (params.tasks?.length ?? 0) > 0 || params.workflowScript !== undefined;
+	const isComposite = (params.tasks?.length ?? 0) > 0 || params.workflowScript !== undefined;
 	const foregroundDefault = configDefaultTimeoutMs ?? DEFAULT_FOREGROUND_TIMEOUT_MS;
 	const asyncSingleDefault = configDefaultTimeoutMs ?? DEFAULT_ASYNC_TIMEOUT_MS;
 	const defaultTimeoutMs = !async ? foregroundDefault : isComposite ? undefined : asyncSingleDefault;
@@ -2695,31 +2170,6 @@ function expandTopLevelTaskCounts(tasks: TaskParam[]): { tasks?: TaskParam[]; er
 	return { tasks: expanded };
 }
 
-function expandChainParallelCounts(chain: ChainStep[]): { chain?: ChainStep[]; error?: string } {
-	const expandedChain: ChainStep[] = [];
-	for (let stepIndex = 0; stepIndex < chain.length; stepIndex++) {
-		const step = chain[stepIndex]!;
-		if (!isParallelStep(step)) {
-			expandedChain.push(step);
-			continue;
-		}
-		const expandedParallel: ParallelTaskItem[] = [];
-		for (let taskIndex = 0; taskIndex < step.parallel.length; taskIndex++) {
-			const task = step.parallel[taskIndex]!;
-			const rawCount = (task as typeof task & { count?: unknown }).count;
-			if (rawCount !== undefined && (typeof rawCount !== "number" || !Number.isInteger(rawCount) || rawCount < 1)) {
-				return { error: `chain[${stepIndex}].parallel[${taskIndex}].count must be an integer >= 1` };
-			}
-			const { count, ...concreteTask } = task;
-			for (let repeat = 0; repeat < (rawCount ?? 1); repeat++) {
-				expandedParallel.push({ ...concreteTask });
-			}
-		}
-		expandedChain.push({ ...step, parallel: expandedParallel });
-	}
-	return { chain: expandedChain };
-}
-
 function normalizeRepeatedParallelCounts(params: SubagentParamsLike): { params?: SubagentParamsLike; error?: AgentToolResult<Details> } {
 	if (params.tasks) {
 		const expandedTasks = expandTopLevelTaskCounts(params.tasks);
@@ -2727,13 +2177,6 @@ function normalizeRepeatedParallelCounts(params: SubagentParamsLike): { params?:
 			return { error: buildRequestedModeError(params, expandedTasks.error) };
 		}
 		return { params: { ...params, ...(expandedTasks.tasks === undefined ? {} : { tasks: expandedTasks.tasks }) } };
-	}
-	if (params.chain) {
-		const expandedChain = expandChainParallelCounts(params.chain);
-		if (expandedChain.error) {
-			return { error: buildRequestedModeError(params, expandedChain.error) };
-		}
-		return { params: { ...params, ...(expandedChain.chain === undefined ? {} : { chain: expandedChain.chain }) } };
 	}
 	return { params };
 }
@@ -2824,7 +2267,6 @@ function collectStaticLaunchSummaries(input: {
 	currentProvider?: string;
 	modelScope?: ModelScopeConfig;
 	thinkingOverrideForTask: ThinkingOverrideForTask;
-	dynamicFanoutMaxItems?: number;
 }): StaticLaunchSummary[] {
 	const summary = (agent: string, index: number, explicitModel?: string) => resolveStaticLaunchSummary({
 		agent,
@@ -2838,81 +2280,7 @@ function collectStaticLaunchSummaries(input: {
 		thinkingOverrideForTask: input.thinkingOverrideForTask,
 	});
 	if (input.params.tasks) return input.params.tasks.map((task, index) => summary(task.agent, index, task.model));
-	if (input.params.chain?.length) {
-		const launches: StaticLaunchSummary[] = [];
-		let flatIndex = 0;
-		for (const step of input.params.chain) {
-			if (isParallelStep(step)) {
-				for (const task of step.parallel) {
-					launches.push(summary(task.agent, flatIndex, task.model));
-					flatIndex++;
-				}
-				continue;
-			}
-			if (isDynamicParallelStep(step)) {
-				const maxItems = step.expand.maxItems ?? input.dynamicFanoutMaxItems ?? 0;
-				for (let itemIndex = 0; itemIndex < maxItems; itemIndex++) {
-					launches.push(summary(step.parallel.agent, flatIndex, step.parallel.model));
-					flatIndex++;
-				}
-				continue;
-			}
-			const sequential = step as SequentialStep;
-			launches.push(summary(sequential.agent, flatIndex, sequential.model));
-			flatIndex++;
-		}
-		return launches;
-	}
 	return input.params.agent ? [summary(input.params.agent, 0, input.params.model as string | undefined)] : [];
-}
-
-function firstRawChainTask(chain: ChainStep[]): string | undefined {
-	const first = chain[0];
-	if (!first) return undefined;
-	if (isParallelStep(first)) return first.parallel[0]?.task;
-	if (isDynamicParallelStep(first)) return first.parallel.task;
-	return (first as SequentialStep).task;
-}
-
-function resolveAsyncEventGoal(workflowTask: string | undefined, rawChain: ChainStep[], unwrapForkFallback = false): string {
-	if (workflowTask?.trim()) return workflowTask;
-	const fallback = firstRawChainTask(rawChain) || "";
-	if (!unwrapForkFallback) return fallback;
-	const forkPrefix = `${DEFAULT_FORK_PREAMBLE}\n\nTask:\n`;
-	return fallback.startsWith(forkPrefix) ? fallback.slice(forkPrefix.length) : fallback;
-}
-
-function wrapChainTasksForContext(
-	chain: ChainStep[],
-	contextPolicy: AgentDefaultContextPolicy,
-	summaryBriefForTask?: (agentName: string, idx?: number) => string | undefined,
-	prequel?: string,
-): ChainStep[] {
-	return chain.map((step, stepIndex) => {
-		if (isParallelStep(step)) {
-			return compactOptional<ParallelStep>({
-				...step,
-				parallel: step.parallel.map((task) => compactOptional<ParallelTaskItem>({
-					...task,
-					task: wrapStepTaskForContext(task.agent, task.task ?? "{previous}", contextPolicy, summaryBriefForTask, prequel),
-				})),
-			});
-		}
-		if (isDynamicParallelStep(step)) {
-			return compactOptional<DynamicParallelStep>({
-				...step,
-				parallel: compactOptional<DynamicParallelStep["parallel"]>({
-					...step.parallel,
-					task: wrapStepTaskForContext(step.parallel.agent, step.parallel.task ?? "{previous}", contextPolicy, summaryBriefForTask, prequel),
-				}),
-			});
-		}
-		const sequential = step as SequentialStep;
-		return compactOptional<SequentialStep>({
-			...sequential,
-			task: wrapStepTaskForContext(sequential.agent, sequential.task ?? (stepIndex === 0 ? "{task}" : "{previous}"), contextPolicy, summaryBriefForTask, prequel),
-		});
-	});
 }
 
 /** Collect the distinct agent names requested by a static launch shape. */
@@ -2920,7 +2288,6 @@ function requestedStaticAgentNames(params: SubagentParamsLike): string[] {
 	const names: string[] = [];
 	if (params.agent) names.push(params.agent);
 	for (const task of params.tasks ?? []) names.push(task.agent);
-	for (const step of params.chain ?? []) names.push(...getStepAgents(step));
 	return [...new Set(names.filter((name): name is string => Boolean(name)))];
 }
 
@@ -2973,7 +2340,6 @@ async function preflightForkSessionsForStaticTasks(
 	params: SubagentParamsLike,
 	contextPolicy: AgentDefaultContextPolicy,
 	prepareSessionForTask: PrepareForkSessionForTask,
-	dynamicFanoutMaxItems?: number,
 ): Promise<void> {
 	if (!contextPolicy.usesFork) return;
 	if (params.agent) {
@@ -2993,28 +2359,6 @@ async function preflightForkSessionsForStaticTasks(
 			if (shouldForkAgent(contextPolicy, task.agent)) await prepareSessionForTask(task.agent, index, task.model);
 		}
 		return;
-	}
-	if (!params.chain?.length) return;
-	let flatIndex = 0;
-	for (const step of params.chain) {
-		if (isParallelStep(step)) {
-			for (const task of step.parallel) {
-				if (shouldForkAgent(contextPolicy, task.agent)) await prepareSessionForTask(task.agent, flatIndex, task.model);
-				flatIndex++;
-			}
-			continue;
-		}
-		if (isDynamicParallelStep(step)) {
-			const maxItems = step.expand.maxItems ?? dynamicFanoutMaxItems ?? 0;
-			if (shouldForkAgent(contextPolicy, step.parallel.agent)) {
-				for (let itemIndex = 0; itemIndex < maxItems; itemIndex++) await prepareSessionForTask(step.parallel.agent, flatIndex + itemIndex, step.parallel.model);
-			}
-			flatIndex += maxItems;
-			continue;
-		}
-		const sequential = step as SequentialStep;
-		if (shouldForkAgent(contextPolicy, sequential.agent)) await prepareSessionForTask(sequential.agent, flatIndex, sequential.model);
-		flatIndex++;
 	}
 }
 
@@ -3116,9 +2460,8 @@ async function runAsyncPath(data: ExecutionContextData, deps: ExecutorDeps): Pro
 		contextPolicy,
 		unknownAgentDiagnosticContext,
 	} = data;
-	const hasChain = (params.chain?.length ?? 0) > 0;
 	const hasTasks = (params.tasks?.length ?? 0) > 0;
-	const hasSingle = !hasChain && !hasTasks && Boolean(params.agent);
+	const hasSingle = !hasTasks && Boolean(params.agent);
 	if (!effectiveAsync) return null;
 
 
@@ -3973,8 +3316,6 @@ async function runSinglePath(data: ExecutionContextData, deps: ExecutorDeps): Pr
 
 function inferExecutionMode(params: SubagentParamsLike): Details["mode"] {
 	if (params.workflowScript !== undefined) return "workflow";
-	if ((params.chain?.length ?? 0) > 0) return "chain";
-	if ((params.tasks?.length ?? 0) > 0) return "parallel";
 	return "single";
 }
 
@@ -5165,7 +4506,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 					const workflowDeadlineAt = timeout === undefined ? undefined : Date.now() + timeout;
 					const workflowResults: SingleResult[] = [];
 					const workflowChildRunIds = new Map<string, string>();
-					const { args: _args, action: _action, agent: _agent, task: _task, resume: _resume, tasks: _tasks, chain: _chain, concurrency: _concurrency, foregroundOnly: _foregroundOnly, clarify: _clarify, timeoutMs: _timeoutMs, maxRuntimeMs: _maxRuntimeMs, missionId: _missionId, mission: _mission, preflight: _preflight, globalConcurrencyLimit: _globalConcurrencyLimit, maxSubagentSpawnsPerRun: _maxSubagentSpawnsPerRun, ...workflowChildDefaults } = workflowRequest;
+					const { args: _args, action: _action, agent: _agent, task: _task, resume: _resume, tasks: _tasks, concurrency: _concurrency, foregroundOnly: _foregroundOnly, clarify: _clarify, timeoutMs: _timeoutMs, maxRuntimeMs: _maxRuntimeMs, missionId: _missionId, mission: _mission, preflight: _preflight, globalConcurrencyLimit: _globalConcurrencyLimit, maxSubagentSpawnsPerRun: _maxSubagentSpawnsPerRun, ...workflowChildDefaults } = workflowRequest;
 					const workflowOutput = typeof workflowChildDefaults.output === "string" || typeof workflowChildDefaults.output === "boolean" ? workflowChildDefaults.output : undefined;
 					const configuredOutputBaseDir = resolveConfiguredSingleRunOutputBaseDir(deps);
 					const workflowAggregateOutputPath = resolveSingleOutputPath(workflowOutput, parentCwd, workflowCwd, resolveSingleRunOutputBaseDir(deps, workflowArtifactsDir, workflowRunId));
@@ -5536,7 +4877,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 					details: { mode: "workflow", runId: workflowRunId, toolCallId, asyncId: workflowRunId, asyncDir, results: [], ...(workflowPreflight ? { preflight: workflowPreflight } : {}), workflow: status.workflow, workflowChildren: status.workflowChildren, chatProgress, ...(deps.state.activeAsyncCapacity ? { activeAsyncCapacity: deps.state.activeAsyncCapacity } : {}) },
 				}, workflowFanoutBudget));
 			}
-			const { workflowScript: _workflowScript, args: _args, action: _action, agent: _agent, task: _task, resume: _resume, tasks: _tasks, chain: _chain, concurrency: _concurrency, async: _async, foregroundOnly: _foregroundOnly, clarify: _clarify, timeoutMs: _timeoutMs, maxRuntimeMs: _maxRuntimeMs, missionId: _missionId, mission: _mission, preflight: _preflight, globalConcurrencyLimit: _globalConcurrencyLimit, maxSubagentSpawnsPerRun: _maxSubagentSpawnsPerRun, ...workflowChildDefaults } = requestParams;
+			const { workflowScript: _workflowScript, args: _args, action: _action, agent: _agent, task: _task, resume: _resume, tasks: _tasks, concurrency: _concurrency, async: _async, foregroundOnly: _foregroundOnly, clarify: _clarify, timeoutMs: _timeoutMs, maxRuntimeMs: _maxRuntimeMs, missionId: _missionId, mission: _mission, preflight: _preflight, globalConcurrencyLimit: _globalConcurrencyLimit, maxSubagentSpawnsPerRun: _maxSubagentSpawnsPerRun, ...workflowChildDefaults } = requestParams;
 			const workflowOutput = typeof workflowChildDefaults.output === "string" || typeof workflowChildDefaults.output === "boolean" ? workflowChildDefaults.output : undefined;
 			const configuredOutputBaseDir = resolveConfiguredSingleRunOutputBaseDir(deps);
 			const workflowAggregateOutputPath = resolveSingleOutputPath(workflowOutput, ctx.cwd, workflowCwd, resolveSingleRunOutputBaseDir(deps, workflowArtifactsDir, foregroundWorkflowRunId));
@@ -6106,9 +5447,6 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 					),
 				}));
 			}
-			if (action === "append-step") {
-				return appendStepToAsyncChain(omitUndefinedProperties({ params: paramsWithResolvedCwd, requestCwd, ctx, deps, parentModel: requestParentModel }));
-			}
 			if (action === "dismiss") {
 				const targetRunId = paramsWithResolvedCwd.runId ?? paramsWithResolvedCwd.id;
 				if (!targetRunId) return { content: [{ type: "text", text: "action='dismiss' requires id." }], isError: true, details: { mode: "management", results: [] } };
@@ -6309,26 +5647,19 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 		const inheritedNestedRouteValue = inheritedNestedRoute(deps);
 		const nestedParentAddress = inheritedNestedRouteValue ? inheritedNestedParentAddress(deps) : undefined;
 		const shareEnabled = effectiveParams.share === true;
-		const hasChain = (effectiveParams.chain?.length ?? 0) > 0;
 		const hasTasks = (effectiveParams.tasks?.length ?? 0) > 0;
-		const hasSingle = !hasChain && !hasTasks && Boolean(effectiveParams.agent);
-		const allowClarifyTaskPrompt = hasChain
-			&& effectiveParams.clarify === true
-			&& ctx.hasUI
-			&& !(effectiveParams.chain?.some(isParallelStep) ?? false);
+		const hasSingle = !hasTasks && Boolean(effectiveParams.agent);
 
 		const validationError = validateExecutionInput(
 			effectiveParams,
 			agents,
-			hasChain,
 			hasTasks,
 			hasSingle,
-			allowClarifyTaskPrompt,
 			unknownAgentDiagnosticContext,
 		);
 		if (validationError) return validationError;
 
-		const foregroundMode: "single" | "parallel" | "chain" = hasChain ? "chain" : hasTasks ? "parallel" : "single";
+		const foregroundMode: SubagentRunMode = "single";
 		const requestedSpawns = countRequestedSubagentSpawns(effectiveParams, deps.config);
 		const spawnPreflight = preflightSpawnBudget(
 			deps.state,
@@ -6390,15 +5721,13 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 		}
 		const selectedAgentNames = hasSingle
 			? [effectiveParams.agent!]
-			: hasTasks
-				? (effectiveParams.tasks ?? []).map((task) => task.agent)
-				: (effectiveParams.chain ?? []).flatMap((step) => getStepAgents(step as ChainStep));
+			: [];
 		const externalAgent = selectedAgentNames
 			.map((name) => agents.find((agent) => agent.name === name))
 			.find((agent) => agent?.runner?.type === "external-cli" || agent?.runner?.type === "external-job");
 		const externalAsyncRequired = Boolean(externalAgent) && effectiveParams.async === undefined && effectiveParams.clarify !== true && effectiveParams.foregroundOnly !== true;
 		const requestedAsync = externalAsyncRequired ? true : effectiveParams.async ?? deps.asyncByDefault;
-		const backgroundRequestedWhileClarifying = (hasChain || hasTasks) && requestedAsync && effectiveParams.clarify === true;
+		const backgroundRequestedWhileClarifying = false;
 		const effectiveAsync = requestedAsync && effectiveParams.clarify !== true;
 		if (externalAgent && (!effectiveAsync || effectiveParams.foregroundOnly === true)) {
 			return buildRequestedModeError(effectiveParams, `Agent '${externalAgent.name}' uses runner.type='${externalAgent.runner?.type}', which currently supports async/background execution only. Omit async or pass async:true; clarify and foregroundOnly are unsupported.`);
@@ -6502,16 +5831,11 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			path.join(sessionDirForIndex(idx), "session.jsonl");
 		try {
 			if (!(effectiveParams.clarify === true && ctx.hasUI) || deps.config.forkContext?.mode === "pruned") {
-				await preflightForkSessionsForStaticTasks(effectiveParams, contextPolicy, prepareForkSessionForTask, deps.config.chain?.dynamicFanout?.maxItems);
+				await preflightForkSessionsForStaticTasks(effectiveParams, contextPolicy, prepareForkSessionForTask);
 			}
 		} catch (error) {
 			activeAsyncCapacity?.rollback();
 			return toExecutionErrorResult(effectiveParams, error, contextPolicy.contextSummary);
-		}
-		const chainBindingsError = validateExecutionChainBindings(effectiveParams, deps.config.chain?.dynamicFanout?.maxItems);
-		if (chainBindingsError) {
-			activeAsyncCapacity?.rollback();
-			return withResolvedContext(chainBindingsError, contextPolicy.contextSummary);
 		}
 
 		const onUpdateWithContext = onUpdate
@@ -6696,7 +6020,6 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 					currentProvider: requestParentModel?.provider,
 					modelScope,
 					thinkingOverrideForTask,
-					dynamicFanoutMaxItems: deps.config.chain?.dynamicFanout?.maxItems,
 				});
 			} catch (error) {
 				console.error("Failed to resolve nested foreground launch metadata:", error);

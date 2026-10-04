@@ -133,7 +133,7 @@ Set `subagents.maxThinking` to enforce a hard maximum for every native Pi child.
 }
 ```
 
-Requests above the ceiling fail before child startup; the setting covers frontmatter, `agentOverrides`, per-run overrides, parallel/chain children, nested launches, and resumed children. Project settings take precedence over user settings. External runners retain their existing behavior.
+Requests above the ceiling fail before child startup; the setting covers frontmatter, `agentOverrides`, per-run overrides, parallel and workflow children, nested launches, and resumed children. Project settings take precedence over user settings. External runners retain their existing behavior.
 
 ## Extension defaults
 

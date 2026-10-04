@@ -2,14 +2,14 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { formatDuration, formatModelThinking, formatTokens, shortenPath } from "../../shared/formatters.ts";
 import { previewDisplayText } from "../../shared/display-text.ts";
-import { formatActivityLabel, formatParallelOutcome } from "../../shared/status-format.ts";
+import { formatActivityLabel } from "../../shared/status-format.ts";
 import { type ActivityState, type AsyncJobStep, type AsyncParallelGroupStatus, type AsyncStatus, type CostSummary, type Details, type HostStepNode, type HostStepState, type LaunchResolvedChildExtensions, type RuntimeAcknowledgedChildExtensions, type NestedRunSummary, type SteeringStatus, type SubagentRunMode, type TimeoutRecoveryProjection, type TokenUsage, type TurnBudgetState, type WorktreeNaming, type WorkflowPreflight, type WorkflowGraphSnapshot } from "../../shared/types.ts";
 import type { ResolvedSubagentCapabilityCeiling, SubagentCapabilityAudit } from "../shared/capability-ceiling.ts";
 import { readStatus } from "../../shared/utils.ts";
 import { attachRootChildrenToSteps, buildNestedRouteIndex, findNestedRouteForRootId, type NestedRoute, projectNestedEvents } from "../shared/nested-events.ts";
 import { formatNestedRunStatusLines } from "../shared/nested-render.ts";
 import { formatRunFanoutBudget, getRunFanoutBudgetSnapshot, readRunFanoutBudgetDescriptor } from "../shared/run-fanout-budget.ts";
-import { flatToLogicalStepIndex, normalizeParallelGroups } from "./parallel-groups.ts";
+import { normalizeParallelGroups } from "./parallel-groups.ts";
 import { contextModeLabel, summarizeContextModes, type ContextMode, type ContextSummary } from "../shared/context-mode.ts";
 import { reconcileAsyncRun, reconcileNestedAsyncDescendants } from "./stale-run-reconciler.ts";
 import { readProcessTerminal, sanitizeProcessTerminal } from "./process-terminal.ts";
@@ -682,22 +682,6 @@ export function formatAsyncRunProgressLabel(run: Pick<AsyncRunSummary, "mode" | 
 		return `stage ${graphStages.length}/${graphStages.length}`;
 	}
 	const stepCount = run.steps.length || 1;
-	const chainStepCount = run.chainStepCount ?? stepCount;
-	const groups = normalizeParallelGroups(run.parallelGroups, run.steps.length, chainStepCount);
-	const activeGroup = run.currentStep !== undefined
-		? groups.find((group) => run.currentStep! >= group.start && run.currentStep! < group.start + group.count)
-		: undefined;
-	if (activeGroup) {
-		const groupSteps = run.steps.slice(activeGroup.start, activeGroup.start + activeGroup.count);
-		const groupLabel = formatParallelOutcome(groupSteps, activeGroup.count, { showRunning: run.state === "running" });
-		if (run.mode === "parallel") return groupLabel;
-		return `step ${activeGroup.stepIndex + 1}/${chainStepCount} · parallel group: ${groupLabel}`;
-	}
-	if (run.mode === "parallel") return formatParallelOutcome(run.steps, stepCount, { showRunning: run.state === "running" });
-	if (run.mode === "chain" && run.currentStep !== undefined && groups.length > 0) {
-		const logicalStep = flatToLogicalStepIndex(run.currentStep, chainStepCount, groups);
-		return `step ${logicalStep + 1}/${chainStepCount}`;
-	}
 	return run.currentStep !== undefined ? `step ${run.currentStep + 1}/${stepCount}` : `steps ${stepCount}`;
 }
 

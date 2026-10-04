@@ -199,7 +199,7 @@ function nestedDisplayCount(children: NestedRunSummary[] | undefined, start = 0)
 	let count = 0;
 	for (let index = start; index < (children?.length ?? 0); index++) {
 		const child = children![index]!;
-		const steps = (child.mode === "parallel" || child.mode === "chain") ? child.steps ?? [] : [];
+		const steps = child.mode === "workflow" ? child.steps ?? [] : [];
 		count += steps.length > 0 ? nestedStepDisplayCount(steps) : 1;
 		count += nestedDisplayCount(child.children);
 	}
@@ -212,7 +212,7 @@ function nestedFleetRows(children: NestedRunSummary[] | undefined, visibleLimit:
 	const appendRuns = (runs: NestedRunSummary[] | undefined, depth: number): boolean => {
 		for (let runIndex = 0; runIndex < (runs?.length ?? 0); runIndex++) {
 			const child = runs![runIndex]!;
-			const steps = (child.mode === "parallel" || child.mode === "chain") ? child.steps ?? [] : [];
+			const steps = child.mode === "workflow" ? child.steps ?? [] : [];
 			if (steps.length > 0) {
 				for (let stepIndex = 0; stepIndex < steps.length; stepIndex++) {
 					if (rows.length >= visibleLimit) {
@@ -436,7 +436,7 @@ export function collectFleetStatusEntries(state: SubagentState): FleetStatusEntr
 			? job.steps
 			: job.agents?.map((agent, index) => {
 				const pending = job.status === "queued"
-					|| (job.mode === "chain" && !job.activeParallelGroup && index !== (job.currentStep ?? 0));
+					|| (job.mode === "workflow" && index !== (job.currentStep ?? 0));
 				return { agent, index, status: pending ? "pending" : "running" };
 			});
 		if (!steps?.length) {
@@ -456,7 +456,6 @@ export function collectFleetStatusEntries(state: SubagentState): FleetStatusEntr
 		for (const [offset, step] of steps.entries()) {
 			if (!isActiveState(step.status)) continue;
 			const index = step.index ?? offset;
-			if (step.status === "pending" && job.mode === "chain" && !job.activeParallelGroup && index !== (job.currentStep ?? 0)) continue;
 			const modelThinking = formatModelThinking(step.model, step.thinking) || undefined;
 			entries.push({
 				key: `async:${job.asyncId}:${index}`,
@@ -606,7 +605,7 @@ export class SubagentFleetStatus {
 				const rowKeys = new Set<string>();
 				let unsupported = false;
 				for (const child of children) {
-					if (!isActiveState(child.status) || (child.mode !== "single" && child.mode !== "parallel" && child.mode !== "chain")
+					if (!isActiveState(child.status) || (child.mode !== "single" && child.mode !== "workflow")
 						|| child.hostSteps?.length || child.workflowGraph
 						|| childrenByParent.has(child.asyncId) || child.nestedChildren?.length
 						|| child.steps?.some((step) => step.children?.length || step.runner || !isActiveState(step.status))) {

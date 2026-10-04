@@ -1924,9 +1924,7 @@ export async function runSubagent(
 	}
 	const initialAgentLabel = initialStatusSteps.length === 1
 		? initialStatusSteps[0]!.agent
-		: (config.resultMode ?? (flatSteps.length > 1 ? "chain" : "single")) === "parallel"
-			? `parallel:${initialStatusSteps.map((step) => step.agent).join("+")}`
-			: `chain:${initialStatusSteps.map((step) => step.agent).join("->")}`;
+		: `workflow:${initialStatusSteps.map((step) => step.agent).join("->")}`;
 	const orcaProgressTab = flatSteps.every((step) => step.importAsyncRoot) ? undefined : createOrcaProgressTab({
 		cwd,
 		runId: id,
@@ -1940,7 +1938,7 @@ export async function runSubagent(
 		runId: id,
 		...(config.sessionId ? { sessionId: config.sessionId } : {}),
 		...(config.completionOwnerId ? { completionOwnerId: config.completionOwnerId } : {}),
-		mode: config.resultMode ?? (flatSteps.length > 1 ? "chain" : "single"),
+		mode: config.resultMode ?? (flatSteps.length > 1 ? "workflow" : "single"),
 		...(config.nestedSelf ? { isNested: true } : {}),
 		state: "running",
 		steering: createSteeringStatus(),
@@ -2092,7 +2090,7 @@ export async function runSubagent(
 			lifecycleArtifactVersion: SUBAGENT_LIFECYCLE_ARTIFACT_VERSION,
 			id,
 			runId: id,
-			agent: statusPayload.steps.length === 1 ? statusPayload.steps[0]!.agent : statusPayload.mode === "parallel" ? `parallel:${statusPayload.steps.map((step) => step.agent).join("+")}` : `chain:${statusPayload.steps.map((step) => step.agent).join("->")}`,
+			agent: statusPayload.steps.length === 1 ? statusPayload.steps[0]!.agent : `workflow:${statusPayload.steps.map((step) => step.agent).join("->")}`,
 			mode: statusPayload.mode,
 			success: state === "complete",
 			state,
@@ -3016,7 +3014,7 @@ export async function runSubagent(
 			const reason = `Worktree finalization retained; manual reconciliation required: ${error instanceof Error ? error.message : String(error)}`;
 			statusPayload.parallelHandoff = writeParallelHandoffGroup({
 				manifestPath: parallelHandoffPath(asyncDir), runId: id,
-				mode: (config.resultMode ?? statusPayload.mode) === "parallel" ? "parallel" : (config.resultMode ?? statusPayload.mode) === "single" ? "single" : "chain",
+				mode: (config.resultMode ?? statusPayload.mode) === "single" ? "single" : "workflow",
 				source: "async", cwd, stepIndex, flatStartIndex, setup, diffs: [], results: [],
 				cleanup: { state: "partial", pruned: false, errors: [reason], tasks: setup.worktrees.map((worktree) => ({
 					index: worktree.index, path: worktree.path, branch: worktree.branch, provider: worktree.provider, naming: worktree.naming,
@@ -3031,7 +3029,7 @@ export async function runSubagent(
 		const cleanup = cleanupWorktrees(setup);
 		statusPayload.parallelHandoff = writeParallelHandoffGroup({
 			manifestPath: parallelHandoffPath(asyncDir), runId: id,
-			mode: (config.resultMode ?? statusPayload.mode) === "parallel" ? "parallel" : (config.resultMode ?? statusPayload.mode) === "single" ? "single" : "chain",
+			mode: (config.resultMode ?? statusPayload.mode) === "single" ? "single" : "workflow",
 			source: "async", cwd, stepIndex, flatStartIndex, setup, diffs: [], results: [], cleanup,
 		});
 		writeStatusPayload();
@@ -3632,9 +3630,7 @@ export async function runSubagent(
 	const finalFlatAgents = statusPayload.steps.map((step) => step.agent);
 	const agentName = finalFlatAgents.length === 1
 		? finalFlatAgents[0]!
-		: resultMode === "parallel"
-			? `parallel:${finalFlatAgents.join("+")}`
-			: `chain:${finalFlatAgents.join("->")}`;
+		: `workflow:${finalFlatAgents.join("->")}`;
 	let sessionFile: string | undefined;
 	let shareUrl: string | undefined;
 	let gistUrl: string | undefined;

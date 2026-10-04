@@ -117,7 +117,7 @@ function isRestorableRun(value: unknown): value is ForegroundResumeRun {
 	if (!value || typeof value !== "object" || Array.isArray(value)) return false;
 	const run = value as Partial<ForegroundResumeRun>;
 	return typeof run.runId === "string" && Boolean(run.runId)
-		&& (run.mode === "single" || run.mode === "parallel" || run.mode === "chain")
+		&& (run.mode === "single" || run.mode === "workflow")
 		&& typeof run.cwd === "string" && Boolean(run.cwd)
 		&& typeof run.sessionId === "string" && Boolean(run.sessionId)
 		&& typeof run.updatedAt === "number" && Number.isFinite(run.updatedAt)

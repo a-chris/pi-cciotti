@@ -300,7 +300,7 @@ export function asyncReviveRequiresRecoveryDescriptor(target: Pick<AsyncResumeTa
 
 function resumeTargetMode(status: AsyncStatus | null, result: AsyncResultFile | undefined): SubagentRunMode | undefined {
 	if (status?.mode) return status.mode;
-	if (result?.mode === "single" || result?.mode === "parallel" || result?.mode === "chain" || result?.mode === "workflow") return result.mode;
+	if (result?.mode === "single" || result?.mode === "workflow") return result.mode;
 	return undefined;
 }
 

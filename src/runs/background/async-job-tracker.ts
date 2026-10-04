@@ -686,7 +686,7 @@ export function createAsyncJobTracker(pi: Pick<ExtensionAPI, "events">, state: S
 			pid: typeof info.pid === "number" ? info.pid : undefined,
 			...(typeof info.sessionId === "string" ? { sessionId: info.sessionId } : {}),
 			...(typeof info.completionOwnerId === "string" ? { completionOwnerId: info.completionOwnerId } : {}),
-			mode: info.mode ?? (info.chain ? "chain" : "single"),
+			mode: info.mode ?? (info.workflowGraph ? "workflow" : "single"),
 			description: info.goal ?? info.task,
 			agents,
 			chainStepCount: info.chainStepCount,

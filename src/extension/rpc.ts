@@ -241,7 +241,7 @@ function buildFleetStatus(
 		for (const [offset, step] of steps.entries()) {
 			if (!activeState(step.status)) continue;
 			const index = step.index ?? offset;
-			if (step.status === "pending" && job.mode === "chain" && !job.activeParallelGroup && index !== (job.currentStep ?? 0)) continue;
+			if (step.status === "pending" && !step.workflowKey && index !== (job.currentStep ?? 0)) continue;
 			addCandidate({
 				internalKey: `async:${job.asyncId}:${index}`,
 				agent: step.agent,

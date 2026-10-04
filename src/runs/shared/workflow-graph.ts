@@ -217,7 +217,7 @@ export function buildWorkflowGraphSnapshot(input: WorkflowGraphBuildInput): Work
 
 	return {
 		runId: input.runId,
-		mode: input.mode ?? "chain",
+		mode: input.mode ?? "workflow",
 		phases,
 		nodes,
 		currentNodeId,

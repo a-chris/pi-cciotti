@@ -9,7 +9,7 @@ import { getActiveAsyncCapacitySnapshot, resolveAbandonedSlotReleaseAfterMs, res
 import { discoverAvailableSkills, type SkillSource } from "../agents/skills.ts";
 import {
 	DIRS,
-	CHAIN_RUNS_DIR,
+	WORKFLOW_RUNS_DIR,
 	TEMP_ROOT_DIR,
 	type ExtensionConfig,
 	type SubagentState,
@@ -49,7 +49,7 @@ function defaultPaths(): DoctorPaths {
 		tempRootDir: TEMP_ROOT_DIR,
 		asyncDir: DIRS.async,
 		resultsDir: DIRS.results,
-		chainRunsDir: CHAIN_RUNS_DIR,
+		chainRunsDir: WORKFLOW_RUNS_DIR,
 	};
 }
 
@@ -226,7 +226,7 @@ export function buildDoctorReport(input: DoctorReportInput): string {
 		formatExistingDirectory("temp root", paths.tempRootDir),
 		formatExistingDirectory("async runs", paths.asyncDir),
 		formatExistingDirectory("results", paths.resultsDir),
-		formatExistingDirectory("chain runs", paths.chainRunsDir),
+		formatExistingDirectory("workflow runs", paths.chainRunsDir),
 		"",
 		"Discovery",
 		...formatDiscovery(input, deps),

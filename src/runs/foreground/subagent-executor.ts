@@ -576,7 +576,7 @@ function trustedSessionRootsForStatus(ctx: ExtensionContext, deps: ExecutorDeps)
 	return [...new Set(roots)];
 }
 
-function spawnBudgetErrorResult(message: string, mode: "single" | "parallel" | "chain"): AgentToolResult<Details> {
+function spawnBudgetErrorResult(message: string, mode: SubagentRunMode): AgentToolResult<Details> {
 	return {
 		content: [{ type: "text", text: message }],
 		isError: true,
@@ -613,28 +613,15 @@ function hasActiveSubagentChildren(state: SubagentState): boolean {
 	return [...state.asyncJobs.values(), ...(state.fleetJobs?.values() ?? [])].some((job) => isActive(job.status));
 }
 
-function countRequestedSubagentSpawns(params: SubagentParamsLike, config: ExtensionConfig): number {
-	if (params.tasks) return params.tasks.length;
-	if (params.chain) {
-		return params.chain.reduce((total, step) => {
-			if (isDynamicParallelStep(step)) return total + (step.expand.maxItems ?? config.chain?.dynamicFanout?.maxItems ?? 0);
-			return total + getStepAgents(step).length;
-		}, 0);
-	}
+function countRequestedSubagentSpawns(params: SubagentParamsLike, _config: ExtensionConfig): number {
 	return params.agent ? 1 : 0;
 }
 
 function staticRunFanoutPaths(params: SubagentParamsLike): string[] {
-	if (params.tasks) return params.tasks.map((_, index) => `tasks[${index}]`);
-	if (params.chain) return params.chain.flatMap((step, stepIndex) => {
-		if (isDynamicParallelStep(step)) return [];
-		if (isParallelStep(step)) return step.parallel.map((_, itemIndex) => `chain[${stepIndex}].parallel[${itemIndex}]`);
-		return [`chain[${stepIndex}]`];
-	});
 	return params.agent ? ["single"] : [];
 }
 
-function runFanoutErrorResult(error: RunFanoutLimitError, mode: "single" | "parallel" | "chain"): AgentToolResult<Details> {
+function runFanoutErrorResult(error: RunFanoutLimitError, mode: SubagentRunMode): AgentToolResult<Details> {
 	return { content: [{ type: "text", text: error.message }], isError: true, details: { mode, results: [], runFanoutBudget: error.snapshot, runFanoutRejection: error.rejection } };
 }
 
@@ -703,7 +690,7 @@ function foregroundChildActivityFromProgress(progress: SingleResult["progress"] 
 	};
 }
 
-function rememberForegroundRun(state: SubagentState, input: { modelResponseAliases?: Record<string, string[]>; runId: string; mode: "single" | "parallel" | "chain"; cwd: string; sessionId: string | null; results: SingleResult[]; params: SubagentParamsLike; effectiveOutput?: string | boolean; effectiveOutputMode: OutputMode; extensionBindings?: ExtensionBindings; requiredExtensions?: SteeringRecoveryDescriptor["requiredExtensions"] }): void {
+function rememberForegroundRun(state: SubagentState, input: { modelResponseAliases?: Record<string, string[]>; runId: string; mode: SubagentRunMode; cwd: string; sessionId: string | null; results: SingleResult[]; params: SubagentParamsLike; effectiveOutput?: string | boolean; effectiveOutputMode: OutputMode; extensionBindings?: ExtensionBindings; requiredExtensions?: SteeringRecoveryDescriptor["requiredExtensions"] }): void {
 	state.foregroundRuns ??= new Map();
 	const previous = state.foregroundRuns.get(input.runId);
 	const updatedAt = Date.now();
@@ -785,7 +772,7 @@ function applyControlEventToRememberedForegroundRun(state: SubagentState, event:
 	};
 }
 
-function updateRememberedForegroundChild(state: SubagentState, input: { runId: string; mode: "single" | "parallel" | "chain"; cwd: string; sessionId: string | null; index: number; result: SingleResult; events: { emit(channel: string, data: unknown): void }; notify?: boolean }): void {
+function updateRememberedForegroundChild(state: SubagentState, input: { runId: string; mode: SubagentRunMode; cwd: string; sessionId: string | null; index: number; result: SingleResult; events: { emit(channel: string, data: unknown): void }; notify?: boolean }): void {
 	state.foregroundRuns ??= new Map();
 	const updatedAt = Date.now();
 	let run = state.foregroundRuns.get(input.runId);
@@ -1937,15 +1924,7 @@ function canonicalizeExecutionParams(params: SubagentParamsLike, agents: AgentCo
 }
 
 function projectEffectiveAcceptanceSchemas(params: SubagentParamsLike, agents: AgentConfig[]): SubagentParamsLike {
-	const withEffectiveSchema = <T extends { agent: string; outputSchema?: JsonSchemaObject | false }>(step: T): T => {
-		const agent = agents.find((candidate) => candidate.name === step.agent);
-		return agent ? { ...step, outputSchema: resolveEffectiveOutputSchema(agent, step.outputSchema) } : step;
-	};
-	return {
-		...params,
-		...(params.tasks ? { tasks: params.tasks.map(withEffectiveSchema) } : {}),
-		...(params.chain ? { chain: projectChainOutputSchemas(params.chain, agents) as ChainStep[] } : {}),
-	};
+	return params;
 }
 
 function validateExecutionInput(
@@ -1979,7 +1958,7 @@ function validateExecutionInput(
 		};
 	}
 
-	if (hasSingle && params.agent && !agents.find((agent) => agent.name === params.agent)) {
+	if (params.agent && !agents.find((agent) => agent.name === params.agent)) {
 		return {
 			content: [{ type: "text", text: formatUnknownAgentError(params.agent, context) }],
 			isError: true,
@@ -1987,80 +1966,11 @@ function validateExecutionInput(
 		};
 	}
 
-	if (hasTasks && params.tasks) {
-		for (let i = 0; i < params.tasks.length; i++) {
-			const task = params.tasks[i]!;
-			if (!agents.find((agent) => agent.name === task.agent)) {
-				return {
-					content: [{ type: "text", text: `${formatUnknownAgentError(task.agent, context)} (task ${i + 1})` }],
-					isError: true,
-					details: { mode: "parallel" as const, results: [] },
-				};
-			}
-		}
-	}
-
-	if (hasChain && params.chain) {
-		if (params.chain.length === 0) {
-			return {
-				content: [{ type: "text", text: "Chain must have at least one step" }],
-				isError: true,
-				details: { mode: "chain" as const, results: [] },
-			};
-		}
-		const firstStep = params.chain[0] as ChainStep;
-		if (isParallelStep(firstStep)) {
-			const missingTaskIndex = firstStep.parallel.findIndex((t) => !t.task);
-			if (missingTaskIndex !== -1) {
-				return {
-					content: [{ type: "text", text: `First parallel step: task ${missingTaskIndex + 1} must have a task (no previous output to reference)` }],
-					isError: true,
-					details: { mode: "chain" as const, results: [] },
-				};
-			}
-		} else if (isDynamicParallelStep(firstStep)) {
-			return {
-				content: [{ type: "text", text: "First step in chain cannot be dynamic fanout; expand.from requires a prior structured named output" }],
-				isError: true,
-				details: { mode: "chain" as const, results: [] },
-			};
-		} else if (!(firstStep as SequentialStep).task && !params.task && !allowClarifyTaskPrompt) {
-			return {
-				content: [{ type: "text", text: "First step in chain must have a task" }],
-				isError: true,
-				details: { mode: "chain" as const, results: [] },
-			};
-		}
-		for (let i = 0; i < params.chain.length; i++) {
-			const step = params.chain[i] as ChainStep;
-			const stepAgents = getStepAgents(step);
-			for (const agentName of stepAgents) {
-				if (!agents.find((a) => a.name === agentName)) {
-					return {
-						content: [{ type: "text", text: `${formatUnknownAgentError(agentName, context)} (step ${i + 1})` }],
-						isError: true,
-						details: { mode: "chain" as const, results: [] },
-					};
-				}
-			}
-			if (isParallelStep(step) && step.parallel.length === 0) {
-				return {
-					content: [{ type: "text", text: `Parallel step ${i + 1} must have at least one task` }],
-					isError: true,
-					details: { mode: "chain" as const, results: [] },
-				};
-			}
-		}
-	}
-
 	return null;
 }
 
 function getRequestedModeLabel(params: SubagentParamsLike): Details["mode"] {
 	if (params.workflowScript !== undefined) return "workflow";
-	if ((params.chain?.length ?? 0) > 0) return "chain";
-	if ((params.tasks?.length ?? 0) > 0) return "parallel";
-	if (params.agent) return "single";
 	return "single";
 }
 
@@ -3594,8 +3504,6 @@ async function runSinglePath(data: ExecutionContextData, deps: ExecutorDeps): Pr
 
 function inferExecutionMode(params: SubagentParamsLike): Details["mode"] {
 	if (params.workflowScript !== undefined) return "workflow";
-	if ((params.chain?.length ?? 0) > 0) return "chain";
-	if ((params.tasks?.length ?? 0) > 0) return "parallel";
 	return "single";
 }
 
@@ -5946,7 +5854,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 		);
 		if (validationError) return validationError;
 
-		const foregroundMode: "single" | "parallel" | "chain" = hasChain ? "chain" : hasTasks ? "parallel" : "single";
+		const foregroundMode: SubagentRunMode = "single";
 		const requestedSpawns = countRequestedSubagentSpawns(effectiveParams, deps.config);
 		const spawnPreflight = preflightSpawnBudget(
 			deps.state,
@@ -6008,15 +5916,13 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 		}
 		const selectedAgentNames = hasSingle
 			? [effectiveParams.agent!]
-			: hasTasks
-				? (effectiveParams.tasks ?? []).map((task) => task.agent)
-				: (effectiveParams.chain ?? []).flatMap((step) => getStepAgents(step as ChainStep));
+			: [];
 		const externalAgent = selectedAgentNames
 			.map((name) => agents.find((agent) => agent.name === name))
 			.find((agent) => agent?.runner?.type === "external-cli" || agent?.runner?.type === "external-job");
 		const externalAsyncRequired = Boolean(externalAgent) && effectiveParams.async === undefined && effectiveParams.clarify !== true && effectiveParams.foregroundOnly !== true;
 		const requestedAsync = externalAsyncRequired ? true : effectiveParams.async ?? deps.asyncByDefault;
-		const backgroundRequestedWhileClarifying = (hasChain || hasTasks) && requestedAsync && effectiveParams.clarify === true;
+		const backgroundRequestedWhileClarifying = false;
 		const effectiveAsync = requestedAsync && effectiveParams.clarify !== true;
 		if (externalAgent && (!effectiveAsync || effectiveParams.foregroundOnly === true)) {
 			return buildRequestedModeError(effectiveParams, `Agent '${externalAgent.name}' uses runner.type='${externalAgent.runner?.type}', which currently supports async/background execution only. Omit async or pass async:true; clarify and foregroundOnly are unsupported.`);
@@ -6120,7 +6026,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			path.join(sessionDirForIndex(idx), "session.jsonl");
 		try {
 			if (!(effectiveParams.clarify === true && ctx.hasUI) || deps.config.forkContext?.mode === "pruned") {
-				await preflightForkSessionsForStaticTasks(effectiveParams, contextPolicy, prepareForkSessionForTask, deps.config.chain?.dynamicFanout?.maxItems);
+				await preflightForkSessionsForStaticTasks(effectiveParams, contextPolicy, prepareForkSessionForTask, undefined);
 			}
 		} catch (error) {
 			activeAsyncCapacity?.rollback();
@@ -6309,7 +6215,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 					currentProvider: requestParentModel?.provider,
 					modelScope,
 					thinkingOverrideForTask,
-					dynamicFanoutMaxItems: deps.config.chain?.dynamicFanout?.maxItems,
+					dynamicFanoutMaxItems: undefined,
 				});
 			} catch (error) {
 				console.error("Failed to resolve nested foreground launch metadata:", error);

@@ -20,6 +20,7 @@ For permission-extension interoperability, use one of the package-owned named re
 { workflow: "review", args: { task: "Review the auth flow" } }
 { workflow: "run-ci", args: { command: "npm test" } }
 { workflow: "perl", args: { task: "Implement the auth fix" } }
+{ workflow: "perla", args: { task: "Implement the auth fix" } }
 ```
 
 The host resolves the script and authority internally and records bounded provenance in workflow details and receipts. Named resources cannot be combined with `agent`, `task`, or `source`; user/project resource registries are not part of this first slice.
@@ -57,7 +58,7 @@ The host resolves the script and authority internally and records bounded proven
 | `prequel` | string | - | `subagent_delegation` | Model-authored summary of the conversation that led here. Consumed when the agent resolves to `fork` or `summary` context; ignored for `fresh`. |
 | `reads` | string[] | agent `defaultReads` | `subagent_delegation` | Plain list of file paths the child should read, composed with the agent's declared defaults. |
 | `cwd` | string | runtime cwd | `subagent_delegation` | Override the child's working directory. |
-| `workflow` | string | - | `subagent_workflow` | Package-owned named workflow resource (`review`, `run-ci`, `perl`) with bounded `args`. |
+| `workflow` | string | - | `subagent_workflow` | Package-owned named workflow resource (`review`, `run-ci`, `perl`, `perla`) with bounded `args`. |
 | `source` | string \| `{ path }` | - | `subagent_workflow` | Inline JavaScript statement body, or `{ path }` to load the same body from a file. Mutually exclusive with `workflow`. |
 | `args` | object | `{}` | `subagent_workflow` | Bounded plain-JSON args for the script; deep-frozen for the script body. |
 | `baseRef` | string | `HEAD` | `subagent_workflow` | `HEAD` or a supported named ref such as `refs/heads/release`, `refs/tags/v1`, or `origin/main`. Full 40/64-character commit IDs and revision expressions such as `HEAD~1` are unsupported. |

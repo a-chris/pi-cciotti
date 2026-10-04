@@ -112,7 +112,6 @@
   "test/unit/workflow-detach-reconcile.test.ts": 14,
   "test/unit/workflow-preflight.test.ts": 6,
   "test/unit/workflow-receipt.test.ts": 2,
-  "test/unit/workflow-resources.test.ts": 2,
   "test/unit/workflow-resume-hint.test.ts": 3,
   "test/unit/worktree.test.ts": 3
 }

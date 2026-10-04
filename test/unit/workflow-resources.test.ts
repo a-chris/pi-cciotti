@@ -33,7 +33,7 @@ describe("named workflow resources", () => {
 			assert.equal(args.nested.task, "original");
 			assert.equal(resolved.resource.provenance.version, 2);
 			expansion.script = "return 'changed';";
-			expansion.hostCommands[0].command = "node changed.mjs";
+			expansion.hostCommands[0]!.command = "node changed.mjs";
 			registration.dispose();
 			assert.equal(resolveWorkflowResource("acme.check", args, "one").ok, false);
 			const replacement = registerWorkflowResource({ sessionId: "one", definition: { ...definition, resolve: () => ({ script: "return 'new';" }) } });
@@ -122,7 +122,8 @@ describe("named workflow resources", () => {
 	});
 
 	it("shares registrations across evaluated module copies", async () => {
-		const copy = await import(`../../src/workflows/workflow-resources.ts?copy=registration-test`);
+		const specifier = "../../src/workflows/workflow-resources.ts?copy=registration-test";
+		const copy = (await import(specifier)) as typeof import("../../src/workflows/workflow-resources.ts");
 		const registration = copy.registerWorkflowResource({ sessionId: "copies", definition: { name: "acme.copy", version: 1, resolve: () => ({ script: "return true;" }) } });
 		try {
 			assert.notEqual(copy.resolveWorkflowResource, resolveWorkflowResource);
@@ -173,7 +174,7 @@ describe("named workflow resources", () => {
 		assert.equal(resolved.resource.provenance.name, "perla");
 		const worktree = "/tmp/perl-fixtures/.pi-perl-fixtures";
 		const hostCalls: string[] = [];
-		const calls: Array<{ key: string; agent?: unknown; task?: unknown; prequel?: unknown; cwd?: unknown }> = [];
+		const calls: Array<{ key: string; agent?: unknown; task?: unknown; prequel?: unknown; cwd?: unknown; output?: unknown }> = [];
 		const execution = await runWorkflowScript({
 			script: resolved.resource.script,
 			async host(key, params) {
@@ -189,16 +190,16 @@ describe("named workflow resources", () => {
 		});
 		assert.equal(hostCalls.length, 1);
 		assert.equal(calls.length, 1);
-		assert.equal(calls[0].key, "planner");
-		assert.equal(calls[0].agent, "planner");
-		assert.ok(String(calls[0].task).startsWith("Add prequel passthrough to workflow children"));
-		assert.match(String(calls[0].task), /Working in git worktree \/tmp\/perl-fixtures\/.pi-perl-fixtures on branch perl\/work\./);
-		assert.equal(calls[0].prequel, "Decisions: use pass-through, not a whitelist");
-		assert.equal(calls[0].cwd, worktree);
+		assert.equal(calls[0]!.key, "planner");
+		assert.equal(calls[0]!.agent, "planner");
+		assert.ok(String(calls[0]!.task).startsWith("Add prequel passthrough to workflow children"));
+		assert.match(String(calls[0]!.task), /Working in git worktree \/tmp\/perl-fixtures\/.pi-perl-fixtures on branch perl\/work\./);
+		assert.equal(calls[0]!.prequel, "Decisions: use pass-through, not a whitelist");
+		assert.equal(calls[0]!.cwd, worktree);
 		// The plan must land in the shared worktree under its own name: the operator reviews
 		// it there and the execute call reads it back from there. A relative `output` would be
 		// routed to the managed artifact directory instead, which broke the plan/execute handoff.
-		assert.equal(calls[0].output, `${worktree}/plan.md`);
+		assert.equal(calls[0]!.output, `${worktree}/plan.md`);
 		assert.deepEqual(execution.value, { phase: "plan", plan: `${worktree}/plan.md`, worktree, summary: "Planned: three steps" });
 	});
 
@@ -302,13 +303,13 @@ describe("named workflow resources", () => {
 		assert.match(resolved.resource.script, /runs\.run\("recon"/);
 		assert.match(resolved.resource.script, /runs\.run\("implement"/);
 		const worktree = "/tmp/perl-fixtures/.pi-perl-fixtures";
-		const calls: Array<{ key: string; cwd?: unknown }> = [];
+		const calls: Array<{ key: string; cwd?: unknown; output?: unknown }> = [];
 		const execution = await runWorkflowScript({
 			script: resolved.resource.script,
 			async host(key) { return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: `WORKTREE ${worktree}`, stderr: "", outputPath: "wt.log", durationMs: 1 }; },
 			async launch(key, params) {
 				calls.push({ key, cwd: params.cwd, output: params.output });
-				if (key.startsWith("review-")) assert.deepEqual(params.outputSchema?.properties?.verdict?.enum, ["BLOCK", "OK", "OK with notes"]);
+				if (key.startsWith("review-")) assert.deepEqual((params.outputSchema as { properties?: { verdict?: { enum?: string[] } } } | undefined)?.properties?.verdict?.enum, ["BLOCK", "OK", "OK with notes"]);
 				if (key === "review-1") return { key, ok: true, output: "review one", artifactPaths: [], structuredOutput: { verdict: "BLOCK", findings: ["src/x.ts: missing case"] } };
 				if (key === "review-2") return { key, ok: true, output: "review two", artifactPaths: [], structuredOutput: { verdict: "OK", findings: [] } };
 				return { key, ok: true, output: "done", artifactPaths: [] };
@@ -384,9 +385,9 @@ describe("named workflow resources", () => {
 				async status(key) { return { key, ok: true, output: "unused", artifactPaths: [] }; },
 			});
 			assert.equal(commands.length, 1);
-			assert.match(commands[0], /\.pi-perl-\$\(basename \"\$R\"\)-auth-fix\"/);
-			assert.match(commands[0], /git worktree add "\$P" -b perl\/work-auth-fix/);
-			if ("task" in args && args.task) assert.deepEqual(execution.value, { phase: "executed", plan: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix/plan.md", worktree: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix", branch: "perl/work-auth-fix", summary: "done", verdict: "OK", fixRounds: 0, findings: [], implementation: "done" });
+			assert.match(commands[0]!, /\.pi-perl-\$\(basename \"\$R\"\)-auth-fix\"/);
+			assert.match(commands[0]!, /git worktree add "\$P" -b perl\/work-auth-fix/);
+			if ("task" in args && args.task) assert.deepEqual(execution.value, { phase: "plan", plan: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix/plan.md", worktree: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix", summary: "done" });
 			else assert.equal((execution.value as { branch: string }).branch, "perl/work-auth-fix");
 		}
 	});

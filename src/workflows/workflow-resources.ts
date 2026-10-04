@@ -251,52 +251,13 @@ const planPath = base ? base + "/plan.md" : "plan.md";
 }
 
 /**
- * perl: plan ↦ execute ↦ review ↦ loop. The manual review gate is the file on disk:
- * `task` runs the plan phase only (planner writes plan.md); without `task` the
- * resource executes the existing plan.md through scout, worker, and a bounded
- * review/fix loop. The operator reviews plan.md between the two calls. All
- * children share one sibling worktree (`.pi-perl-<repo>[-<slug>]` on
- * `perl/work[-<slug>]`) when the workflow cwd is a git repository, otherwise
- * they share the plain cwd. The optional `slug` names a lane so concurrent
- * perl runs in the same repo get distinct worktrees; the slug is the stable
- * identity that makes the execute call find the worktree the plan call made.
+ * Generated-script tail for the execute phase (assumes the worktree preamble
+ * already ran): scout writes context.md, worker implements plan.md, then up to
+ * `rounds` reviewer/fix rounds with a machine-readable verdict. `resultFields`
+ * completes the returned evidence object, because the bare execute call and the
+ * unattended plan+execute run report slightly different shapes.
  */
-function resolvePerl(args: Readonly<Record<string, unknown>>): ReturnType<WorkflowResourceDefinition["resolve"]> {
-	const unsupported = Object.keys(args).filter((key) => key !== "task" && key !== "prequel" && key !== "maxRounds" && key !== "slug");
-	if (unsupported.length > 0) return { error: `workflow 'perl' args contain unsupported fields: ${unsupported.join(", ")}.` };
-	const prequel = args.prequel;
-	if (prequel !== undefined && (typeof prequel !== "string" || !prequel.trim())) return { error: "workflow 'perl' args.prequel must be a non-empty string." };
-	const maxRounds = args.maxRounds;
-	if (maxRounds !== undefined && (typeof maxRounds !== "number" || !Number.isInteger(maxRounds) || maxRounds < 1 || maxRounds > PERL_MAX_REVIEW_ROUNDS)) return { error: `workflow 'perl' args.maxRounds must be an integer from 1 to ${PERL_MAX_REVIEW_ROUNDS}.` };
-	const rounds = maxRounds === undefined ? PERL_DEFAULT_REVIEW_ROUNDS : maxRounds;
-	let slug: string | undefined;
-	if (args.slug !== undefined) {
-		if (typeof args.slug !== "string") return { error: "workflow 'perl' args.slug must be a string." };
-		slug = sanitizePerlSlug(args.slug);
-		if (!slug) return { error: "workflow 'perl' args.slug must contain at least one alphanumeric character." };
-	}
-	const setupCommand = perlWorktreeCommand(slug);
-	const branch = slug ? `perl/work-${slug}` : PERL_WORKTREE_BRANCH;
-	const hostCommands: readonly WorkflowResourceHostAuthority[] = [{ key: "wt-setup", command: setupCommand }];
-
-	const task = args.task;
-	if (task !== undefined) {
-		if (typeof task !== "string" || !task.trim()) return { error: "workflow 'perl' args.task must be a non-empty string." };
-		const launch: Record<string, unknown> = { agent: "planner", async: false, output: true, worktree: false };
-		if (prequel !== undefined) launch.prequel = prequel.trim();
-		// The planner is pinned into the worktree (cwd) but is not otherwise told where it
-		// is, so it would invent a branch name in plan.md. The task is assembled in the
-		// generated script (where the runtime worktree path is known) so plan.md references
-		// the real path and branch.
-		const launchLiteral = JSON.stringify(launch);
-		const taskLiteral = JSON.stringify(task.trim());
-		const branchLiteral = JSON.stringify(branch);
-		return {
-			script: `${perlWorktreePreamble(setupCommand)}const launch = ${launchLiteral}; launch.task = ${taskLiteral} + (worktree ? " (Working in git worktree " + worktree + " on branch " + ${branchLiteral} + ". Use these exact paths and branch name in plan.md.)" : ""); return { phase: "plan", plan: planPath, worktree: worktree || null, summary: (await runs.run("planner", intoWt(launch, "plan.md"))).output };`,
-			hostCommands,
-		};
-	}
-
+function perlExecuteScript(rounds: number, branch: string, implementLaunch: Record<string, unknown>, resultFields: string): string {
 	const reviewSchema = {
 		type: "object",
 		additionalProperties: false,
@@ -306,15 +267,7 @@ function resolvePerl(args: Readonly<Record<string, unknown>>): ReturnType<Workfl
 			findings: { type: "array", items: { type: "string" } },
 		},
 	};
-	const implementLaunch: Record<string, unknown> = {
-		agent: "worker",
-		task: "Implement plan.md, guided by context.md. Follow the plan's steps and scope bounds (Now only). Verify with the plan's verification commands and report what you changed, what you verified with which results, and anything BLOCKED.",
-		async: false,
-		worktree: false,
-	};
-	if (prequel !== undefined) implementLaunch.prequel = prequel.trim();
-	return {
-		script: `${perlWorktreePreamble(setupCommand)}const reviewSchema = ${JSON.stringify(reviewSchema)};
+	return `const reviewSchema = ${JSON.stringify(reviewSchema)};
 const recon = await runs.run("recon", intoWt({ agent: "scout", task: "Read plan.md and write context.md for the worker that will implement it: the exact files and seams to touch, existing conventions, and the verification commands that already exist. Do not implement anything.", async: false, output: true, worktree: false }, "context.md"));
 const implementation = await runs.run("implement", withWt(${JSON.stringify(implementLaunch)}));
 let verdict = "BLOCK";
@@ -331,13 +284,86 @@ for (let round = 1; round <= ${rounds}; round++) {
 		await runs.run("fix-" + round, withWt({ agent: "worker", task: "Fix these review findings from the implementation of plan.md:\\n\\n" + detail + "\\n\\nRe-check each finding against the code before applying it, re-run the plan's verification commands, and report what you changed plus the results.", async: false, worktree: false }));
 	}
 }
-return { phase: "executed", plan: "plan.md", worktree: worktree || null, branch: worktree ? ${JSON.stringify(branch)} : null, verdict, fixRounds, findings, implementation: implementation.output };`,
-		hostCommands,
+return { phase: "executed", ${resultFields}verdict, fixRounds, findings, implementation: implementation.output };`;
+}
+
+/** The execute-phase worker launch; `prequel` rides with the child like on the planner. */
+function perlImplementLaunch(prequel: string | undefined): Record<string, unknown> {
+	const implementLaunch: Record<string, unknown> = {
+		agent: "worker",
+		task: "Implement plan.md, guided by context.md. Follow the plan's steps and scope bounds (Now only). Verify with the plan's verification commands and report what you changed, what you verified with which results, and anything BLOCKED.",
+		async: false,
+		worktree: false,
+	};
+	if (prequel !== undefined) implementLaunch.prequel = prequel.trim();
+	return implementLaunch;
+}
+
+/**
+ * perl and perla are one plan ↦ execute ↦ review ↦ loop engine that differs
+ * only in where the run stops. `perl` is the unattended lane: with `task` the
+ * planner writes plan.md and the same run continues straight into scout,
+ * worker, and the bounded review/fix loop. `perla` is the approval lane: with
+ * `task` it runs the plan phase only and stops, the operator reviews plan.md
+ * between the two calls, and the bare call executes the existing plan.md
+ * through scout, worker, and the bounded review/fix loop. All children share
+ * one sibling worktree (`.pi-perl-<repo>[-<slug>]` on `perl/work[-<slug>]`)
+ * when the workflow cwd is a git repository, otherwise they share the plain
+ * cwd. The optional `slug` names a lane so concurrent runs in the same repo
+ * get distinct worktrees; the slug is the stable identity that makes an
+ * execute call find the worktree the plan call made.
+ */
+function resolvePerlResource(name: "perl" | "perla", gate: "auto" | "manual") {
+	return (args: Readonly<Record<string, unknown>>): ReturnType<WorkflowResourceDefinition["resolve"]> => {
+		const unsupported = Object.keys(args).filter((key) => key !== "task" && key !== "prequel" && key !== "maxRounds" && key !== "slug");
+		if (unsupported.length > 0) return { error: `workflow '${name}' args contain unsupported fields: ${unsupported.join(", ")}.` };
+		const prequel = args.prequel;
+		if (prequel !== undefined && (typeof prequel !== "string" || !prequel.trim())) return { error: `workflow '${name}' args.prequel must be a non-empty string.` };
+		const maxRounds = args.maxRounds;
+		if (maxRounds !== undefined && (typeof maxRounds !== "number" || !Number.isInteger(maxRounds) || maxRounds < 1 || maxRounds > PERL_MAX_REVIEW_ROUNDS)) return { error: `workflow '${name}' args.maxRounds must be an integer from 1 to ${PERL_MAX_REVIEW_ROUNDS}.` };
+		const rounds = maxRounds === undefined ? PERL_DEFAULT_REVIEW_ROUNDS : maxRounds;
+		let slug: string | undefined;
+		if (args.slug !== undefined) {
+			if (typeof args.slug !== "string") return { error: `workflow '${name}' args.slug must be a string.` };
+			slug = sanitizePerlSlug(args.slug);
+			if (!slug) return { error: `workflow '${name}' args.slug must contain at least one alphanumeric character.` };
+		}
+		const setupCommand = perlWorktreeCommand(slug);
+		const branch = slug ? `perl/work-${slug}` : PERL_WORKTREE_BRANCH;
+		const hostCommands: readonly WorkflowResourceHostAuthority[] = [{ key: "wt-setup", command: setupCommand }];
+
+		const task = args.task;
+		if (task !== undefined) {
+			if (typeof task !== "string" || !task.trim()) return { error: `workflow '${name}' args.task must be a non-empty string.` };
+			const launch: Record<string, unknown> = { agent: "planner", async: false, output: true, worktree: false };
+			if (prequel !== undefined) launch.prequel = prequel.trim();
+			// The planner is pinned into the worktree (cwd) but is not otherwise told where it
+			// is, so it would invent a branch name in plan.md. The task is assembled in the
+			// generated script (where the runtime worktree path is known) so plan.md references
+			// the real path and branch.
+			const planSetup = `const launch = ${JSON.stringify(launch)}; launch.task = ${JSON.stringify(task.trim())} + (worktree ? " (Working in git worktree " + worktree + " on branch " + ${JSON.stringify(branch)} + ". Use these exact paths and branch name in plan.md.)" : "");`;
+			if (gate === "manual") {
+				return {
+					script: `${perlWorktreePreamble(setupCommand)}${planSetup} return { phase: "plan", plan: planPath, worktree: worktree || null, summary: (await runs.run("planner", intoWt(launch, "plan.md"))).output };`,
+					hostCommands,
+				};
+			}
+			return {
+				script: `${perlWorktreePreamble(setupCommand)}${planSetup} const planned = (await runs.run("planner", intoWt(launch, "plan.md"))).output;
+${perlExecuteScript(rounds, branch, perlImplementLaunch(prequel), `plan: planPath, worktree: worktree || null, branch: ${JSON.stringify(branch)}, summary: planned, `)}`,
+				hostCommands,
+			};
+		}
+		return {
+			script: `${perlWorktreePreamble(setupCommand)}${perlExecuteScript(rounds, branch, perlImplementLaunch(prequel), `plan: "plan.md", worktree: worktree || null, branch: ${JSON.stringify(branch)}, `)}`,
+			hostCommands,
+		};
 	};
 }
 
 const WORKFLOW_RESOURCES: readonly WorkflowResourceDefinition[] = [
-	{ name: "perl", version: 1, resolve: resolvePerl },
+	{ name: "perl", version: 1, resolve: resolvePerlResource("perl", "auto") },
+	{ name: "perla", version: 1, resolve: resolvePerlResource("perla", "manual") },
 	{ name: "review", version: 1, resolve: resolveReview },
 	{ name: "run-ci", version: 1, resolve: resolveRunCi },
 ];

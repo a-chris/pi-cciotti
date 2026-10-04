@@ -299,7 +299,7 @@ export const SubagentDelegationParams = keepTopLevelParameterDescriptions(Type.O
 
 // --- subagent_workflow (run a workflow) ------------------------------------
 const workflowDescriptions = {
-	workflow: "Named workflow resource, e.g. \"review\", \"run-ci\", or \"perl\".",
+	workflow: "Named workflow resource, e.g. \"review\", \"run-ci\", \"perl\" (unattended: plan then execute in one run), or \"perla\" (plan, stop for approval, then execute).",
 	source: "Inline script body, or { path } to a script file.",
 	args: "Bounded JSON inputs for the workflow.",
 	// Workflows are background UNLESS async:false (`asyncWorkflow = async !== false`,

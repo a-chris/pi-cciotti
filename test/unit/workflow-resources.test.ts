@@ -85,6 +85,7 @@ describe("named workflow resources", () => {
 			{ ...valid, sessionId: " " },
 			{ ...valid, trusted: true },
 			{ ...valid, definition: { ...valid.definition, name: "perl" } },
+			{ ...valid, definition: { ...valid.definition, name: "perla" } },
 			{ ...valid, definition: { ...valid.definition, name: "run-ci" } },
 			{ ...valid, definition: { ...valid.definition, name: "review" } },
 			{ ...valid, definition: { ...valid.definition, name: "bad name" } },
@@ -162,14 +163,14 @@ describe("named workflow resources", () => {
 		assert.equal((execution.value as { ok?: boolean }).ok, true);
 	});
 
-	it("resolves and executes the perl plan phase as a single planner child inside the shared worktree", async () => {
-		const resolved = resolveWorkflowResource("perl", { task: "Add prequel passthrough to workflow children", prequel: "Decisions: use pass-through, not a whitelist" });
+	it("resolves and executes the perla plan phase as a single planner child inside the shared worktree", async () => {
+		const resolved = resolveWorkflowResource("perla", { task: "Add prequel passthrough to workflow children", prequel: "Decisions: use pass-through, not a whitelist" });
 		assert.equal(resolved.ok, true);
 		if (!resolved.ok) return;
 		assert.equal(validateWorkflowScript(resolved.resource.script).ok, true);
 		assert.match(resolved.resource.script, /runs\.host\("wt-setup"/);
 		assert.match(resolved.resource.script, /runs\.run\("planner"/);
-		assert.equal(resolved.resource.provenance.name, "perl");
+		assert.equal(resolved.resource.provenance.name, "perla");
 		const worktree = "/tmp/perl-fixtures/.pi-perl-fixtures";
 		const hostCalls: string[] = [];
 		const calls: Array<{ key: string; agent?: unknown; task?: unknown; prequel?: unknown; cwd?: unknown }> = [];
@@ -201,10 +202,10 @@ describe("named workflow resources", () => {
 		assert.deepEqual(execution.value, { phase: "plan", plan: `${worktree}/plan.md`, worktree, summary: "Planned: three steps" });
 	});
 
-	it("runs the perl plan phase in the plain cwd when the setup command reports PLAIN", async () => {
+	it("runs the perla plan phase in the plain cwd when the setup command reports PLAIN", async () => {
 		// Outside a git repository the setup command succeeds with `PLAIN <pwd>`: there is no
 		// worktree to isolate into, but the shared directory still owns plan.md.
-		const resolved = resolveWorkflowResource("perl", { task: "Do the thing" });
+		const resolved = resolveWorkflowResource("perla", { task: "Do the thing" });
 		assert.equal(resolved.ok, true);
 		if (!resolved.ok) return;
 		const calls: Array<{ key: string; cwd?: unknown; output?: unknown }> = [];
@@ -221,10 +222,10 @@ describe("named workflow resources", () => {
 		assert.deepEqual(execution.value, { phase: "plan", plan: "/repo/plan.md", worktree: null, summary: "planned" });
 	});
 
-	it("runs the perl plan phase on default artifact routing when worktree setup fails", async () => {
+	it("runs the perla plan phase on default artifact routing when worktree setup fails", async () => {
 		// A hard setup failure (worktree add error, refused path) leaves no shared directory:
 		// the launch wrapper stays identity and the engine's managed artifact routing applies.
-		const resolved = resolveWorkflowResource("perl", { task: "Do the thing" });
+		const resolved = resolveWorkflowResource("perla", { task: "Do the thing" });
 		assert.equal(resolved.ok, true);
 		if (!resolved.ok) return;
 		const calls: Array<{ key: string; cwd?: unknown; output?: unknown }> = [];
@@ -240,6 +241,56 @@ describe("named workflow resources", () => {
 		assert.deepEqual(calls, [{ key: "planner", cwd: null, output: true }]);
 		// With no shared directory the result honestly reports the unqualified name the engine routes.
 		assert.deepEqual(execution.value, { phase: "plan", plan: "plan.md", worktree: null, summary: "planned" });
+	});
+
+	it("perla plans and stops: the run reports the plan phase and launches nothing else", async () => {
+		// The approval lane's whole contract: one planner child, then the run ends. The
+		// unattended perl lane continues into recon/implement in the same run instead.
+		const resolved = resolveWorkflowResource("perla", { task: "Do the thing" });
+		assert.equal(resolved.ok, true);
+		if (!resolved.ok) return;
+		assert.doesNotMatch(resolved.resource.script, /runs\.run\("recon"/);
+		assert.doesNotMatch(resolved.resource.script, /runs\.run\("implement"/);
+		assert.doesNotMatch(resolved.resource.script, /runs\.run\("review-"/);
+	});
+
+	it("perl plans and executes unattended in one run: planner, scout, worker, bounded review loop", async () => {
+		const resolved = resolveWorkflowResource("perl", { task: "Add prequel passthrough to workflow children", prequel: "Decisions: use pass-through" });
+		assert.equal(resolved.ok, true);
+		if (!resolved.ok) return;
+		assert.equal(validateWorkflowScript(resolved.resource.script).ok, true);
+		assert.match(resolved.resource.script, /runs\.run\("planner"/);
+		assert.match(resolved.resource.script, /runs\.run\("recon"/);
+		assert.match(resolved.resource.script, /runs\.run\("implement"/);
+		const worktree = "/tmp/perl-fixtures/.pi-perl-fixtures";
+		const calls: Array<{ key: string; prequel?: unknown; cwd?: unknown; output?: unknown }> = [];
+		const execution = await runWorkflowScript({
+			script: resolved.resource.script,
+			async host(key) { return { key, kind: "command", ok: true, state: "passed", exitCode: 0, stdout: `WORKTREE ${worktree}`, stderr: "", outputPath: "wt.log", durationMs: 1 }; },
+			async launch(key, params) {
+				calls.push({ key, prequel: params.prequel, cwd: params.cwd, output: params.output });
+				if (key === "review-1") return { key, ok: true, output: "review one", artifactPaths: [], structuredOutput: { verdict: "OK", findings: [] } };
+				return { key, ok: true, output: `${key} output`, artifactPaths: [] };
+			},
+			async status(key) { return { key, ok: true, output: "unused", artifactPaths: [] }; },
+		});
+		assert.deepEqual(calls.map(({ key }) => key), ["planner", "recon", "implement", "review-1"]);
+		// The prequel rides with the planner and every child shares the worktree cwd; plan.md
+		// and context.md are pinned into the shared directory for the plan/execute handoff.
+		assert.equal(calls[0].prequel, "Decisions: use pass-through");
+		assert.ok(calls.every(({ cwd }) => cwd === worktree));
+		assert.equal(calls.find(({ key }) => key === "planner")?.output, `${worktree}/plan.md`);
+		assert.equal(calls.find(({ key }) => key === "recon")?.output, `${worktree}/context.md`);
+		const value = execution.value as { phase: string; plan: string; worktree: string | null; branch: string | null; summary: string; verdict: string; fixRounds: number; findings: string[]; implementation: string };
+		assert.equal(value.phase, "executed");
+		assert.equal(value.plan, `${worktree}/plan.md`);
+		assert.equal(value.worktree, worktree);
+		assert.equal(value.branch, "perl/work");
+		assert.equal(value.summary, "planner output");
+		assert.equal(value.verdict, "OK");
+		assert.equal(value.fixRounds, 0);
+		assert.deepEqual(value.findings, []);
+		assert.equal(value.implementation, "implement output");
 	});
 
 	it("resolves and executes the perl execution phase with a bounded review/fix loop in the shared worktree", async () => {
@@ -335,20 +386,22 @@ describe("named workflow resources", () => {
 			assert.equal(commands.length, 1);
 			assert.match(commands[0], /\.pi-perl-\$\(basename \"\$R\"\)-auth-fix\"/);
 			assert.match(commands[0], /git worktree add "\$P" -b perl\/work-auth-fix/);
-			if ("task" in args && args.task) assert.deepEqual(execution.value, { phase: "plan", plan: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix/plan.md", worktree: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix", summary: "done" });
+			if ("task" in args && args.task) assert.deepEqual(execution.value, { phase: "executed", plan: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix/plan.md", worktree: "/tmp/perl-fixtures/.pi-perl-fixtures-auth-fix", branch: "perl/work-auth-fix", summary: "done", verdict: "OK", fixRounds: 0, findings: [], implementation: "done" });
 			else assert.equal((execution.value as { branch: string }).branch, "perl/work-auth-fix");
 		}
 	});
 
 	it("authorizes only the exact perl wt-setup host command", () => {
-		for (const args of [{ task: "plan" }, {}]) {
-			const resolved = resolveWorkflowResource("perl", args);
-			assert.equal(resolved.ok, true);
-			if (!resolved.ok) return;
-			assert.match(resolved.resource.script, /runs\.host\("wt-setup"/);
-			assert.equal(typeof consumeWorkflowResourcePermit(resolved.resource.permit, resolved.resource.script), "object");
-			assert.equal(authorizeWorkflowResourceHost(resolved.resource.permit, "wt-setup", "git worktree add /tmp/x"), "The command for runs.host('wt-setup') is not allowed for workflow resource 'perl'.");
-			assert.match(authorizeWorkflowResourceHost(resolved.resource.permit, "other", "git status") ?? "", /not allowed/);
+		for (const resource of ["perl", "perla"] as const) {
+			for (const args of [{ task: "plan" }, {}]) {
+				const resolved = resolveWorkflowResource(resource, args);
+				assert.equal(resolved.ok, true);
+				if (!resolved.ok) return;
+				assert.match(resolved.resource.script, /runs\.host\("wt-setup"/);
+				assert.equal(typeof consumeWorkflowResourcePermit(resolved.resource.permit, resolved.resource.script), "object");
+				assert.equal(authorizeWorkflowResourceHost(resolved.resource.permit, "wt-setup", "git worktree add /tmp/x"), `The command for runs.host('wt-setup') is not allowed for workflow resource '${resource}'.`);
+				assert.match(authorizeWorkflowResourceHost(resolved.resource.permit, "other", "git status") ?? "", /not allowed/);
+			}
 		}
 	});
 
@@ -401,6 +454,10 @@ describe("named workflow resources", () => {
 			["perl", { maxRounds: 1.5 }],
 			["perl", { slug: 7 }],
 			["perl", { slug: "!!" }],
+			["perla", { task: 42 }],
+			["perla", { task: "plan", extra: true }],
+			["perla", { maxRounds: 0 }],
+			["perla", { slug: "!!" }],
 		] as const) {
 			const result = resolveWorkflowResource(name, args);
 			assert.equal(result.ok, false, `${name}: ${JSON.stringify(args)}`);

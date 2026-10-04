@@ -1,9 +1,5 @@
-import type { AgentContract, EffectsProjection, ExecutionProjection, ReviewProjection, SingleResult } from "../../shared/types.ts";
+import type { EffectsProjection, ExecutionProjection, ReviewProjection, SingleResult } from "../../shared/types.ts";
 import { parseBlockedReason } from "./blocked-result.ts";
-
-export function isAgentContract(contract: AgentContract | undefined): boolean {
-	return contract?.version === 1;
-}
 
 export function buildExecutionProjection(result: Pick<SingleResult, "exitCode" | "error" | "interrupted" | "timedOut" | "stopped" | "detached" | "finalOutput">): ExecutionProjection {
 	if (result.detached) {

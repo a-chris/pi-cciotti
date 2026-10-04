@@ -5,7 +5,6 @@ import { deriveForkPromptCacheKey } from "../shared/child-tool-plan.ts";
 import { normalizeExtensionBindings } from "../shared/extension-bindings.ts";
 import type { RunnerSubagentStep } from "../shared/parallel-utils.ts";
 import { formatAcceptancePrompt } from "../shared/acceptance.ts";
-import { isAgentContract } from "../shared/agent-contract.ts";
 
 export interface RunnerChildLaunchContext {
 	cwd: string;
@@ -28,7 +27,7 @@ export function buildRunnerChildLaunch(step: RunnerSubagentStep, ctx: RunnerChil
 }) {
 	// Resource-backed system instructions survive SDK split-turn compaction verbatim.
 	const acceptancePrompt = step.effectiveAcceptance
-		? formatAcceptancePrompt(step.effectiveAcceptance, { reportOptional: isAgentContract(step.agentContract), structuredOutput: Boolean(step.structuredOutput?.acceptanceReportPath) })
+		? formatAcceptancePrompt(step.effectiveAcceptance, { structuredOutput: Boolean(step.structuredOutput?.acceptanceReportPath) })
 		: "";
 	return buildInProcessChildLaunch({
 		parentSessionId: step.parentSessionId,

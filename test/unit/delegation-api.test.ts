@@ -190,7 +190,6 @@ describe("public subagent delegation contract", () => {
 			timeoutMs: 1_000,
 			toolBudget: { soft: 3, hard: 5, block: "*" },
 			skill: ["review"],
-			acceptance: false,
 			artifacts: true,
 			delegatedThinkingOverride: "high",
 			delegatedAllowZeroToolBudget: true,

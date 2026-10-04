@@ -298,15 +298,12 @@ describe("SubagentParams schema", { skip: !schemasAvailable ? "typebox not avail
 		}
 	});
 
-	it("keeps agentContract.version as integer bounds without an enum (Gemini schema subset)", () => {
-		const agentContract = (SubagentParams?.properties as Record<string, JsonSchemaNode> | undefined)?.agentContract;
-		assert.ok(agentContract, "agentContract schema should exist");
-		const version = (agentContract.properties as Record<string, JsonSchemaNode> | undefined)?.version;
-		assert.ok(version, "agentContract.version schema should exist");
-		assert.equal(version.type, "integer");
-		assert.equal(version.minimum, 1);
-		assert.equal(version.maximum, 1);
-		assert.equal(version.enum, undefined);
+	it("rejects agentContract as an unknown subagent parameter", () => {
+		const subagentProps = (SubagentParams?.properties as Record<string, JsonSchemaNode> | undefined) ?? {};
+		assert.equal(subagentProps.agentContract, undefined);
+		for (const required of SubagentParams?.required ?? []) {
+			assert.notEqual(required, "agentContract");
+		}
 	});
 
 	it("documents workflow timeout aliases and omits removed turn budgets", () => {
@@ -644,8 +641,7 @@ describe("SubagentParams schema", { skip: !schemasAvailable ? "typebox not avail
 		const acceptanceLevelBranch = acceptanceStringBranches.find((branch) => Array.isArray(branch.enum) && branch.enum.includes("auto"));
 		assert.deepEqual(acceptanceLevelBranch?.enum, ["auto", "attested", "checked"], "verified requires object form with runtime commands");
 		const reviewedRecoveryBranch = acceptanceStringBranches.find((branch) => Array.isArray(branch.enum) && branch.enum.includes("reviewed"));
-		assert.deepEqual(reviewedRecoveryBranch?.enum, ["reviewed"]);
-		assert.equal(reviewedRecoveryBranch?.deprecated, true);
+		assert.equal(reviewedRecoveryBranch, undefined, "reviewed must not remain a schema-recognized acceptance level");
 		const acceptanceObjectStringBranch = acceptanceStringBranches.find((branch) => branch.enum === undefined);
 		assert.equal(acceptanceObjectStringBranch?.pattern, "^\\s*\\{", "acceptance should tolerate only object-shaped JSON strings");
 		assert.match(String(acceptanceSchema.description ?? ""), /omit for read-only\/review/i);

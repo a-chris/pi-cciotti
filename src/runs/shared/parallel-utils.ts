@@ -70,7 +70,6 @@ export interface RunnerSubagentStep {
 	waitToolDefaultTimeoutMs?: number;
 	structuredOutput?: import("./structured-output.ts").StructuredOutputRuntime;
 	structuredOutputSchema?: import("../../shared/types.ts").JsonSchemaObject;
-	agentContract?: import("../../shared/types.ts").AgentContract;
 	definitionDigest?: string;
 	launchBindingTask?: string;
 	launchContractDigest?: string;
@@ -80,7 +79,6 @@ export interface RunnerSubagentStep {
 	effectiveAcceptance?: import("../../shared/types.ts").ResolvedAcceptanceConfig;
 	acceptanceInput?: import("../../shared/types.ts").AcceptanceInput;
 	acceptanceRole?: import("../../shared/types.ts").AcceptanceRole;
-	gateOn?: import("../../shared/types.ts").ChainGateLayer;
 	toolBudget?: import("../../shared/types.ts").ResolvedToolBudget;
 	capabilityCeiling?: import("./capability-ceiling.ts").ResolvedSubagentCapabilityCeiling;
 	capabilityAudit?: import("./capability-ceiling.ts").SubagentCapabilityAudit;
@@ -110,8 +108,6 @@ export interface DynamicRunnerGroup {
 	effectiveAcceptance?: import("../../shared/types.ts").ResolvedAcceptanceConfig;
 	acceptanceInput?: import("../../shared/types.ts").AcceptanceInput;
 	acceptanceRole?: import("../../shared/types.ts").AcceptanceRole;
-	agentContract?: import("../../shared/types.ts").AgentContract;
-	gateOn?: import("../../shared/types.ts").ChainGateLayer;
 	capabilityCeiling?: import("./capability-ceiling.ts").ResolvedSubagentCapabilityCeiling;
 	capabilityAudit?: import("./capability-ceiling.ts").SubagentCapabilityAudit;
 	thinkingCeiling?: import("../../shared/model-info.ts").ThinkingLevel;

@@ -41,7 +41,6 @@ import { createRunFanoutBudget, writeRunFanoutBudgetDescriptor } from "../shared
 import { validateImplementationToolContract } from "../shared/completion-guard.ts";
 import {
 	type AcceptanceInput,
-	type AgentContract,
 	type AsyncParallelGroupStatus,
 	type AsyncStatus,
 	type ArtifactConfig,
@@ -194,7 +193,6 @@ interface AsyncChainParams {
 	artifactConfig: ArtifactConfig;
 	shareEnabled: boolean;
 	sessionRoot?: string;
-	agentContract?: AgentContract;
 	chainSkills?: string[];
 	sessionFilesByFlatIndex?: (string | undefined)[];
 	thinkingOverridesByFlatIndex?: (AgentConfig["thinking"] | undefined)[];
@@ -237,7 +235,7 @@ interface AsyncSingleParams {
 	/** Raw caller-facing goal used only by the started event. */
 	goal?: string;
 	agentConfig: AgentConfig;
-	/** Agent contract before per-run bridge injection, used only for recovery persistence. */
+	/** Agent config snapshot before per-run bridge injection, used only for recovery persistence. */
 	recoveryAgentConfig?: AgentConfig;
 	requiredExtensions?: RequiredChildExtensionSnapshot;
 	ctx: AsyncExecutionContext;
@@ -258,7 +256,6 @@ interface AsyncSingleParams {
 	outputMode?: "inline" | "file-only";
 	outputBaseDir?: string;
 	outputClaimPath?: string;
-	agentContract?: AgentContract;
 	structuredOutputSchema?: JsonSchemaObject;
 	modelOverride?: string;
 	modelOverrideFromParent?: boolean;
@@ -329,7 +326,6 @@ export interface AsyncRunnerStepBuildParams {
 	thinkingOverridesByFlatIndex?: (AgentConfig["thinking"] | undefined)[];
 	contextForAgent?: (agentName: string) => ContextMode;
 	progressDir?: string;
-	agentContract?: AgentContract;
 	dynamicFanoutMaxItems?: number;
 	waitToolEnabled?: boolean;
 	waitToolDefaultTimeoutMs?: number;
@@ -956,7 +952,8 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 			const unsupported: string[] = [];
 			if (s.model !== undefined) unsupported.push("model override");
 			if (effectiveBehavior.outputSchema !== undefined) unsupported.push("structured output");
-			if (s.acceptance !== undefined || params.agentContract !== undefined || s.agentContract !== undefined) unsupported.push("acceptance/agent contract");
+			if (s.acceptance !== undefined) unsupported.push("acceptance");
+			if ("agentContract" in s || "agentContract" in params) unsupported.push("agentContract");
 			if (s.toolBudget !== undefined || params.toolBudget !== undefined || a.toolBudget !== undefined || params.configToolBudget !== undefined) unsupported.push("tool budget");
 			if ((s.fast ?? params.fast ?? a.fast) === true) unsupported.push("fast mode");
 			if (params.contextForAgent?.(s.agent) === "fork") unsupported.push("fork context");
@@ -1043,7 +1040,6 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 				throw new AsyncStartValidationError(error instanceof Error ? error.message : String(error));
 			}
 		}
-		const agentContract = s.agentContract ?? params.agentContract;
 		const permissionRules = resolvePermissionRules(ctx.permissions, a.permissions);
 		let selectedModel = model;
 		let requestedModel: string | undefined;
@@ -1108,7 +1104,6 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 			task,
 			...(a.runner ? { runner: a.runner } : {}),
 			...(params.contextForAgent ? { context: params.contextForAgent(s.agent) } : {}),
-			...(agentContract ? { agentContract } : {}),
 			phase: s.phase,
 			label: s.label,
 			outputName: s.as,
@@ -1155,11 +1150,9 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 				mode: resultMode,
 				async: true,
 				dynamic: false,
-				agentContract,
 			}),
 			acceptanceInput: s.acceptance,
 			acceptanceRole: a.acceptanceRole,
-			...(s.gateOn ? { gateOn: s.gateOn } : {}),
 			...(behavior.outputSchema ? { structuredOutputSchema: behavior.outputSchema } : {}),
 			...(behavior.outputSchema ? { structuredOutput: createStructuredOutputRuntime(behavior.outputSchema, path.join(asyncDir, "structured-output"), { acceptanceReport: resolveAcceptanceReportMode(s.acceptance) }) } : {}),
 			...(resolvedToolBudget.budget ? { toolBudget: resolvedToolBudget.budget } : {}),
@@ -1203,7 +1196,7 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 							}
 						}
 						const staticStep = nextFlatStep();
-						return buildSeqStep({ ...t, worktree: s.worktree, agentContract: t.agentContract ?? s.agentContract, gateOn: t.gateOn ?? s.gateOn }, staticStep.sessionFile, behaviorCwd, progressPrecreated, parallelBehaviors[taskIndex], staticStep.index, { stepIndex, taskIndex }, resultMode === "parallel" ? `tasks[${taskIndex}]` : `chain[${stepIndex}].parallel[${taskIndex}]`);
+						return buildSeqStep({ ...t, worktree: s.worktree }, staticStep.sessionFile, behaviorCwd, progressPrecreated, parallelBehaviors[taskIndex], staticStep.index, { stepIndex, taskIndex }, resultMode === "parallel" ? `tasks[${taskIndex}]` : `chain[${stepIndex}].parallel[${taskIndex}]`);
 					}),
 					concurrency: s.concurrency,
 					failFast: s.failFast,
@@ -1220,7 +1213,7 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 				}
 				const maxItems = s.expand.maxItems ?? params.dynamicFanoutMaxItems ?? 0;
 				const dynamicFlatSteps = Array.from({ length: maxItems }, () => nextFlatStep());
-				const parallel = buildSeqStep({ ...(s.parallel as SequentialStep), agentContract: s.parallel.agentContract ?? s.agentContract, gateOn: s.parallel.gateOn ?? s.gateOn }, undefined, undefined, progressPrecreated, behavior, undefined, { stepIndex });
+				const parallel = buildSeqStep({ ...(s.parallel as SequentialStep) }, undefined, undefined, progressPrecreated, behavior, undefined, { stepIndex });
 				return {
 					expand: s.expand,
 					parallel,
@@ -1239,12 +1232,9 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 						mode: resultMode,
 						async: true,
 						dynamicGroup: true,
-						agentContract: s.agentContract ?? params.agentContract,
 					}),
 					acceptanceInput: s.acceptance,
 					acceptanceRole: agent.acceptanceRole,
-					...(s.agentContract ?? params.agentContract ? { agentContract: s.agentContract ?? params.agentContract } : {}),
-					...(s.gateOn ? { gateOn: s.gateOn } : {}),
 					...(parallel.thinkingCeiling ? { thinkingCeiling: parallel.thinkingCeiling } : {}),
 				};
 			}
@@ -1366,7 +1356,6 @@ export function executeAsyncChain(
 		thinkingOverridesByFlatIndex,
 		contextForAgent: params.contextForAgent,
 		progressDir: params.progressDir ?? (artifactsDir ? path.join(artifactsDir, "progress", id) : resultMode === "parallel" ? path.join(asyncDir, "progress") : undefined),
-		agentContract: params.agentContract,
 		outputBaseDir: artifactsDir ? path.join(artifactsDir, "outputs", id) : undefined,
 		dynamicFanoutMaxItems: params.dynamicFanoutMaxItems,
 		waitToolEnabled: params.waitToolEnabled,
@@ -1648,7 +1637,8 @@ export function executeAsyncSingle(
 		if ((params.fast ?? agentConfig.fast) === true) unsupported.push("fast mode");
 		if (params.thinkingOverride !== undefined) unsupported.push("thinking override");
 		if (params.structuredOutputSchema !== undefined) unsupported.push("structured output");
-		if (params.acceptance !== undefined || params.agentContract !== undefined) unsupported.push("acceptance/agent contract");
+		if (params.acceptance !== undefined) unsupported.push("acceptance");
+		if ("agentContract" in params) unsupported.push("agentContract");
 		if (params.toolBudget !== undefined || agentConfig.toolBudget !== undefined || params.configToolBudget !== undefined) unsupported.push("tool budget");
 		if (params.context === "fork") unsupported.push("fork context");
 		if ((params.skills?.length ?? 0) > 0) unsupported.push("skills");
@@ -1844,7 +1834,6 @@ export function executeAsyncSingle(
 		task,
 		mode: "single",
 		async: true,
-		agentContract: params.agentContract,
 	});
 	const recoveryAgentConfig = params.recoveryAgentConfig ?? agentConfig;
 	const recoveryDescriptor: SteeringRecoveryDescriptor = {
@@ -1855,7 +1844,6 @@ export function executeAsyncSingle(
 		...(requiredExtensions.length > 0 ? { requiredExtensions } : {}),
 		runFanoutBudget,
 		sourceRunId: id,
-		...(params.agentContract ? { agentContract: params.agentContract } : {}),
 		agent,
 		launchResolvedExtensions,
 		...(sessionFile ? { sessionFile } : {}),
@@ -1954,7 +1942,6 @@ export function executeAsyncSingle(
 						...(!externalRunner && sessionFile ? { sessionFile } : {}),
 						waitToolEnabled: params.waitToolEnabled,
 						waitToolDefaultTimeoutMs: params.waitToolDefaultTimeoutMs,
-						...(params.agentContract ? { agentContract: params.agentContract } : {}),
 						definitionDigest,
 						launchBindingTask: task,
 						launchContractDigest,

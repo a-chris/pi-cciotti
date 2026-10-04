@@ -74,7 +74,6 @@ interface AsyncRunStepSummary {
 	toolBudgetBlocked?: boolean;
 	wrapUpRequested?: boolean;
 	acceptance?: AsyncJobStep["acceptance"];
-	agentContract?: AsyncJobStep["agentContract"];
 	execution?: AsyncJobStep["execution"];
 	review?: AsyncJobStep["review"];
 	effects?: AsyncJobStep["effects"];
@@ -372,7 +371,6 @@ function statusToSummary(asyncDir: string, status: AsyncStatus & { cwd?: string 
 			...(step.toolBudgetBlocked !== undefined ? { toolBudgetBlocked: step.toolBudgetBlocked } : {}),
 			...(step.wrapUpRequested !== undefined ? { wrapUpRequested: step.wrapUpRequested } : {}),
 			...(step.acceptance ? { acceptance: step.acceptance } : {}),
-			...(step.agentContract ? { agentContract: step.agentContract } : {}),
 			...(step.launchContractDigest ? { launchContractDigest: step.launchContractDigest } : {}),
 			...(step.launchResolvedExtensions ? { launchResolvedExtensions: step.launchResolvedExtensions } : {}),
 			...(step.runtimeAcknowledgedExtensions ? { runtimeAcknowledgedExtensions: step.runtimeAcknowledgedExtensions } : {}),

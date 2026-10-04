@@ -468,12 +468,6 @@ export interface ParallelHandoffReference {
 	cleanupState: "complete" | "partial";
 }
 
-export interface AgentContract {
-	version: 1;
-}
-
-export type ChainGateLayer = "execution" | "acceptance";
-
 export type ExecutionProjectionStatus = "completed" | "failed" | "partial" | "paused" | "stopped" | "detached" | "blocked";
 
 export interface ExecutionProjection {
@@ -743,7 +737,6 @@ export interface SteeringRecoveryDescriptor {
 	requiredExtensions?: RequiredChildExtensionSnapshot;
 	runFanoutBudget: RunFanoutBudgetDescriptor;
 	sourceRunId: string;
-	agentContract?: AgentContract;
 	agent: string;
 	sessionFile?: string;
 	/** Git ref used to allocate managed worktrees for this run. */
@@ -1159,7 +1152,6 @@ export interface SingleResult {
 	structuredOutputPath?: string;
 	structuredOutputSchemaPath?: string;
 	acceptance?: AcceptanceLedger;
-	agentContract?: AgentContract;
 	launchContractDigest?: string;
 	launchResolvedExtensions?: LaunchResolvedChildExtensions;
 	runtimeAcknowledgedExtensions?: RuntimeAcknowledgedChildExtensions;
@@ -1774,7 +1766,6 @@ export interface AsyncStatus {
 		structuredOutputPath?: string;
 		structuredOutputSchemaPath?: string;
 		acceptance?: AcceptanceLedger;
-		agentContract?: AgentContract;
 		launchContractDigest?: string;
 		launchResolvedExtensions?: LaunchResolvedChildExtensions;
 		runtimeAcknowledgedExtensions?: RuntimeAcknowledgedChildExtensions;
@@ -1898,12 +1889,10 @@ export interface ForegroundResumeChild {
 	transcriptError?: string;
 	detachedReason?: string;
 	acceptance?: AcceptanceLedger;
-	agentContract?: AgentContract;
 	/** Private bounded launch fields needed to preserve the child contract on resume. */
 	resumeContract?: {
 		modelResponseAliases?: Record<string, string[]>;
 		outputSchema?: JsonSchemaObject | false;
-		agentContract?: AgentContract;
 		acceptance?: AcceptanceInput;
 		output?: string | boolean;
 		outputMode?: OutputMode;
@@ -2250,7 +2239,6 @@ export interface RunSyncOptions {
 		acceptanceReportPath?: string;
 		acceptanceReportRequired?: boolean;
 	};
-	agentContract?: AgentContract;
 	acceptance?: AcceptanceInput;
 	acceptanceContext?: {
 		mode?: SubagentRunMode;

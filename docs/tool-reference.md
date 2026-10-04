@@ -308,8 +308,17 @@ Edge cases:
 - The bare string `"none"` is rejected; use `{ level: "none", reason: "..." }` instead.
 - `acceptance: false` is accepted only as a deprecated shorthand for disabling gates.
 - For reviewer/read-only calls, omit `acceptance`.
-- The explicit value `"reviewed"` is not a policy level: it remains schema-recognized only so semantic preflight can explain the mistake without spawning a child. To require review of a writer result, use `acceptance: { level: "checked", review: { required: true, agent: "reviewer" } }` and orchestrate the reviewer separately.
-- With `agentContract: { version: 1 }`, omitted, `"auto"`, and `false` mean no acceptance request for that run; explicit acceptance is reported separately from execution.
+- The explicit value `"reviewed"` is not a policy level and is rejected as an invalid level. To require review of a writer result, use `acceptance: { level: "checked", review: { required: true, agent: "reviewer" } }` and orchestrate the reviewer separately.
+
+### Completion contract
+
+There is exactly one completion contract, and it fails closed:
+
+- Implementation tasks must produce file mutations. The completion guard is on by default for mutation-capable agents; `completionGuard: false` opts out for a run. A child that returns prose without edits exits non-zero with the missing-implementation error (`Subagent completed without making edits for an implementation task.`).
+- An explicit acceptance failure fails the run: the exit code becomes non-zero and the rejection message is appended to the error.
+- When acceptance is requested, the structured acceptance report is required; a missing report rejects the acceptance ledger.
+- Failures carry structured evidence, not just an error string: the acceptance ledger with per-check results, the `FileMutationEffect` (`expected`, `attempted`, `status: missing | observed | blocked | not-applicable`), and a settlement diagnostic (`mutation: { expected, attempted, observed }`).
+- Children run one-shot. Nothing auto-retries or auto-reviews a failed run; the evidence returns to the caller, and the parent decides the follow-up: re-plan, re-run with a sharper task, launch a reviewer child, or escalate. `BLOCKED` remains the child's own first-class terminal status for "cannot safely finish".
 
 ### Evidence status
 
@@ -360,4 +369,4 @@ async: true
 
 Supported: status artifacts, stdout/stderr logs, timeout, and stop. Full stdout and stderr are written to log files, while the in-memory final stdout response and stderr error are limited to their last 64 KiB.
 
-Intentionally unsupported: native Pi child options such as model override, structured output, acceptance/agent contract, tool budgets, fast mode, fork context, skills, or native Pi tools unless the runner explicitly implements them. Foreground/clarify, steer/resume/interrupt-as-pause, and nested subagents are also unsupported.
+Intentionally unsupported: native Pi child options such as model override, structured output, acceptance, tool budgets, fast mode, fork context, skills, or native Pi tools unless the runner explicitly implements them. Foreground/clarify, steer/resume/interrupt-as-pause, and nested subagents are also unsupported.

@@ -22,7 +22,6 @@ describe("planCompletionEvidence", () => {
 			mutationCapable: true,
 			mutationAttemptObserved: false,
 			mutationEvidence: evidence,
-			agentContractEnabled: false,
 		});
 
 		assert.equal(plan.guardTriggered, true);
@@ -36,27 +35,12 @@ describe("planCompletionEvidence", () => {
 		});
 	});
 
-	it("keeps agent contract rejection in evidence without forcing execution failure", () => {
-		const plan = planCompletionEvidence({
-			guard: { expectedMutation: true, attemptedMutation: false, triggered: true, blocked: false },
-			completionGuardEnabled: true,
-			mutationCapable: true,
-			mutationAttemptObserved: false,
-			agentContractEnabled: true,
-		});
-
-		assert.equal(plan.guardTriggered, true);
-		assert.equal(plan.fileMutation?.status, "missing");
-		assert.equal(plan.legacyFailureError, undefined);
-	});
-
 	it("projects blocked tool availability and observed/not-applicable completions", () => {
 		const blocked = planCompletionEvidence({
 			guard: { expectedMutation: true, attemptedMutation: false, triggered: false, blocked: true, message: "tools unavailable" },
 			completionGuardEnabled: true,
 			mutationCapable: false,
 			mutationAttemptObserved: true,
-			agentContractEnabled: false,
 		});
 		assert.deepEqual(blocked.fileMutation, {
 			status: "blocked",
@@ -81,7 +65,6 @@ describe("planCompletionEvidence", () => {
 			completionGuardEnabled: true,
 			mutationCapable: true,
 			mutationAttemptObserved: true,
-			agentContractEnabled: false,
 		});
 		assert.deepEqual(observed.fileMutation, {
 			status: "observed",
@@ -95,7 +78,6 @@ describe("planCompletionEvidence", () => {
 			completionGuardEnabled: true,
 			mutationCapable: true,
 			mutationAttemptObserved: false,
-			agentContractEnabled: false,
 		});
 		assert.deepEqual(notApplicable.fileMutation, {
 			status: "not-applicable",
@@ -109,7 +91,6 @@ describe("planCompletionEvidence", () => {
 			completionGuardEnabled: true,
 			mutationCapable: true,
 			mutationAttemptObserved: false,
-			agentContractEnabled: false,
 		});
 		assert.equal(plan.mutationExpected, true);
 		assert.equal(plan.fileMutation, undefined);
@@ -122,7 +103,6 @@ describe("projectSettlementDiagnostic", () => {
 			completionGuardEnabled: true,
 			mutationCapable: true,
 			mutationAttemptObserved: false,
-			agentContractEnabled: false,
 		});
 		assert.deepEqual(projectSettlementDiagnostic(plan, {
 			terminalFailed: true,
@@ -143,7 +123,6 @@ describe("projectSettlementDiagnostic", () => {
 			completionGuardEnabled: false,
 			mutationCapable: false,
 			mutationAttemptObserved: false,
-			agentContractEnabled: false,
 		});
 		assert.equal(projectSettlementDiagnostic(plan, {
 			terminalFailed: false,

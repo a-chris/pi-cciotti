@@ -62,12 +62,6 @@ const AcceptanceOverride = Type.Unsafe({
 		{ type: "string", enum: ["auto", "attested", "checked"] },
 		{
 			type: "string",
-			enum: ["reviewed"],
-			deprecated: true,
-			description: "Invalid as an explicit policy. Recognized only so preflight can explain that reviewed is an achieved status.",
-		},
-		{
-			type: "string",
 			pattern: "^\\s*\\{",
 		},
 		{ type: "boolean" },
@@ -75,10 +69,6 @@ const AcceptanceOverride = Type.Unsafe({
 	],
 	description: "Evidence policy; omit for read-only/review. false disables; true invalid. Prefer object; see guide tool-reference for levels, evidence and review.required.",
 });
-
-const AgentContractOverride = Type.Object({
-	version: Type.Integer({ minimum: 1, maximum: 1, description: "Enable compatibility behavior for this run/child." }),
-}, { additionalProperties: false, description: "Compatibility behavior. Omit for the default behavior." });
 
 const ToolBudgetBlock = Type.Unsafe({
 	anyOf: [
@@ -218,7 +208,6 @@ const SubagentParamProperties = {
 	model: Type.Optional(Type.String({ description: "Child model provider/id; bare id only if unique. Suffix :off/minimal/low/medium/high/xhigh/max overrides agent thinking default." })),
 	fast: Type.Optional(Type.Boolean({ description: "Native OpenAI-Codex priority tier; default false, may cost more/quota." })),
 	outputSchema: Type.Optional(OutputSchemaOverride),
-	agentContract: Type.Optional(AgentContractOverride),
 	acceptance: Type.Optional(AcceptanceOverride),
 	gate: Type.Optional(Type.String({ minLength: 1, description: "Host gate command. Cannot be combined with acceptance; an explicit acceptance of false is treated as omitted." })),
 };

@@ -22,12 +22,7 @@ import {
 } from "./agents.ts";
 import { serializeAgent } from "./agent-serializer.ts";
 import { mergeAgentsForScope } from "./agent-selection.ts";
-import { discoverAvailableSkills, resolveSkills } from "./skills.ts";
-import type { AvailableSkill } from "./proactive-skills.ts";
-import type { ProactiveSkillSubagentsConfig } from "../shared/types.ts";
-import {
-	buildProactiveSkillSubagentRecommendationLines,
-} from "./proactive-skills.ts";
+import { resolveSkills } from "./skills.ts";
 import { parseFrontmatter, parseFrontmatterList } from "./frontmatter.ts";
 import { resolveEffectiveThinking, toModelInfo } from "../shared/model-info.ts";
 import { resolveSubagentModelOverride, type ParentModel } from "../runs/shared/model-resolution.ts";
@@ -976,12 +971,6 @@ export function handleList(params: ManagementParams, ctx: ManagementContext): Ag
 	const agents = visibleAgents.filter((a) => isAgentAllowedByCapabilityCeiling(a.name, capabilityCeiling));
 	const restrictedAgents = visibleAgents.filter((a) => !isAgentAllowedByCapabilityCeiling(a.name, capabilityCeiling));
 	const restrictedSources = capabilityCeilingAgentRestrictionSources(capabilityCeiling);
-	const proactiveInput: { agents: AgentConfig[]; config?: ProactiveSkillSubagentsConfig | false; discoverAvailableSkills: () => AvailableSkill[] } = {
-		agents,
-		discoverAvailableSkills: () => discoverAvailableSkills(ctx.cwd),
-	};
-	if (ctx.config?.proactiveSkillSubagents !== undefined) proactiveInput.config = ctx.config.proactiveSkillSubagents;
-	const proactiveSuggestions = buildProactiveSkillSubagentRecommendationLines(proactiveInput);
 	const providerStatus = registeredExternalJobProviderStatus();
 	const providerNameSet = providerNames(providerStatus);
 	const capabilityMode = params.capabilities === true;
@@ -996,7 +985,6 @@ export function handleList(params: ManagementParams, ctx: ManagementContext): Ag
 	appendRestrictedAgentLines({ lines, agents: restrictedAgents, sources: restrictedSources, providerNames: providerNameSet, formatLine });
 	appendExternalJobRegistryLine(lines, [...agents, ...restrictedAgents], providerStatus);
 	appendAgentDiagnosticLines(lines, d.agentDiagnostics);
-	if (proactiveSuggestions.length) lines.push("", ...proactiveSuggestions);
 	return result(lines.join("\n"), false, agentCapabilityDetails({
 		capabilityMode,
 		agents,

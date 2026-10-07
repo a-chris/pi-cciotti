@@ -30,7 +30,7 @@ import { validateToolBudgetConfig } from "../runs/shared/tool-budget.ts";
 import { formatReviewGateLabel, validateAcceptanceInput } from "../runs/shared/acceptance.ts";
 import { resolveExternalCliRunnerStatus } from "../runs/shared/external-cli-contract.ts";
 import { resolveExternalCliBinaryAvailability, type ExternalCliBinaryAvailability } from "../runs/shared/external-cli-preflight.ts";
-import type { AcceptanceInput, AgentCapabilitiesSnapshot, AgentCapabilityRow, Details, ExtensionConfig, ToolBudgetConfig } from "../shared/types.ts";
+import type { AcceptanceInput, AgentCapabilitiesSnapshot, AgentCapabilityRow, Details, ToolBudgetConfig } from "../shared/types.ts";
 import { getProjectConfigDir } from "../shared/utils.ts";
 import { previewDisplayText } from "../shared/display-text.ts";
 import { capabilityCeilingAgentRestrictionSources, isAgentAllowedByCapabilityCeiling, resolveCurrentSubagentCapabilityCeiling } from "../runs/shared/capability-ceiling.ts";
@@ -39,7 +39,7 @@ import { listExternalJobProviders } from "../api/external-job-provider.ts";
 
 type ManagementAction = "list" | "get" | "models" | "create" | "update" | "delete" | "eject" | "disable" | "enable" | "reset";
 type ManagementScope = "user" | "project";
-type ManagementContext = Pick<ExtensionContext, "cwd" | "modelRegistry"> & { model?: ExtensionContext["model"]; config?: ExtensionConfig; currentSessionId?: string; runtimeAgentOwner?: RuntimeAgentOwner; onAgentsChanged?: () => void };
+type ManagementContext = Pick<ExtensionContext, "cwd" | "modelRegistry"> & { model?: ExtensionContext["model"]; currentSessionId?: string; runtimeAgentOwner?: RuntimeAgentOwner; onAgentsChanged?: () => void };
 
 interface ManagementParams {
 	action?: string;

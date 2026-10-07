@@ -93,6 +93,18 @@ When the focused editor is empty, press `↓` or `←` to expand the summary int
 
 FleetView and the under-editor async widget are both enabled by default; set `asyncWidget: false` to keep only FleetView. Successful background completions stay quiet so inactive Pi tabs are not marked unread, while failed or paused completions still notify the originating session. Parallel runs show every active child independently. Chains with parallel groups keep their grouped shape in progress and results, so failed or paused agents stay visible next to completed ones. Children cannot launch subagents, so the status tree is two levels: the run and its children.
 
+### Per-child context size in the footer
+
+While Pi children are live, FleetView also writes a one-line status to Pi's footer listing each child with its current context size:
+
+```text
+ctx worker1 67k · scout1 43k · scout2 12k
+```
+
+Each number is that run's latest assistant turn in tokens — the same measurement FleetView labels `window` — rounded for display (`66,500` shows as `67k`), so it shows how much context each child is sitting in, not what it has spent. Each child has its own model window, so values are never added together: every live child gets its own entry, largest first, at most five named with `· +N` counting the rest.
+
+When children share an agent type, the label carries an ordinal in launch order, so `scout1` is the child that started before `scout2` — the number says nothing about which context is larger. A type with one live child is still numbered (`worker1`), and ordinals are contiguous per type over the children that are live: when `scout1` finishes, the surviving child becomes `scout1`, so the line never shows a gap or a number that no longer exists. Children whose provider reports no usage, workflow wrapper totals, and non-Pi external jobs are left off the line rather than shown as zero. The line is part of FleetView, so it appears and disappears with running work, hides while the Fleet inspector is open or widgets are suspended for compaction, and is absent when `fleetView: false`.
+
 ## The fleet inspector
 
 `/subagents-fleet` opens the live fleet inspector with current-session foreground work, recent async children, structured Markdown/tool transcripts, and completed output/session paths.

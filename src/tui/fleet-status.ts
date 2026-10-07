@@ -1,7 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { type EditorComponent, isKeyRelease, Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { snapshotExternalRuns } from "../api/external-runs.ts";
-import { formatModelThinking } from "../shared/formatters.ts";
+import { formatModelThinking, formatTokens } from "../shared/formatters.ts";
 import type { AsyncJobState, AsyncJobStep, FleetViewPlacement, HostStepState, HostStepVerdict, NestedRunSummary, NestedStepSummary, SubagentState } from "../shared/types.ts";
 import { projectAsyncWorkflowRows, type AsyncStatusWorkflowRow } from "../runs/shared/async-status-projection.ts";
 import { contextModeLabel } from "../runs/shared/context-mode.ts";
@@ -12,10 +12,14 @@ import { inlineWorkflowRenderKey } from "./render.ts";
 import { formatWorkflowChecklistBottleneck, formatWorkflowChecklistPhase, formatWorkflowChecklistSummary, projectWorkflowChecklist, type WorkflowChecklistPhase, type WorkflowChecklistProjection } from "../workflows/workflow-checklist.ts";
 
 export const FLEET_STATUS_WIDGET_KEY = "subagent-fleet-status";
+/** Footer status line listing each live Pi child with its context size. */
+export const FLEET_CONTEXT_STATUS_KEY = "subagent-fleet-context";
 
 // Six rows fit the accepted collapsed hierarchy: one owner, four visible descendants, and overflow.
 const MAX_AGENT_ROWS = 6;
 const REFRESH_MS = 500;
+// The footer status line is one truncated row, so only the largest contexts are worth naming.
+const MAX_CONTEXT_STATUS_CHILDREN = 5;
 
 type Theme = ExtensionContext["ui"]["theme"];
 
@@ -50,7 +54,7 @@ export function fleetAgentIdentityColor(identity: string): (typeof FLEET_AGENT_I
 type FleetStatusTui = {
 	requestRender(): void;
 };
-type FleetStatusEntry = {
+export type FleetStatusEntry = {
 	key: string;
 	surface?: "project-pane";
 	parentKey?: string;
@@ -311,6 +315,43 @@ function fleetTreeRows(entries: FleetStatusEntry[]): FleetTreeRow[] {
 	return rows;
 }
 
+/**
+ * Format live Pi children's context occupancy with one entry per child, largest
+ * first, e.g. `ctx worker1 67k · scout1 43k · scout2 8k`. Same-type children are
+ * labelled in launch order, so `scout1` is the child that started before `scout2`;
+ * the ordinal never encodes which is larger. Children whose provider reports no
+ * usage are omitted rather than shown as zero, and non-Pi external jobs never
+ * contribute.
+ */
+export function formatFleetContextStatus(entries: readonly FleetStatusEntry[]): string {
+	type LiveChild = { agent: string; window: number; startedAt: number; label: string };
+	const live: LiveChild[] = [];
+	for (const entry of entries) {
+		if (entry.external || entry.workflowWrapper) continue;
+		const window = entry.window;
+		if (window === undefined || !Number.isFinite(window) || window <= 0) continue;
+		const agent = entry.agent.trim();
+		if (!agent) continue;
+		live.push({ agent, window, startedAt: entry.startedAt, label: agent });
+	}
+	if (live.length === 0) return "";
+	// Ordinals follow launch order per agent type, so the numbers stay put while two
+	// children are live; equal start times fall back to entry order for determinism.
+	const launched = [...live].sort((left, right) => left.startedAt - right.startedAt);
+	const startedCount = new Map<string, number>();
+	for (const child of launched) {
+		const occurrence = (startedCount.get(child.agent) ?? 0) + 1;
+		startedCount.set(child.agent, occurrence);
+		child.label = `${child.agent}${occurrence}`;
+	}
+	const ordered = launched.sort((left, right) => right.window - left.window || left.startedAt - right.startedAt);
+	const visible = ordered.slice(0, MAX_CONTEXT_STATUS_CHILDREN)
+		.map((child) => `${child.label} ${formatTokens(child.window)}`)
+		.join(" · ");
+	const overflow = ordered.length - MAX_CONTEXT_STATUS_CHILDREN;
+	return `ctx ${visible}${overflow > 0 ? ` · +${overflow}` : ""}`;
+}
+
 function foregroundDescription(control: { parentWorkflowRunId?: string; workflowKey?: string }, description: string | undefined): string | undefined {
 	if (!control.parentWorkflowRunId) return description;
 	const workflow = `workflow child: ${control.parentWorkflowRunId}${control.workflowKey ? ` (${control.workflowKey})` : ""}`;
@@ -509,6 +550,7 @@ export class SubagentFleetStatus {
 	private inputUnsubscribe: (() => void) | undefined;
 	private timer: ReturnType<typeof setInterval> | undefined;
 	private widgetRegistered = false;
+	private contextStatus: string | undefined;
 	private active = false;
 	private selectedKey = "main";
 	private inspectorOpen = false;
@@ -576,6 +618,7 @@ export class SubagentFleetStatus {
 			return;
 		}
 		this.entries = collectFleetStatusEntries(this.state);
+		this.syncContextStatus();
 		this.workflowSnapshots.clear();
 		if (this.active && !this.inspectorOpen && !this.state.fleetInspectorOpen && this.onWorkflowCoverageChange) {
 			const childrenByParent = new Map<string, AsyncJobState[]>();
@@ -1026,8 +1069,39 @@ export class SubagentFleetStatus {
 		}
 	}
 
+	/**
+	 * Publish live Pi children's per-agent context sizes to Pi's footer status line.
+	 * Writing only on change keeps the built-in status handling quiet on the 500ms tick.
+	 */
+	private syncContextStatus(): void {
+		const text = this.state.widgetsSuspended || this.inspectorOpen || this.state.fleetInspectorOpen
+			? ""
+			: formatFleetContextStatus(this.entries.filter((entry) => !entry.surface));
+		const status = text || undefined;
+		if (this.contextStatus === status) return;
+		this.contextStatus = status;
+		try {
+			this.writeContextStatus(this.ui, status);
+		} catch (error) {
+			this.contextStatus = undefined;
+			if (!isStaleExtensionContextError(error)) throw error;
+		}
+	}
+
+	/** Optional pi UI method, guarded the same way this class handles `onTerminalInput`. */
+	private writeContextStatus(ui: ExtensionContext["ui"] | undefined, status: string | undefined): void {
+		if (!ui || typeof ui.setStatus !== "function") return;
+		ui.setStatus(FLEET_CONTEXT_STATUS_KEY, status);
+	}
+
 	private clearWidget(): void {
 		this.clearWorkflowCoverage();
+		this.contextStatus = undefined;
+		try {
+			this.writeContextStatus(this.ui, undefined);
+		} catch (error) {
+			if (!isStaleExtensionContextError(error)) throw error;
+		}
 		if (!this.widgetRegistered) return;
 		try {
 			this.ui?.setWidget(FLEET_STATUS_WIDGET_KEY, undefined);
@@ -1048,10 +1122,12 @@ export class SubagentFleetStatus {
 		const inputUnsubscribe = this.inputUnsubscribe;
 		const ui = this.ui;
 		const widgetRegistered = this.widgetRegistered;
+		const statusRegistered = this.contextStatus !== undefined;
 		this.inputUnsubscribe = undefined;
 		this.ctx = undefined;
 		this.ui = undefined;
 		this.widgetRegistered = false;
+		this.contextStatus = undefined;
 		this.tui = undefined;
 
 		const cleanupErrors: unknown[] = [];
@@ -1059,6 +1135,13 @@ export class SubagentFleetStatus {
 			inputUnsubscribe?.();
 		} catch (error) {
 			if (!isStaleExtensionContextError(error)) cleanupErrors.push(error);
+		}
+		if (statusRegistered) {
+			try {
+				this.writeContextStatus(ui, undefined);
+			} catch (error) {
+				if (!isStaleExtensionContextError(error)) cleanupErrors.push(error);
+			}
 		}
 		if (ui && widgetRegistered) {
 			try {

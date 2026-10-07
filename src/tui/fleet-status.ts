@@ -12,14 +12,14 @@ import { inlineWorkflowRenderKey } from "./render.ts";
 import { formatWorkflowChecklistBottleneck, formatWorkflowChecklistPhase, formatWorkflowChecklistSummary, projectWorkflowChecklist, type WorkflowChecklistPhase, type WorkflowChecklistProjection } from "../workflows/workflow-checklist.ts";
 
 export const FLEET_STATUS_WIDGET_KEY = "subagent-fleet-status";
-/** Footer status line listing each live Pi child agent type with its context size. */
+/** Footer status line listing each live Pi child with its context size. */
 export const FLEET_CONTEXT_STATUS_KEY = "subagent-fleet-context";
 
 // Six rows fit the accepted collapsed hierarchy: one owner, four visible descendants, and overflow.
 const MAX_AGENT_ROWS = 6;
 const REFRESH_MS = 500;
 // The footer status line is one truncated row, so only the largest contexts are worth naming.
-const MAX_CONTEXT_STATUS_AGENTS = 5;
+const MAX_CONTEXT_STATUS_CHILDREN = 5;
 
 type Theme = ExtensionContext["ui"]["theme"];
 
@@ -316,28 +316,39 @@ function fleetTreeRows(entries: FleetStatusEntry[]): FleetTreeRow[] {
 }
 
 /**
- * Format live Pi children's context occupancy grouped by agent type, e.g.
- * `ctx scout 43k · worker 67k`. Each child has its own model window, so the
- * values are never summed: an agent type shows the largest window among its
- * live children. Children whose provider reports no usage are omitted rather
- * than shown as zero, and non-Pi external jobs never contribute.
+ * Format live Pi children's context occupancy with one entry per child, largest
+ * first, e.g. `ctx worker1 67k · scout1 43k · scout2 8k`. Same-type children are
+ * labelled in launch order, so `scout1` is the child that started before `scout2`;
+ * the ordinal never encodes which is larger. Children whose provider reports no
+ * usage are omitted rather than shown as zero, and non-Pi external jobs never
+ * contribute.
  */
 export function formatFleetContextStatus(entries: readonly FleetStatusEntry[]): string {
-	const largestByAgent = new Map<string, number>();
+	type LiveChild = { agent: string; window: number; startedAt: number; label: string };
+	const live: LiveChild[] = [];
 	for (const entry of entries) {
 		if (entry.external || entry.workflowWrapper) continue;
 		const window = entry.window;
 		if (window === undefined || !Number.isFinite(window) || window <= 0) continue;
 		const agent = entry.agent.trim();
 		if (!agent) continue;
-		largestByAgent.set(agent, Math.max(largestByAgent.get(agent) ?? 0, window));
+		live.push({ agent, window, startedAt: entry.startedAt, label: agent });
 	}
-	if (largestByAgent.size === 0) return "";
-	const ordered = [...largestByAgent.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
-	const visible = ordered.slice(0, MAX_CONTEXT_STATUS_AGENTS)
-		.map(([agent, window]) => `${agent} ${formatTokens(window)}`)
+	if (live.length === 0) return "";
+	// Ordinals follow launch order per agent type, so the numbers stay put while two
+	// children are live; equal start times fall back to entry order for determinism.
+	const launched = [...live].sort((left, right) => left.startedAt - right.startedAt);
+	const startedCount = new Map<string, number>();
+	for (const child of launched) {
+		const occurrence = (startedCount.get(child.agent) ?? 0) + 1;
+		startedCount.set(child.agent, occurrence);
+		child.label = `${child.agent}${occurrence}`;
+	}
+	const ordered = launched.sort((left, right) => right.window - left.window || left.startedAt - right.startedAt);
+	const visible = ordered.slice(0, MAX_CONTEXT_STATUS_CHILDREN)
+		.map((child) => `${child.label} ${formatTokens(child.window)}`)
 		.join(" · ");
-	const overflow = ordered.length - MAX_CONTEXT_STATUS_AGENTS;
+	const overflow = ordered.length - MAX_CONTEXT_STATUS_CHILDREN;
 	return `ctx ${visible}${overflow > 0 ? ` · +${overflow}` : ""}`;
 }
 

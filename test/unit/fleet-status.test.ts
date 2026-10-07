@@ -170,36 +170,43 @@ describe("below-editor subagent FleetView", () => {
 		} finally { fleet.dispose(); }
 	});
 
-	it("reports one context size per agent type and omits children without usage", () => {
+	it("numbers live children per agent type in launch order and omits children without usage", () => {
 		const entry = (over: Partial<FleetStatusEntry>): FleetStatusEntry => ({
 			key: over.key ?? "async:x", agent: "worker", startedAt: 0, tokens: 0, state: "running", ...over,
 		});
-		// Same agent type takes the largest window; siblings of other types stay separate.
+		// Ordinals follow launch order, so worker1 is the child that started first even
+		// though worker2 has the larger window; the line stays ordered largest-first.
 		assert.equal(formatFleetContextStatus([
-			entry({ key: "a", agent: "worker", window: 1_200 }),
-			entry({ key: "b", agent: "worker", window: 66_500 }),
-			entry({ key: "c", agent: "scout", window: 43_000 }),
-		]), "ctx worker 67k · scout 43k");
+			entry({ key: "a", agent: "worker", startedAt: 1_000, window: 1_200 }),
+			entry({ key: "b", agent: "worker", startedAt: 2_000, window: 66_500 }),
+			entry({ key: "c", agent: "scout", startedAt: 3_000, window: 43_000 }),
+		]), "ctx worker2 67k · scout1 43k · worker1 1.2k");
+		// Ordinals are per agent type, so an oracle launched after a worker is oracle1.
+		assert.equal(formatFleetContextStatus([
+			entry({ key: "a", agent: "worker", startedAt: 1_000, window: 5_000 }),
+			entry({ key: "b", agent: "oracle", startedAt: 2_000, window: 9_000 }),
+		]), "ctx oracle1 9.0k · worker1 5.0k");
 		// Providers without usage, workflow wrapper totals, and non-Pi jobs report nothing
 		// rather than a misleading zero.
 		assert.equal(formatFleetContextStatus([
 			entry({ window: undefined }), entry({ agent: "workflow", workflowWrapper: true, window: 5_000 }),
 			entry({ agent: "external · review", external: true, window: 9_000 }),
 		]), "");
-		// A footer line stays one line: the five largest are named, the rest are counted.
-		assert.equal(formatFleetContextStatus(["a", "b", "c", "d", "e", "f"].map((agent, index) => entry({ key: agent, agent, window: (index + 1) * 10_000 }))),
-			"ctx f 60k · e 50k · d 40k · c 30k · b 20k · +1");
+		// A footer line stays one line: the five largest children are named, the rest counted.
+		assert.equal(formatFleetContextStatus(["a", "b", "c", "d", "e", "f"].map((agent, index) => entry({ key: agent, agent, startedAt: (index + 1) * 1_000, window: (index + 1) * 10_000 }))),
+			"ctx f1 60k · e1 50k · d1 40k · c1 30k · b1 20k · +1");
 	});
 
-	it("lists each live agent type's context size in the footer status line", () => {
+	it("lists each live child's context size in the footer status line", () => {
 		const state = stateForTest();
-		const runs: Array<[id: string, agent: string, window: number]> = [
-			["scout-run", "scout", 43_000],
-			["worker-run", "worker", 67_000],
-			["worker-run-two", "worker", 12_000],
+		const launched = Date.now();
+		const runs: Array<[id: string, agent: string, startedAt: number, window: number]> = [
+			["scout-run", "scout", launched, 43_000],
+			["worker-run", "worker", launched + 1_000, 67_000],
+			["worker-run-two", "worker", launched + 2_000, 12_000],
 		];
-		for (const [runId, agent, window] of runs) state.foregroundControls.set(runId, {
-			runId, mode: "single", currentAgent: agent, startedAt: Date.now(), updatedAt: Date.now(),
+		for (const [runId, agent, startedAt, window] of runs) state.foregroundControls.set(runId, {
+			runId, mode: "single", currentAgent: agent, startedAt, updatedAt: Date.now(),
 			tokens: 5_000, window,
 		});
 		const statuses = new Map<string, string | undefined>();
@@ -207,8 +214,13 @@ describe("below-editor subagent FleetView", () => {
 		const fleet = new SubagentFleetStatus(state, () => {}, { refreshMs: 60_000 });
 		try {
 			fleet.setContext({ hasUI: true, ui } as unknown as ExtensionContext);
-			// Largest context first, one entry per agent type: workers 67k and 12k report 67k.
-			assert.equal(statuses.get(FLEET_CONTEXT_STATUS_KEY), "ctx worker 67k · scout 43k");
+			// Largest context first; worker-run-two launched last, so it keeps the highest ordinal.
+			assert.equal(statuses.get(FLEET_CONTEXT_STATUS_KEY), "ctx worker1 67k · scout1 43k · worker2 12k");
+			// Finishing worker1 renumbers the survivor: ordinals are contiguous over the live
+			// children of each type, so no gaps or stale numbers are left behind.
+			state.foregroundControls.delete("worker-run");
+			fleet.refresh();
+			assert.equal(statuses.get(FLEET_CONTEXT_STATUS_KEY), "ctx scout1 43k · worker1 12k");
 			for (const [runId] of runs) state.foregroundControls.delete(runId);
 			fleet.refresh();
 			assert.equal(statuses.get(FLEET_CONTEXT_STATUS_KEY), undefined);

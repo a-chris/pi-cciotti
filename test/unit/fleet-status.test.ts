@@ -7,13 +7,16 @@ import type { SubagentState } from "../../src/shared/types.ts";
 import { EXTERNAL_RUN_REGISTRY_KEY, EXTERNAL_RUN_REGISTRY_VERSION, registerExternalRun } from "../../src/api/external-runs.ts";
 import { collectFleetSnapshot } from "../../src/tui/fleet.ts";
 import {
+	FLEET_CONTEXT_STATUS_KEY,
 	FLEET_STATUS_WIDGET_KEY,
 	SubagentFleetStatus,
 	collectFleetStatusEntries,
 	fleetAgentIdentityColor,
+	formatFleetContextStatus,
 	formatFleetElapsed,
 	formatFleetTokens,
 	resolveFleetViewPlacement,
+	type FleetStatusEntry,
 } from "../../src/tui/fleet-status.ts";
 
 function clearExternalRuns(): void {
@@ -164,6 +167,51 @@ describe("below-editor subagent FleetView", () => {
 			const compact = fleet.render(240, theme as unknown as ExtensionContext["ui"]["theme"]).join("\n");
 			assert.match(compact, /standalone: ↓ 30\.0k window · 42\.0k spent · workflow usage on child rows/);
 			assert.doesNotMatch(compact, /119\.2k|161\.2k|280\.4k|Σ windows/);
+		} finally { fleet.dispose(); }
+	});
+
+	it("reports one context size per agent type and omits children without usage", () => {
+		const entry = (over: Partial<FleetStatusEntry>): FleetStatusEntry => ({
+			key: over.key ?? "async:x", agent: "worker", startedAt: 0, tokens: 0, state: "running", ...over,
+		});
+		// Same agent type takes the largest window; siblings of other types stay separate.
+		assert.equal(formatFleetContextStatus([
+			entry({ key: "a", agent: "worker", window: 1_200 }),
+			entry({ key: "b", agent: "worker", window: 66_500 }),
+			entry({ key: "c", agent: "scout", window: 43_000 }),
+		]), "ctx worker 67k · scout 43k");
+		// Providers without usage, workflow wrapper totals, and non-Pi jobs report nothing
+		// rather than a misleading zero.
+		assert.equal(formatFleetContextStatus([
+			entry({ window: undefined }), entry({ agent: "workflow", workflowWrapper: true, window: 5_000 }),
+			entry({ agent: "external · review", external: true, window: 9_000 }),
+		]), "");
+		// A footer line stays one line: the five largest are named, the rest are counted.
+		assert.equal(formatFleetContextStatus(["a", "b", "c", "d", "e", "f"].map((agent, index) => entry({ key: agent, agent, window: (index + 1) * 10_000 }))),
+			"ctx f 60k · e 50k · d 40k · c 30k · b 20k · +1");
+	});
+
+	it("lists each live agent type's context size in the footer status line", () => {
+		const state = stateForTest();
+		const runs: Array<[id: string, agent: string, window: number]> = [
+			["scout-run", "scout", 43_000],
+			["worker-run", "worker", 67_000],
+			["worker-run-two", "worker", 12_000],
+		];
+		for (const [runId, agent, window] of runs) state.foregroundControls.set(runId, {
+			runId, mode: "single", currentAgent: agent, startedAt: Date.now(), updatedAt: Date.now(),
+			tokens: 5_000, window,
+		});
+		const statuses = new Map<string, string | undefined>();
+		const ui = { setWidget() {}, setStatus: (key: string, text: string | undefined) => { statuses.set(key, text); }, theme };
+		const fleet = new SubagentFleetStatus(state, () => {}, { refreshMs: 60_000 });
+		try {
+			fleet.setContext({ hasUI: true, ui } as unknown as ExtensionContext);
+			// Largest context first, one entry per agent type: workers 67k and 12k report 67k.
+			assert.equal(statuses.get(FLEET_CONTEXT_STATUS_KEY), "ctx worker 67k · scout 43k");
+			for (const [runId] of runs) state.foregroundControls.delete(runId);
+			fleet.refresh();
+			assert.equal(statuses.get(FLEET_CONTEXT_STATUS_KEY), undefined);
 		} finally { fleet.dispose(); }
 	});
 

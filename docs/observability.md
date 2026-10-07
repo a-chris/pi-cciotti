@@ -93,6 +93,16 @@ When the focused editor is empty, press `↓` or `←` to expand the summary int
 
 FleetView and the under-editor async widget are both enabled by default; set `asyncWidget: false` to keep only FleetView. Successful background completions stay quiet so inactive Pi tabs are not marked unread, while failed or paused completions still notify the originating session. Parallel runs show every active child independently. Chains with parallel groups keep their grouped shape in progress and results, so failed or paused agents stay visible next to completed ones. Children cannot launch subagents, so the status tree is two levels: the run and its children.
 
+### Per-agent context size in the footer
+
+While Pi children are live, FleetView also writes a one-line status to Pi's footer listing each agent type with its current context size:
+
+```text
+ctx worker 67k · scout 43k
+```
+
+Each number is that run's latest assistant turn in tokens — the same measurement FleetView labels `window` — rounded for display (`66,500` shows as `67k`), so it shows how much context each child is sitting in, not what it has spent. Each child has its own model window, so values are never added together: when several children share an agent type, the line shows the largest of them, and each type appears once. At most five types are named, largest first, with `· +N` counting the rest. Children whose provider reports no usage, workflow wrapper totals, and non-Pi external jobs are left off the line rather than shown as zero. The line is part of FleetView, so it appears and disappears with running work, hides while the Fleet inspector is open or widgets are suspended for compaction, and is absent when `fleetView: false`.
+
 ## The fleet inspector
 
 `/subagents-fleet` opens the live fleet inspector with current-session foreground work, recent async children, structured Markdown/tool transcripts, and completed output/session paths.

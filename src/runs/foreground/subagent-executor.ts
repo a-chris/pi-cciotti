@@ -6234,7 +6234,6 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			return handleManagementAction(action, paramsWithResolvedCwd, {
 				...ctx,
 				cwd: requestCwd,
-				config: deps.config,
 				currentSessionId: deps.state.currentSessionId ?? ctx.sessionManager.getSessionId() ?? undefined,
 				runtimeAgentOwner: deps.pi,
 				onAgentsChanged: deps.onAgentsChanged,

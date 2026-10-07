@@ -22,12 +22,7 @@ import {
 } from "./agents.ts";
 import { serializeAgent } from "./agent-serializer.ts";
 import { mergeAgentsForScope } from "./agent-selection.ts";
-import { discoverAvailableSkills, resolveSkills } from "./skills.ts";
-import type { AvailableSkill } from "./proactive-skills.ts";
-import type { ProactiveSkillSubagentsConfig } from "../shared/types.ts";
-import {
-	buildProactiveSkillSubagentRecommendationLines,
-} from "./proactive-skills.ts";
+import { resolveSkills } from "./skills.ts";
 import { parseFrontmatter, parseFrontmatterList } from "./frontmatter.ts";
 import { resolveEffectiveThinking, toModelInfo } from "../shared/model-info.ts";
 import { resolveSubagentModelOverride, type ParentModel } from "../runs/shared/model-resolution.ts";
@@ -35,7 +30,7 @@ import { validateToolBudgetConfig } from "../runs/shared/tool-budget.ts";
 import { formatReviewGateLabel, validateAcceptanceInput } from "../runs/shared/acceptance.ts";
 import { resolveExternalCliRunnerStatus } from "../runs/shared/external-cli-contract.ts";
 import { resolveExternalCliBinaryAvailability, type ExternalCliBinaryAvailability } from "../runs/shared/external-cli-preflight.ts";
-import type { AcceptanceInput, AgentCapabilitiesSnapshot, AgentCapabilityRow, Details, ExtensionConfig, ToolBudgetConfig } from "../shared/types.ts";
+import type { AcceptanceInput, AgentCapabilitiesSnapshot, AgentCapabilityRow, Details, ToolBudgetConfig } from "../shared/types.ts";
 import { getProjectConfigDir } from "../shared/utils.ts";
 import { previewDisplayText } from "../shared/display-text.ts";
 import { capabilityCeilingAgentRestrictionSources, isAgentAllowedByCapabilityCeiling, resolveCurrentSubagentCapabilityCeiling } from "../runs/shared/capability-ceiling.ts";
@@ -44,7 +39,7 @@ import { listExternalJobProviders } from "../api/external-job-provider.ts";
 
 type ManagementAction = "list" | "get" | "models" | "create" | "update" | "delete" | "eject" | "disable" | "enable" | "reset";
 type ManagementScope = "user" | "project";
-type ManagementContext = Pick<ExtensionContext, "cwd" | "modelRegistry"> & { model?: ExtensionContext["model"]; config?: ExtensionConfig; currentSessionId?: string; runtimeAgentOwner?: RuntimeAgentOwner; onAgentsChanged?: () => void };
+type ManagementContext = Pick<ExtensionContext, "cwd" | "modelRegistry"> & { model?: ExtensionContext["model"]; currentSessionId?: string; runtimeAgentOwner?: RuntimeAgentOwner; onAgentsChanged?: () => void };
 
 interface ManagementParams {
 	action?: string;
@@ -976,12 +971,6 @@ export function handleList(params: ManagementParams, ctx: ManagementContext): Ag
 	const agents = visibleAgents.filter((a) => isAgentAllowedByCapabilityCeiling(a.name, capabilityCeiling));
 	const restrictedAgents = visibleAgents.filter((a) => !isAgentAllowedByCapabilityCeiling(a.name, capabilityCeiling));
 	const restrictedSources = capabilityCeilingAgentRestrictionSources(capabilityCeiling);
-	const proactiveInput: { agents: AgentConfig[]; config?: ProactiveSkillSubagentsConfig | false; discoverAvailableSkills: () => AvailableSkill[] } = {
-		agents,
-		discoverAvailableSkills: () => discoverAvailableSkills(ctx.cwd),
-	};
-	if (ctx.config?.proactiveSkillSubagents !== undefined) proactiveInput.config = ctx.config.proactiveSkillSubagents;
-	const proactiveSuggestions = buildProactiveSkillSubagentRecommendationLines(proactiveInput);
 	const providerStatus = registeredExternalJobProviderStatus();
 	const providerNameSet = providerNames(providerStatus);
 	const capabilityMode = params.capabilities === true;
@@ -996,7 +985,6 @@ export function handleList(params: ManagementParams, ctx: ManagementContext): Ag
 	appendRestrictedAgentLines({ lines, agents: restrictedAgents, sources: restrictedSources, providerNames: providerNameSet, formatLine });
 	appendExternalJobRegistryLine(lines, [...agents, ...restrictedAgents], providerStatus);
 	appendAgentDiagnosticLines(lines, d.agentDiagnostics);
-	if (proactiveSuggestions.length) lines.push("", ...proactiveSuggestions);
 	return result(lines.join("\n"), false, agentCapabilityDetails({
 		capabilityMode,
 		agents,

@@ -21,7 +21,7 @@ const CURSOR_FILE_MUTATION_THINKING =
 	/(?:^|\n)\s*Cursor (?:edit|write)\s*:/i;
 
 export function completionGuardEnabled(flag: boolean | undefined): boolean {
-	return flag !== false;
+	return flag === true;
 }
 
 export interface CompletionMutationGuardInput {

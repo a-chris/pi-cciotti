@@ -1181,5 +1181,12 @@ describe("builtin agent overrides", () => {
 			{ description: "   " } as Parameters<typeof buildBuiltinOverrideConfig>[1],
 		);
 		assert.equal(whitespaceDescription, undefined);
+
+		// A base that omits completionGuard is off; a draft opting in is a real change and must be recorded.
+		const optedIn = buildBuiltinOverrideConfig(
+			{ description: "Base description" },
+			{ completionGuard: true },
+		);
+		assert.equal(optedIn?.completionGuard, true);
 	});
 });

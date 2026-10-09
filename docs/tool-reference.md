@@ -314,7 +314,7 @@ Edge cases:
 
 There is exactly one completion contract, and it fails closed:
 
-- Implementation tasks must produce file mutations. The completion guard is on by default for mutation-capable agents; `completionGuard: false` opts out for a run. A child that returns prose without edits exits non-zero with the missing-implementation error (`Subagent completed without making edits for an implementation task.`).
+- Implementation tasks must produce file mutations. The completion guard is on by default for the builtin `worker` and off for every other agent; set `completionGuard: true` to opt a custom mutation-capable agent in, `completionGuard: false` to opt out. A child that returns prose without edits exits non-zero with the missing-implementation error (`Subagent completed without making edits for an implementation task.`).
 - An explicit acceptance failure fails the run: the exit code becomes non-zero and the rejection message is appended to the error.
 - When acceptance is requested, the structured acceptance report is required; a missing report rejects the acceptance ledger.
 - Failures carry structured evidence, not just an error string: the acceptance ledger with per-check results, the `FileMutationEffect` (`expected`, `attempted`, `status: missing | observed | blocked | not-applicable`), and a settlement diagnostic (`mutation: { expected, attempted, observed }`).

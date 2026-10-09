@@ -132,7 +132,7 @@ export function serializeAgent(config: AgentConfig, options: SerializeAgentOptio
 
 	if (config.defaultProgress) lines.push("defaultProgress: true");
 	if (config.interactive) lines.push("interactive: true");
-	if (config.completionGuard === false || preserve("completionGuard")) {
+	if (config.completionGuard === true || preserve("completionGuard")) {
 		lines.push(`completionGuard: ${config.completionGuard === undefined ? "" : config.completionGuard ? "true" : "false"}`);
 	}
 	if (config.toolBudget || preserve("toolBudget")) {

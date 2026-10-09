@@ -951,21 +951,22 @@ Advise only.
 		assert.match(readText(invalid), /config\.acceptanceRole must be 'read-only', 'writer', or false/);
 	});
 
-	it("creates agents with completion guard disabled", () => {
+	it("creates agents with completion guard opted in", () => {
 		const ctx = { cwd: tempDir, modelRegistry: { getAvailable: () => [] } };
 		const result = handleCreate(
-			{ config: { name: "test-runner", description: "Run tests", scope: "project", tools: "read, grep, bash, ls", completionGuard: false } },
+			{ config: { name: "test-runner", description: "Run tests", scope: "project", tools: "read, grep, bash, ls", completionGuard: true } },
 			ctx,
 		);
 
 		assert.equal(result.isError, false);
 		const filePath = path.join(tempDir, ".pi", "agents", "test-runner.md");
 		const content = fs.readFileSync(filePath, "utf-8");
-		assert.match(content, /^completionGuard: false$/m);
+		assert.match(content, /^completionGuard: true$/m);
 
 		const got = handleManagementAction("get", { agent: "test-runner" }, ctx);
 		assert.equal(got.isError, false);
-		assert.match(readText(got), /Completion guard: false/);
+		// The display line only fires for an explicit opt-out; an opt-in stays silent.
+		assert.doesNotMatch(readText(got), /Completion guard: false/);
 	});
 
 	it("rejects non-boolean completion guard config", () => {

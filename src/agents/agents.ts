@@ -1584,8 +1584,8 @@ export function buildBuiltinOverrideConfig(
 		override.subagentOnlyExtensions = draft.subagentOnlyExtensions ? [...draft.subagentOnlyExtensions] : false;
 	}
 	if (!arraysEqual(draft.mutationTools, base.mutationTools)) override.mutationTools = draft.mutationTools ? [...draft.mutationTools] : false;
-	if ((draft.completionGuard !== false) !== (base.completionGuard !== false)) {
-		override.completionGuard = draft.completionGuard !== false;
+	if ((draft.completionGuard === true) !== (base.completionGuard === true)) {
+		override.completionGuard = draft.completionGuard === true;
 	}
 	if (JSON.stringify(draft.toolBudget) !== JSON.stringify(base.toolBudget)) override.toolBudget = draft.toolBudget ?? false;
 

@@ -5,6 +5,7 @@ advertise: true
 systemPromptMode: append
 inheritProjectContext: true
 tools: read, grep, find, ls, bash, edit, write
+completionGuard: false
 inheritSkills: false
 ---
 

@@ -13,7 +13,7 @@ Builtin agents inherit your current Pi default model. This keeps new installs fr
 
 Precedence, strongest first: per-run override → provider-scoped role override → `agentOverrides.<name>.model` → agent frontmatter `model` → `subagents.defaultModel` → the parent session model. A provider preference does not replace this order; it only resolves bare model ids when the active registry has more than one match. Fully qualified `provider/model` strings still win exactly.
 
-Each launch resolves one model. Provider errors, including HTTP 429 responses, are returned from that model rather than selecting another one. Separately, a verified compaction abort after useful progress may continue the retained child session once on the same resolved model; this lifecycle recovery preserves work and is not model fallback.
+Each launch resolves an ordered candidate chain: the primary model above, followed by the agent's declared [`fallbackModels`](#fallback-models) (usually none). Provider-style failures — authentication, quota/credits, rate limits, HTTP 5xx, timeouts, unavailable models, empty responses — advance to the next candidate in the chain, but only before the child has called any tool; after tool use the failure is returned instead of redoing side effects on another model. Context overflow never rotates. Separately, a verified compaction abort after useful progress may continue the retained child session once on the same model; this lifecycle recovery preserves work and is not model fallback.
 
 Use `model: "inherit"` in agent frontmatter or `agentOverrides.<name>.model` to select the current parent session model explicitly.
 
@@ -84,6 +84,37 @@ For a persistent role override:
 
 `subagents.defaultModel` and `subagents.defaultProvider` apply to builtin, package, user, and project agents. `defaultModel` fills only agents that do not set `model` in frontmatter. `defaultProvider` is also applied to frontmatter and override models so bare ids resolve against the intended provider. Per-run model overrides and `agentOverrides.<name>.model` win over frontmatter and the global default. The same `agentOverrides` block can change `tools`, `skills`, inherited context, prompt text, or disable an agent (see [agents.md](agents.md)); matching custom-agent frontmatter is replaced for any field set by the override.
 
+## Fallback models
+
+An agent can declare an ordered chain of backup models. When its primary model fails with a provider-style error before any tool use, the extension transparently retries the next declared model within the same launch. The orchestrating model is not involved: no call parameter selects or manages fallbacks, and delegation stays `subagent({ agent, task })`.
+
+Declare the chain in agent frontmatter:
+
+```yaml
+model: openai/gpt-5.6-luna
+fallbackModels:
+  - anthropic/claude-sonnet-4
+  - openrouter/deepseek/deepseek-chat
+```
+
+or for one role through settings:
+
+```json
+{
+  "subagents": {
+    "agentOverrides": {
+      "worker": { "fallbackModels": ["anthropic/claude-sonnet-4"] }
+    }
+  }
+}
+```
+
+Each entry is resolved with the same fuzzy matching as `model` (bare ids, separator and case variants, date stamps). Entries missing from the active registry are skipped with a warning; if the primary does not resolve, the launch fails as before. Under `modelScope`, fallbacks warn by default and fail only under `strict: true`.
+
+Which failures advance the chain: quota/credit and usage-limit errors, auth failures, HTTP 401/429/5xx, connection and stream errors, timeouts, unavailable or unknown models, and empty/no-output attempts — all only before the child has called a tool. Which never do: context overflow, tool-call failures, runs stopped or timed out, and workflow-permit runs (fallback is rejected for those with an explicit error). One compaction-abort resume per run stays pinned to the same model.
+
+Bounding and observability: a fallback retry starts only while the run deadline has not passed and no stop/abort signal is raised, and usage is aggregated across attempts. When a fallback happens, the run output carries a note like `[fallback] openai/gpt-5.6-luna failed: … Retrying with anthropic/claude-sonnet-4.` and the result reports the model that finally served. Persistent model exclusions and read-only HTTP 429 session continuation are not part of this mechanism.
+
 ## Fast mode
 
 Set `fast: true` on a run, in agent frontmatter, or in `subagents.agentOverrides.<name>.fast` to request the OpenAI priority service tier for supported native OpenAI-Codex children. This can use a higher quota tier or cost more. It is off by default.
@@ -101,7 +132,7 @@ A setup that works well in practice: route agents by task shape instead of runni
 
 The routing rule: use the capability tiers (1–3) when the task is well-scoped, and the intent tier (4) when scoping or judging is the task itself.
 
-Each launch resolves one model and starts the child once. Provider, authentication, quota, rate-limit, stream, empty-response, context-overflow, and provisioning failures are returned from that attempt. To try another model, the parent or operator must issue a later explicit launch.
+Each launch resolves one candidate chain and starts the child once per candidate. Provider, authentication, quota, rate-limit, stream, empty-response, and provisioning failures advance the chain (see [Fallback models](#fallback-models)); context overflow is terminal for the attempt. When every candidate fails, the run reports the last failure.
 
 ## Thinking level defaults
 

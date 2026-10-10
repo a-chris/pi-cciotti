@@ -123,7 +123,7 @@ You can override selected agent fields without copying the whole agent. Override
 }
 ```
 
-Supported override fields: `description`, `output`, `outputMode`, `defaultReads`, `model`, `defaultProvider`, `thinking`, `systemPromptMode`, `inheritProjectContext`, `inheritGlobalContext`, `inheritSkills`, `defaultContext`, `contextBrief`, `acceptanceRole`, `disabled`, `skills`, `tools`, and `systemPrompt`.
+Supported override fields: `description`, `output`, `outputMode`, `defaultReads`, `model`, `fallbackModels`, `defaultProvider`, `thinking`, `systemPromptMode`, `inheritProjectContext`, `inheritGlobalContext`, `inheritSkills`, `defaultContext`, `contextBrief`, `acceptanceRole`, `disabled`, `skills`, `tools`, and `systemPrompt`.
 
 - `description` replaces the discovered description for builtin and custom agents, which lets list output show deployment-specific routing or model metadata.
 - Use `output: false`, `defaultReads: false`, `defaultContext: false`, or `acceptanceRole: false` to clear an inherited value.
@@ -228,6 +228,7 @@ Field notes:
 | `extensions` | Omitted means a background child loads the parent's ambient extensions; empty means no ambient extensions; list values load exactly those extensions. Foreground children never load ambient extensions, so for them only listed values apply. |
 | `subagentOnlyExtensions` | Extension paths loaded only in this agent's child sessions. Tools registered there are unavailable to the main agent unless also installed through normal Pi extension configuration. |
 | `model` | Default model. Bare ids prefer the current provider when possible, then unique registry matches. |
+| `fallbackModels` | Optional ordered backup models. A provider-style failure before any tool use retries the next entry within the same launch; see [models.md](models.md#fallback-models). |
 | `thinking` | Appended as a `:level` suffix at runtime unless a suffix is already present. |
 | `systemPromptMode` | `replace` by default; `append` keeps Pi's base prompt. |
 | `inheritProjectContext` | Keeps or strips inherited repository instruction blocks. |

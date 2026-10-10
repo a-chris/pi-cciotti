@@ -2253,6 +2253,36 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		assert.equal(mockPi.callCount(), 1);
 	});
 
+	it("retries with the agent's fallback model on a retryable provider failure", async () => {
+		mockPi.onCall({
+			jsonl: [{
+				type: "message_end",
+				message: {
+					role: "assistant",
+					content: [{ type: "text", text: "temporary provider failure" }],
+					model: "openai/gpt-5-mini",
+					errorMessage: "rate limit exceeded",
+					usage: { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, cost: { total: 0.01 } },
+				},
+			}],
+			exitCode: 1,
+		});
+		mockPi.onCall({ output: "Recovered on fallback" });
+		const agents = [makeAgent("echo", {
+			model: "openai/gpt-5-mini",
+			fallbackModels: ["anthropic/claude-sonnet-4"],
+		})];
+
+		const result = await runSync(tempDir, agents, "echo", "Task", {
+			runId: "fallback-sync",
+		});
+
+		assert.equal(result.exitCode, 0);
+		assert.equal(result.model, "anthropic/claude-sonnet-4");
+		assert.equal(result.usage.turns, 2);
+		assert.equal(mockPi.callCount(), 2);
+	});
+
 	it("fails zero-exit provider errors after one launch", async () => {
 		mockPi.onCall({
 			jsonl: [{

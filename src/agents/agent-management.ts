@@ -258,6 +258,7 @@ export function editableAgentConfig(agent: AgentConfig): AgentConfig {
 		outputMode: _outputMode,
 		defaultReads: _defaultReads,
 		model: _model,
+		fallbackModels: _fallbackModels,
 		fast: _fast,
 		thinking: _thinking,
 		systemPromptMode: _systemPromptMode,
@@ -294,6 +295,7 @@ export function editableAgentConfig(agent: AgentConfig): AgentConfig {
 		...(base.outputMode !== undefined ? { outputMode: base.outputMode } : {}),
 		...(base.defaultReads !== undefined ? { defaultReads: [...base.defaultReads] } : {}),
 		...(base.model !== undefined && hasDeclaredField("model") ? { model: base.model } : {}),
+		...(base.fallbackModels !== undefined ? { fallbackModels: [...base.fallbackModels] } : {}),
 		...(base.fast !== undefined ? { fast: base.fast } : {}),
 		...(base.thinking !== undefined && hasDeclaredField("thinking") ? { thinking: base.thinking } : {}),
 		systemPromptMode: base.systemPromptMode,
@@ -341,6 +343,7 @@ export function preservedAgentFrontmatterFields(agent: AgentConfig, cfg: Record<
 	if (hasKey(cfg, "systemPrompt")) changed("systemPrompt");
 	if (hasKey(cfg, "runner")) changed("runner");
 	if (hasKey(cfg, "model")) changed("model");
+	if (hasKey(cfg, "fallbackModels")) changed("fallbackModels");
 	if (hasKey(cfg, "tools")) changed("tools");
 	if (hasKey(cfg, "excludeTools")) changed("excludeTools");
 	if (hasKey(cfg, "skills")) changed("skill", "skills");
@@ -455,7 +458,21 @@ function applyAgentConfig(target: AgentConfig, cfg: Record<string, unknown>): st
 			else delete target.model;
 		} else return "config.model must be a string or false when provided.";
 	}
-	if (hasKey(cfg, "fallbackModels")) return "config.fallbackModels was removed; configure one model instead.";
+	if (hasKey(cfg, "fallbackModels")) {
+		if (cfg.fallbackModels === false || cfg.fallbackModels === "") delete target.fallbackModels;
+		else if (typeof cfg.fallbackModels === "string") {
+			const models = parseCsv(cfg.fallbackModels);
+			if (models.length) target.fallbackModels = models;
+			else delete target.fallbackModels;
+		} else if (Array.isArray(cfg.fallbackModels)) {
+			const models = cfg.fallbackModels
+				.filter((value): value is string => typeof value === "string")
+				.map((value) => value.trim())
+				.filter(Boolean);
+			if (models.length) target.fallbackModels = [...new Set(models)];
+			else delete target.fallbackModels;
+		} else return "config.fallbackModels must be a comma-separated string, string array, or false when provided.";
+	}
 	if (hasKey(cfg, "tools")) {
 		if (cfg.tools === false || cfg.tools === "") { delete target.tools; delete target.mcpDirectTools; }
 		else if (typeof cfg.tools === "string") {
@@ -611,6 +628,7 @@ function applyAgentConfig(target: AgentConfig, cfg: Record<string, unknown>): st
 			target.tools?.length || target.mcpDirectTools?.length ? "tools" : undefined,
 			target.excludeTools?.length ? "excludeTools" : undefined,
 			target.model ? "model" : undefined,
+			target.fallbackModels?.length ? "fallbackModels" : undefined,
 			target.thinking ? "thinking" : undefined,
 			target.extensions?.length ? "extensions" : undefined,
 			target.subagentOnlyExtensions?.length ? "subagentOnlyExtensions" : undefined,

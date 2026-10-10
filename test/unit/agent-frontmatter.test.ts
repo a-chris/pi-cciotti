@@ -1588,8 +1588,8 @@ Do work
 	});
 });
 
-describe("removed agent frontmatter", () => {
-	it("rejects fallbackModels clearly", () => {
+describe("agent frontmatter fallbackModels", () => {
+	it("parses an ordered fallback chain", () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-agent-fallback-frontmatter-"));
 		tempDirs.push(dir);
 		const agentsDir = path.join(dir, ".pi", "agents");
@@ -1604,7 +1604,9 @@ Do work
 `, "utf-8");
 
 		const result = discoverAgents(dir, "project");
-		assert.match(result.agentDiagnostics?.find((diagnostic) => diagnostic.name === "worker")?.error ?? "", /removed frontmatter field 'fallbackModels'/);
+		const worker = result.agents.find((agent) => agent.name === "worker");
+		assert.deepEqual(worker?.fallbackModels, ["openai/gpt-5-mini", "anthropic/claude-sonnet-4"]);
+		assert.equal(result.agentDiagnostics?.find((diagnostic) => diagnostic.name === "worker")?.error, undefined);
 	});
 });
 

@@ -1700,6 +1700,52 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 		assert.equal(mockPi.callCount(), 1);
 	});
 
+	it("background runs retry the fallback model after a provider connection error", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
+		mockPi.onCall({
+			jsonl: [{
+				type: "message_end",
+				message: {
+					role: "assistant",
+					content: [],
+					model: "openai/gpt-5-mini",
+					errorMessage: "Connection error.",
+					usage: { input: 10, output: 0, cacheRead: 0, cacheWrite: 0, cost: { total: 0.001 } },
+				},
+			}],
+			exitCode: 1,
+		});
+		mockPi.onCall({ output: "Recovered after connection error" });
+		const id = `async-fallback-connection-error-${Date.now().toString(36)}`;
+		executeAsyncSingle(id, {
+			agent: "worker",
+			task: "Do work",
+			agentConfig: makeAgent("worker", {
+				model: "openai/gpt-5-mini:high",
+				fallbackModels: ["anthropic/claude-sonnet-4:low"],
+			}),
+			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
+			availableModels: [
+				{ provider: "openai", id: "gpt-5-mini", fullId: "openai/gpt-5-mini" },
+				{ provider: "anthropic", id: "claude-sonnet-4", fullId: "anthropic/claude-sonnet-4" },
+			],
+			artifactConfig: {
+				enabled: false,
+				includeInput: false,
+				includeOutput: false,
+				includeJsonl: false,
+				includeMetadata: false,
+				cleanupDays: 7,
+			},
+			shareEnabled: false,
+		});
+
+		const payload = JSON.parse(fs.readFileSync(await waitForAsyncResultFile(id), "utf-8"));
+		assert.equal(payload.success, true);
+		assert.match(payload.results[0].output ?? "", /Recovered after connection error/u);
+		assert.equal(payload.results[0].model, "anthropic/claude-sonnet-4:low");
+		assert.equal(mockPi.callCount(), 2);
+	});
+
 	it("background runs do not retry raw connection stderr after child activity", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {
 		mockPi.onCall({
 			jsonl: [{

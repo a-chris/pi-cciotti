@@ -85,6 +85,7 @@ export interface BuildInProcessChildLaunchInput {
 	runFanoutBudget?: RunFanoutBudgetDescriptor;
 	structuredOutput?: StructuredOutputRuntime;
 	fast?: boolean;
+	modelCandidates?: readonly string[];
 	toolBudget?: ResolvedToolBudget;
 	permissionRules?: PermissionRules;
 	permissionAuditPath?: string;
@@ -184,6 +185,7 @@ export function buildInProcessChildLaunch(input: BuildInProcessChildLaunchInput)
 		structuredOutput: Boolean(input.structuredOutput),
 		fast: input.fast,
 		model: input.model,
+		modelCandidates: input.modelCandidates,
 		capabilityCeiling: input.capabilityCeiling,
 		inheritedCapabilityCeiling: inheritedCapabilityCeiling(input.inherited),
 		agentName: input.childAgentName,

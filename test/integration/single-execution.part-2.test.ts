@@ -2253,6 +2253,72 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		assert.equal(mockPi.callCount(), 1);
 	});
 
+	it("retries with the agent's fallback model on a retryable provider failure", async () => {
+		mockPi.onCall({
+			jsonl: [{
+				type: "message_end",
+				message: {
+					role: "assistant",
+					content: [{ type: "text", text: "temporary provider failure" }],
+					model: "openai/gpt-5-mini",
+					errorMessage: "rate limit exceeded",
+					usage: { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, cost: { total: 0.01 } },
+				},
+			}],
+			exitCode: 1,
+		});
+		mockPi.onCall({ output: "Recovered on fallback" });
+		const agents = [makeAgent("echo", {
+			model: "openai/gpt-5-mini",
+			fallbackModels: ["anthropic/claude-sonnet-4"],
+		})];
+
+		const result = await runSync(tempDir, agents, "echo", "Task", {
+			runId: "fallback-sync",
+		});
+
+		assert.equal(result.exitCode, 0);
+		assert.equal(result.model, "anthropic/claude-sonnet-4");
+		assert.equal(result.usage.turns, 2);
+		assert.equal(mockPi.callCount(), 2);
+	});
+
+	it("a second launch starts at the fallback while the primary is marked unhealthy", async () => {
+		mockPi.onCall({
+			jsonl: [{
+				type: "message_end",
+				message: {
+					role: "assistant",
+					content: [{ type: "text", text: "temporary provider failure" }],
+					model: "openai/gpt-5-mini",
+					errorMessage: "rate limit exceeded",
+					usage: { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, cost: { total: 0.01 } },
+				},
+			}],
+			exitCode: 1,
+		});
+		mockPi.onCall({ output: "Recovered on fallback" });
+		const agents = [makeAgent("echo", {
+			model: "openai/gpt-5-mini",
+			fallbackModels: ["anthropic/claude-sonnet-4"],
+		})];
+
+		const first = await runSync(tempDir, agents, "echo", "Task", { runId: "fallback-skip-first" });
+		assert.equal(first.exitCode, 0);
+		assert.equal(first.model, "anthropic/claude-sonnet-4");
+
+		mockPi.onCall({ output: "Second launch straight on the fallback" });
+		const second = await runSync(tempDir, agents, "echo", "Task", { runId: "fallback-skip-second" });
+		assert.equal(second.exitCode, 0);
+		assert.equal(second.model, "anthropic/claude-sonnet-4");
+		assert.deepEqual(mockPi.sessions.map((session) => session.launch.model), [
+			"openai/gpt-5-mini",
+			"anthropic/claude-sonnet-4",
+			"anthropic/claude-sonnet-4",
+		]);
+		assert.equal(mockPi.callCount(), 3);
+	});
+
 	it("fails zero-exit provider errors after one launch", async () => {
 		mockPi.onCall({
 			jsonl: [{

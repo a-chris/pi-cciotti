@@ -1,5 +1,6 @@
 import { splitKnownThinkingSuffix as splitThinkingSuffix, type ModelInfo as AvailableModelInfo } from "../../shared/model-info.ts";
 import { checkModelScope, type ModelScopeCheckRule, type ModelScopeViolation, type ModelSource } from "./model-scope.ts";
+import { trimUnhealthyLeadingCandidates, UNHEALTHY_MODEL_TTL_MS } from "./model-health.ts";
 
 export type { AvailableModelInfo };
 
@@ -419,6 +420,153 @@ export function resolveModelSelection(
 	}
 	return { ...(resolved ? { model: resolved } : {}), ...(requestedModel ? { requestedModel } : {}) };
 }
+/**
+ * Build the ordered model candidate chain for one launch: the resolved primary
+ * followed by the agent's declared fallbacks. Fallbacks that are unavailable in
+ * the active registry are skipped with a warning; if nothing resolves the
+ * chain stays empty and callers keep their single-model behavior.
+ */
+export function buildModelCandidates(
+	primaryModel: string | undefined,
+	fallbackModels: string[] | undefined,
+	availableModels: AvailableModelInfo[] | undefined,
+	preferredProvider?: string,
+	options?: ResolveModelSelectionOptions,
+): { candidates: string[]; requestedModel?: string } {
+	const primary = resolveModelSelection(primaryModel, availableModels, preferredProvider, options);
+	const scopes = configuredScopes(options?.scope);
+	const seen = new Set<string>();
+	const candidates: string[] = [];
+	if (primary.model) {
+		candidates.push(primary.model);
+		seen.add(primary.model);
+	}
+	for (const raw of fallbackModels ?? []) {
+		const trimmed = typeof raw === "string" ? raw.trim() : "";
+		if (!trimmed) continue;
+		const resolved = resolveSubagentModelCandidate(trimmed, availableModels, preferredProvider);
+		if (!resolved) {
+			console.warn(`[pi-cciotti] Skipping fallback model '${trimmed}' because it is unavailable in this environment.`);
+			continue;
+		}
+		if (seen.has(resolved)) continue;
+		// Fallbacks warn under enforce scope and error only under strict scope.
+		enforceModelScopes(resolved, scopes, "inherited", options?.onWarn);
+		seen.add(resolved);
+		candidates.push(resolved);
+	}
+	const trimmed = trimUnhealthyLeadingCandidates(candidates);
+	if (trimmed.length < candidates.length) {
+		console.warn(`[pi-cciotti] Skipping recently failed model '${candidates[0]}' (retryable failure within the last ${Math.round(UNHEALTHY_MODEL_TTL_MS / 60_000)} minutes); starting with '${trimmed[0]}'.`);
+	}
+	return { candidates: trimmed, ...(primary.requestedModel ? { requestedModel: primary.requestedModel } : {}) };
+}
+
+const MODEL_UNAVAILABLE_PATTERN = /(?:model.*(?:not found|unavailable|disabled)|unknown model)/i;
+
+const RETRYABLE_MODEL_FAILURE_PATTERNS = [
+	/^REQUEST_LIMIT_EXCEEDED$/,
+	/rate\s*limit/i,
+	/usage\s*limit/i,
+	/too many requests/i,
+	/\b429\b/,
+	/quota/i,
+	/billing/i,
+	/credit/i,
+	// OpenRouter can return only a status-prefixed body, without auth-related prose.
+	/^\s*401\s*:/,
+	/auth(?:entication)?/i,
+	/unauthori[sz]ed/i,
+	/forbidden/i,
+	/api key/i,
+	/token expired/i,
+	/invalid key/i,
+	/provider.*unavailable/i,
+	MODEL_UNAVAILABLE_PATTERN,
+	/overloaded/i,
+	/service unavailable/i,
+	/temporar(?:ily)? unavailable/i,
+	/connection\s+(?:error|reset|closed|aborted)/i,
+	/connection refused/i,
+	/fetch failed/i,
+	/network error/i,
+	/socket hang up/i,
+	/stream ended without finish_reason/i,
+	/upstream/i,
+	/timed? out/i,
+	/timeout/i,
+	/\b500\b/,
+	/\b502\b/,
+	/\b503\b/,
+	/\b504\b/,
+	/internal server error/i,
+	/cold.?start/i,
+	/empty response/i,
+	/no output/i,
+	/model.*(?:load|fail|error)/i,
+];
+
+const TRANSIENT_STREAM_FAILURE_PATTERNS = [
+	// Pi's Anthropic provider uses this exact error when a stream closes before
+	// its terminal event.
+	/^Anthropic stream ended before message_stop$/,
+	// Node's fetch reports a prematurely closed response body with this message.
+	/^terminated$/,
+];
+
+function isTransientStreamFailure(error: string | undefined): boolean {
+	if (!error) return false;
+	const normalized = error.trim();
+	return TRANSIENT_STREAM_FAILURE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+/**
+ * Failures reported as `<tool> failed (exit N): ...` or `<tool> failed with
+ * exit code N` come from a tool call inside the child's task, not from the
+ * provider/model, however network-flavored their details read. Retrying a
+ * different model cannot fix them and would rerun the whole task. Tool names
+ * include namespaced forms like `mcp.server/write`.
+ */
+const TOOL_FAILURE_PREFIX = /^[\w.:@/-]+ failed (?:(?:\(exit \d+\):)|(?:with exit code \d+))(?:\s|$)/i;
+
+export function isRetryableModelFailure(error: string | undefined): boolean {
+	if (!error) return false;
+	if (TOOL_FAILURE_PREFIX.test(error.trim())) return false;
+	return isTransientStreamFailure(error) || RETRYABLE_MODEL_FAILURE_PATTERNS.some((pattern) => pattern.test(error));
+}
+
+function messageError(message: unknown): string | undefined {
+	if (!message || typeof message !== "object") return undefined;
+	const value = (message as { errorMessage?: unknown }).errorMessage;
+	return typeof value === "string" ? value : undefined;
+}
+
+function isTransientNoOutputFailure(error: string | undefined): boolean {
+	return error === "Subagent produced no output (possible model cold-start or empty response)."
+		|| /^Subagent produced no output after terminal assistant stopReason "[^"]+"\.$/.test(error ?? "");
+}
+
+/**
+ * A failure advances the fallback chain only when it happened before any tool
+ * use: once the child called tools, retrying the whole task on another model
+ * would redo side effects.
+ */
+export function isRetryableModelFailureAttempt(input: { error: string | undefined; messages?: readonly unknown[]; toolCount?: number }): boolean {
+	if (!isRetryableModelFailure(input.error)) return false;
+	if ((input.toolCount ?? 0) > 0) return false;
+	if (isTransientNoOutputFailure(input.error)) return true;
+	if ((input.toolCount ?? 0) === 0 && (input.messages?.length ?? 0) === 0) return true;
+	const error = input.error?.trim();
+	return Boolean(error && input.messages?.some((message) => messageError(message)?.trim() === error));
+}
+
+export function formatModelAttemptNote(attempt: { model: string; error?: string; exitCode?: number | null }, nextModel?: string): string {
+	const failure = attempt.error?.trim() || `exit ${attempt.exitCode ?? 1}`;
+	return nextModel
+		? `[fallback] ${attempt.model} failed: ${failure}. Retrying with ${nextModel}.`
+		: `[fallback] ${attempt.model} failed: ${failure}.`;
+}
+
 /** Context-overflow signals used to surface a clear input-too-large error. */
 const CONTEXT_OVERFLOW_PATTERNS = [
 	/context(?: length| window| limit)? (?:exceed|overflow|too long)/i,

@@ -93,7 +93,8 @@ import { buildTimeoutRecoverySummary, collectTrackedMutationEvidence, snapshotTr
 import { collectDynamicResults, DynamicFanoutError, materializeDynamicParallelStep, validateDynamicCollection } from "../shared/dynamic-fanout.ts";
 import { claimRunFanoutBatch, getRunFanoutBudgetSnapshot } from "../shared/run-fanout-budget.ts";
 import { nestedSummaryFromAsyncStatus, projectNestedEvents, resolveNestedAsyncDir, writeNestedEvent } from "../shared/nested-events.ts";
-import { formatSubagentModelVerificationError, isContextOverflow } from "../shared/model-resolution.ts";
+import { recordUnhealthyModel } from "../shared/model-health.ts";
+import { formatModelAttemptNote, formatSubagentModelVerificationError, isContextOverflow, isRetryableModelFailureAttempt } from "../shared/model-resolution.ts";
 import { markProcessTerminalCandidateLeaseRelease, processTerminalPath, writeProcessTerminalCandidate, type ProcessTerminalCandidate } from "./process-terminal.ts";
 import { createSteeringStatus, recordSteeringRequest, steeringStatus, terminalSteeringNoticeState, unconsumedSteerReason, updateSteeringTarget } from "./steering.ts";
 import { PROMPT_REDACTED, detectSubagentError, extractTextFromContent, extractToolArgsPreview, formatEmptyTerminalAssistantResponseError, getAgentDir, getFinalOutput, hasEmptyTerminalAssistantResponse, readStatus } from "../../shared/utils.ts";
@@ -977,7 +978,9 @@ export async function runSingleStepInner(
 		alignForkedSessionCwd(step.sessionFile, effectiveCwd);
 	}
 
-	const candidate = step.model;
+	const candidates: (string | undefined)[] = step.modelCandidates !== undefined
+		? step.modelCandidates.length > 0 ? step.modelCandidates : [undefined]
+		: step.model ? [step.model] : [undefined];
 	let capabilityAudit: import("../shared/capability-ceiling.ts").SubagentCapabilityAudit | undefined;
 	let launchResolvedExtensions = step.launchResolvedExtensions;
 	let finalRequiredOutputMissing: boolean | undefined;
@@ -999,9 +1002,15 @@ export async function runSingleStepInner(
 	let launched = false;
 	let recoveryTask = task;
 	let stagedIndexBaseline: string | undefined;
-	singleLaunch: for (let attemptIndex = 0; attemptIndex < 2; attemptIndex++) {
+	const attemptNotes: string[] = [];
+	let modelIndex = 0;
+	let attemptIndex = 0;
+	let recoveringAbort = false;
+	let settledWithDiagnostic = false;
+	singleLaunch: for (;;) {
+		const candidate = candidates[modelIndex];
 		if (ctx.timeoutSignal?.aborted || ctx.stopSignal?.aborted || ctx.skipAcceptance?.()) break singleLaunch;
-		const expectedModelForVerification = candidate && !step.skipPrimaryModelVerification ? candidate : undefined;
+		const expectedModelForVerification = candidate && !(step.skipPrimaryModelVerification && modelIndex === 0) ? candidate : undefined;
 		try {
 			assertThinkingWithinCeiling({ model: candidate, configThinking: step.thinking, ceiling: step.thinkingCeiling, agent: step.agent, runId: ctx.id });
 		} catch (error) {
@@ -1048,6 +1057,7 @@ export async function runSingleStepInner(
 				subagentOnlyExtensions: step.subagentOnlyExtensions,
 				fast: step.fast,
 				model: step.model,
+				modelCandidates: step.modelCandidates,
 				mcpDirectTools: step.mcpDirectTools,
 				cwd: step.cwd ?? ctx.cwd,
 				requireReadTool: Boolean(step.skills?.length),
@@ -1271,18 +1281,39 @@ export async function runSingleStepInner(
 			afterCompactionSettlement: run.afterCompactionSettlement,
 		});
 		if (recovery.action === "resume") {
+			recoveringAbort = true;
+			attemptIndex += 1;
 			recoveryTask = recovery.prompt;
 			continue singleLaunch;
 		}
 		if (recovery.diagnostic) {
 			finalResult.abortRecoveryDiagnostic = recovery.diagnostic;
+			settledWithDiagnostic = true;
 		}
 
 		if (isContextOverflow(error)) {
 			contextOverflow = true;
 			break singleLaunch;
 		}
-		break singleLaunch;
+		// One compaction resume and a settled diagnostic are terminal; otherwise
+		// advance the configured fallback chain on provider-style failures only.
+		if (recoveringAbort || settledWithDiagnostic) break singleLaunch;
+		if (modelIndex >= candidates.length - 1) break singleLaunch;
+		if (ctx.deadlineAt !== undefined && Date.now() >= ctx.deadlineAt) break singleLaunch;
+		const nextModel = candidates[modelIndex + 1];
+		if (!nextModel || !isRetryableModelFailureAttempt({ error, messages: run.messages, toolCount: run.toolCount })) break singleLaunch;
+		recordUnhealthyModel(candidate ?? run.model ?? step.model);
+		attemptNotes.push(formatModelAttemptNote({
+			model: candidate ?? run.model ?? step.model ?? "default",
+			error,
+			exitCode: effectiveExitCode,
+		}, nextModel));
+		modelIndex += 1;
+		attemptIndex = 0;
+		recoveringAbort = false;
+		settledWithDiagnostic = false;
+		recoveryTask = task;
+		continue singleLaunch;
 	}
 
 	const rawOutput = finalResult?.finalOutput ?? "";
@@ -1301,6 +1332,9 @@ export async function runSingleStepInner(
 	const output = stripAcceptanceReport(resolvedOutput.fullOutput);
 	const outputReference = resolvedOutput.savedPath ? formatSavedOutputReference(resolvedOutput.savedPath, output) : undefined;
 	let outputForSummary = output;
+	if (attemptNotes.length > 0) {
+		outputForSummary = `${attemptNotes.join("\n")}\n\n${outputForSummary}`.trim();
+	}
 	if (finalResult?.stopped && !outputForSummary.trim()) {
 		outputForSummary = ctx.stopMessage ?? "Subagent stopped by user.";
 	}
@@ -3224,7 +3258,14 @@ export async function runSubagent(
 					const thinkingOverride = step.thinkingOverrides?.[itemIndex];
 					const model = thinkingOverride ? applyThinkingSuffix(step.parallel.model, thinkingOverride, true) : step.parallel.model;
 					const configThinking = thinkingOverride ? thinkingOverride : step.parallel.thinking;
-					assertThinkingWithinCeiling({ model, configThinking, ceiling: step.parallel.thinkingCeiling, agent: step.parallel.agent, runId: id });
+					const itemCandidates = step.parallel.modelCandidates !== undefined
+						? step.parallel.modelCandidates.length > 0
+							? step.parallel.modelCandidates.map((itemCandidate) => thinkingOverride ? applyThinkingSuffix(itemCandidate, thinkingOverride, true) ?? itemCandidate : itemCandidate)
+							: [undefined]
+						: model ? [model] : [undefined];
+					for (const itemCandidate of itemCandidates) {
+						assertThinkingWithinCeiling({ model: itemCandidate, configThinking, ceiling: step.parallel.thinkingCeiling, agent: step.parallel.agent, runId: id });
+					}
 				}
 				if (materialized.collectedOnEmpty) await validateDynamicCollection(step.collect.outputSchema, materialized.collectedOnEmpty);
 				if (!config.runFanoutBudget) throw new Error("Async runner is missing its run fan-out budget identity.");
@@ -3354,6 +3395,10 @@ export async function runSubagent(
 					...(thinkingOverride ? {
 						...(model ? { model } : {}),
 						...(thinking ? { thinking } : {}),
+						...(step.parallel.modelCandidates ? { modelCandidates: step.parallel.modelCandidates.flatMap((itemCandidate) => {
+							const resolved = applyThinkingSuffix(itemCandidate, thinkingOverride, true);
+							return resolved ? [resolved] : [];
+						}) } : {}),
 					} : {}),
 					structuredOutputSchema: step.parallel.structuredOutputSchema ?? step.parallel.structuredOutput?.schema,
 				});

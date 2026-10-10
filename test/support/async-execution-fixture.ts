@@ -17,6 +17,7 @@ import * as path from "node:path";
 import { asyncResultTimeoutEvidence } from "./async-result-timeout-evidence.ts";
 import { createEventBus, createMockPi, createTempDir, makeAgent, removeTempDir, resolveMockPiCallArgs, tryImport } from "./helpers.ts";
 import type { MockPi } from "./helpers.ts";
+import { clearModelHealth } from "../../src/runs/shared/model-health.ts";
 
 interface LaunchResolvedExtensions {
 	version?: number;
@@ -556,6 +557,7 @@ export function installAsyncExecutionHooks(): void {
 	beforeEach(() => {
 		tempDir = createTempDir();
 		mockPi.reset();
+		clearModelHealth();
 	});
 
 	afterEach(() => {

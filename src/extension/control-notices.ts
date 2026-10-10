@@ -6,8 +6,10 @@ export const SUBAGENT_CONTROL_MESSAGE_TYPE = "subagent_control_notice";
 
 export interface SubagentControlMessageDetails {
 	event: ControlEvent;
-	source?: "foreground" | "async" | "goal";
+	source?: "foreground" | "async" | "goal" | "nested";
 	asyncDir?: string;
+	/** Nested notices reach the operator without a parent turn unless this is set. */
+	wakeParent?: boolean;
 	noticeText?: string;
 }
 
@@ -31,7 +33,7 @@ function deliverControlNotice(input: {
 			display: true,
 			details: { ...input.details, noticeText },
 		},
-		{ triggerTurn: input.details.source === "async" },
+		{ triggerTurn: input.details.source === "async" || (input.details.source === "nested" && input.details.wakeParent === true) },
 	);
 }
 

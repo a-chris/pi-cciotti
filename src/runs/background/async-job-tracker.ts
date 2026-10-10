@@ -7,6 +7,7 @@ import {
 	type AsyncJobState,
 	type AsyncStartedEvent,
 	type ControlEvent,
+	type ResolvedControlConfig,
 	type SteeringNotice,
 	type SubagentChildStatusEvent,
 	type SubagentState,
@@ -18,6 +19,7 @@ import {
 } from "../../shared/types.ts";
 import { readStatus, resolveWatchPath } from "../../shared/utils.ts";
 import { normalizeParallelGroups } from "./parallel-groups.ts";
+import { createNestedChildHealthMonitor } from "./child-health-monitor.ts";
 import { reconcileAsyncRun, reconcileNestedAsyncDescendants } from "./stale-run-reconciler.ts";
 import { findNestedRouteForRootId, hasLiveNestedDescendants, updateAsyncJobNestedProjection } from "../shared/nested-events.ts";
 import { listAsyncRuns, type AsyncRunSummary } from "./async-status.ts";
@@ -36,6 +38,10 @@ interface AsyncJobTrackerOptions {
 	widgetEnabled?: boolean;
 	platform?: NodeJS.Platform;
 	onJobTerminal?: () => void;
+	/** Report nested descendants that stalled or lost their runner process. */
+	controlConfig?: ResolvedControlConfig;
+	/** Deliver those reports as a parent turn instead of a visible-only notice. */
+	wakeOnNestedAttention?: boolean;
 	watch?: typeof fs.watch;
 	kill?: (pid: number, signal?: NodeJS.Signals | 0) => boolean;
 	now?: () => number;
@@ -74,6 +80,14 @@ export function createAsyncJobTracker(pi: Pick<ExtensionAPI, "events">, state: S
 	const livenessIntervalMs = options.pollIntervalMs ?? DEFAULT_LIVENESS_INTERVAL_MS;
 	const resultsDir = options.resultsDir ?? DIRS.results;
 	const steeringNoticeSeen = new Map<string, number>();
+	// Only the top-level run's control event log is read, and a dead or wedged
+	// nested descendant may never write a self-report at all, so nested health is
+	// re-derived from status facts here instead of forwarded from child events.
+	const nestedHealth = createNestedChildHealthMonitor({
+		controlConfig: options.controlConfig,
+		kill: options.kill,
+		now: options.now,
+	});
 	const jobWatchers = new Map<string, { watchers: Map<string, fs.FSWatcher>; retryTimer?: ReturnType<typeof setTimeout> }>();
 	const refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 	let widgetRerenderTimer: ReturnType<typeof setTimeout> | undefined;
@@ -221,6 +235,7 @@ export function createAsyncJobTracker(pi: Pick<ExtensionAPI, "events">, state: S
 			state.cleanupTimers.delete(asyncId);
 			closeJobWatcher(asyncId);
 			state.asyncJobs.delete(asyncId);
+			nestedHealth.forgetJob(asyncId);
 			rerenderLastWidget();
 		}, completionRetentionMs);
 		state.cleanupTimers.set(asyncId, timer);
@@ -369,6 +384,28 @@ export function createAsyncJobTracker(pi: Pick<ExtensionAPI, "events">, state: S
 		terminalPublications.delete(asyncId);
 	};
 
+	// Nested descendants have no other route to the parent, so their derived
+	// health is reported here. Only identity and timing facts travel; child
+	// content does not.
+	const reportNestedChildHealth = (job: AsyncJobState): void => {
+		let events: ControlEvent[];
+		try {
+			events = nestedHealth.observe(job);
+		} catch (error) {
+			console.error(`Failed to check nested child health for '${job.asyncDir}':`, error);
+			return;
+		}
+		for (const event of events) {
+			pi.events.emit(SUBAGENT_CONTROL_EVENT, {
+				event,
+				source: "nested" as const,
+				asyncDir: job.asyncDir,
+				wakeParent: options.wakeOnNestedAttention === true,
+				noticeText: formatControlNoticeMessage(event),
+			});
+		}
+	};
+
 	const refreshJob = (job: AsyncJobState): boolean => {
 		const widgetExpanded = withLastUiContext((ctx) => ctx.ui.getToolsExpanded?.() ?? false) ?? false;
 		const widgetStateBefore = widgetRenderKey(job, widgetExpanded);
@@ -511,6 +548,7 @@ export function createAsyncJobTracker(pi: Pick<ExtensionAPI, "events">, state: S
 						scheduleCleanup(job.asyncId);
 					}
 				}
+				if (!isTerminalJobStatus(job.status)) reportNestedChildHealth(job);
 				return widgetRenderKey(job, widgetExpanded) !== widgetStateBefore;
 			}
 			if (job.status === "queued") {
@@ -758,6 +796,7 @@ export function createAsyncJobTracker(pi: Pick<ExtensionAPI, "events">, state: S
 		runningJobIds.clear();
 		externalJobBridgeRuns.clear();
 		terminalPublications.clear();
+		nestedHealth.reset();
 	};
 
 	const resetJobs = (ctx?: ExtensionContext) => {

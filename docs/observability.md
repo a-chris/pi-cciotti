@@ -51,6 +51,14 @@ expand setting, run execution, or completion notifications. Task rows, drag and
 wheel events, and modifier clicks are left unhandled. The state resets when the
 widget is removed or Pi reloads. Regular mode keeps the existing keyboard controls.
 
+### Nested child health
+
+Only the top-level run's `events.jsonl` is read by the tracker, so a nested descendant that stalls, wedges inside a tool, or loses its runner process used to stay silent until the parent run itself finished or timed out — and a dead or wedged child may never write a verdict at all. The tracker therefore checks each background run's nested projection **itself, once per minute, from observable status**: a descendant with no observed activity beyond `control.needsAttentionAfterMs`, a tool call open beyond `control.activeNoticeAfterMs`, or a recorded PID that no longer exists while the run still reports `running` is reported as a `subagent:control-event` notice (`reason: "nested_idle"`, `"tool_open_threshold"`, or `"nested_unreachable"`). The checks reuse the child runners' own primitives (`deriveActivityState`, `shouldEmitOpenToolAttention`, `checkPidLiveness`) and the operator's `control` config — including the thinking-level scaling of the quiet window and startup grace for a descendant that has not finished its first turn — so there is no second stall rule. A descendant is reported once per reason: repeats wait for the reason to change or for activity to prove the child worked since, so a stuck child does not restate itself every minute and a later genuine stall still reaches the parent.
+
+The notice names the **owning background run** on its `Run:` line and the descendant on a separate `Nesting:` line, and routes both ways: the nudge targets the nested child's own id — id-scoped `resume` and `steer` resolve nested runs and deliver into that child — while `status` and `stop` name the owning run, which is what those verbs act on. The report carries identity and timing facts only — the same fields a top-level notice carries (agent, run id, elapsed, turns, tools, the tool and file it is currently on). No child transcript, prompt, output, or run-directory path is opened to build it.
+
+By default the notice is visible without waking a parent turn; `control.wakeOnNestedAttention` makes it a wake instead. See `docs/configuration.md`.
+
 ### Reducing status display noise
 
 Chat records tool-call history; FleetView and the async widget show live run/child updates. Separate `subagent_control({ action: "status", id: "..." })` calls leave separate historical entries even when their `Status target: run …` labels match. A matching run ID identifies the queried run, not the tool call, and is not evidence of duplicate execution. Live Fleet/widget refreshes do not merge those entries.

@@ -22,6 +22,7 @@ interface AsyncJobTrackerModule {
 			resultsDir?: string;
 			widgetEnabled?: boolean;
 			platform?: NodeJS.Platform;
+			wakeOnNestedAttention?: boolean;
 			onJobTerminal?: () => void;
 			watch?: typeof fs.watch;
 			kill?: (pid: number, signal?: NodeJS.Signals | 0) => boolean;
@@ -834,6 +835,143 @@ describe("async job tracker", { skip: !available ? "pi packages not available" :
 
 			await waitForCondition(() => state.asyncJobs.get("run-nested-events")?.nestedChildren?.[0]?.id === "nested-child", "evented nested child refresh", 3000);
 			assert.equal(state.asyncJobs.get("run-nested-events")?.steps?.[0]?.children?.[0]?.id, "nested-child");
+			tracker.resetJobs();
+		} finally {
+			removeTempDir(asyncRoot);
+			removeTempDir(routeRoot);
+		}
+	});
+
+	it("reports a stalled nested descendant through the control channel", async () => {
+		const asyncRoot = createTempDir("pi-async-job-nested-health-");
+		const nestedRoute = createNestedRoute("run-nested-health");
+		const routeRoot = path.dirname(nestedRoute.eventSink);
+		try {
+			const runDir = path.join(asyncRoot, "run-nested-health");
+			fs.mkdirSync(runDir, { recursive: true });
+			const now = Date.now();
+			fs.writeFileSync(path.join(runDir, "status.json"), JSON.stringify({
+				runId: "run-nested-health",
+				mode: "single",
+				state: "running",
+				startedAt: now - 30_000,
+				lastUpdate: now,
+				steps: [{ agent: "orchestrator", status: "running" }],
+			}), "utf-8");
+
+			const state = createState();
+			const recorder = createEventRecorder();
+			const tracker = createTracker(recorder.pi, state as never, asyncRoot, {
+				pollIntervalMs: 60_000,
+				wakeOnNestedAttention: true,
+				kill: () => true,
+				now: () => now,
+			});
+			tracker.handleStarted({ id: "run-nested-health", asyncDir: runDir, agent: "orchestrator", nestedRoute });
+
+			await new Promise((resolve) => setTimeout(resolve, 100));
+			fs.writeFileSync(path.join(nestedRoute.eventSink, "0000000001000-child.json"), JSON.stringify({
+				type: "subagent.nested.updated",
+				ts: 1000,
+				rootRunId: nestedRoute.rootRunId,
+				parentRunId: "run-nested-health",
+				parentStepIndex: 0,
+				capabilityToken: nestedRoute.capabilityToken,
+				child: {
+					id: "nested-stalled",
+					parentRunId: "run-nested-health",
+					parentStepIndex: 0,
+					depth: 1,
+					path: [{ runId: "run-nested-health", stepIndex: 0 }],
+					state: "running",
+					agent: "builder",
+					pid: 4242,
+					startedAt: now - 30_000,
+					lastUpdate: now - 90_000,
+					lastActivityAt: now - 90_000,
+					// No self-reported verdict: the parent's own per-minute check derives
+					// the stall from these facts. turnCount >= 1 keeps it past startup grace.
+					turnCount: 5,
+				},
+			}), "utf-8");
+
+			await waitForCondition(
+				() => recorder.events.some((event) => event.channel === "subagent:control-event"),
+				"nested child health notice",
+				3000,
+			);
+			const notice = recorder.events.find((event) => event.channel === "subagent:control-event")!.data as Record<string, any>;
+			assert.equal(notice.source, "nested");
+			assert.equal(notice.wakeParent, true);
+			assert.equal(notice.event.reason, "nested_idle");
+			assert.equal(notice.event.nestedRunId, "nested-stalled");
+			assert.match(notice.noticeText, /Nested subagent not healthy: builder/);
+			assert.match(notice.noticeText, /no observed activity for 90s/);
+			tracker.resetJobs();
+		} finally {
+			removeTempDir(asyncRoot);
+			removeTempDir(routeRoot);
+		}
+	});
+
+	it("does not wake the parent for a nested descendant unless configured to", async () => {
+		const asyncRoot = createTempDir("pi-async-job-nested-health-silent-");
+		const nestedRoute = createNestedRoute("run-nested-health-silent");
+		const routeRoot = path.dirname(nestedRoute.eventSink);
+		try {
+			const runDir = path.join(asyncRoot, "run-nested-health-silent");
+			fs.mkdirSync(runDir, { recursive: true });
+			const now = Date.now();
+			fs.writeFileSync(path.join(runDir, "status.json"), JSON.stringify({
+				runId: "run-nested-health-silent",
+				mode: "single",
+				state: "running",
+				startedAt: now - 30_000,
+				lastUpdate: now,
+				steps: [{ agent: "orchestrator", status: "running" }],
+			}), "utf-8");
+
+			const state = createState();
+			const recorder = createEventRecorder();
+			const tracker = createTracker(recorder.pi, state as never, asyncRoot, {
+				pollIntervalMs: 60_000,
+				kill: () => true,
+				now: () => now,
+			});
+			tracker.handleStarted({ id: "run-nested-health-silent", asyncDir: runDir, agent: "orchestrator", nestedRoute });
+
+			await new Promise((resolve) => setTimeout(resolve, 100));
+			fs.writeFileSync(path.join(nestedRoute.eventSink, "0000000001000-child.json"), JSON.stringify({
+				type: "subagent.nested.updated",
+				ts: 1000,
+				rootRunId: nestedRoute.rootRunId,
+				parentRunId: "run-nested-health-silent",
+				parentStepIndex: 0,
+				capabilityToken: nestedRoute.capabilityToken,
+				child: {
+					id: "nested-unwoken",
+					parentRunId: "run-nested-health-silent",
+					parentStepIndex: 0,
+					depth: 1,
+					path: [{ runId: "run-nested-health-silent", stepIndex: 0 }],
+					state: "running",
+					agent: "builder",
+					pid: 4242,
+					startedAt: now - 30_000,
+					lastUpdate: now - 90_000,
+					lastActivityAt: now - 90_000,
+					turnCount: 5,
+				},
+			}), "utf-8");
+
+			await waitForCondition(
+				() => recorder.events.some((event) => event.channel === "subagent:control-event"),
+				"nested child health notice without wake",
+				3000,
+			);
+			const notice = recorder.events.find((event) => event.channel === "subagent:control-event")!.data as Record<string, any>;
+			assert.equal(notice.source, "nested");
+			assert.equal(notice.wakeParent, false, "waking a parent turn costs tokens; it must be opted into");
 			tracker.resetJobs();
 		} finally {
 			removeTempDir(asyncRoot);

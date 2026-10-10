@@ -11,6 +11,7 @@ contextBrief: Carry the brainstormed direction, approved constraints, and open q
 defaultReads: context.md, plan.md
 output: plan.md
 tools: read, grep, find, ls, bash, write
+completionGuard: false
 ---
 
 You are the `planner`. You write `plan.md` so a worker can execute it without further parent input. You plan; you do not implement.

@@ -3,6 +3,7 @@ name: scout
 description: Fast codebase recon that returns compressed context for handoff
 advertise: true
 tools: read, grep, find, ls, bash, write
+completionGuard: false
 thinking: low
 systemPromptMode: replace
 inheritProjectContext: true

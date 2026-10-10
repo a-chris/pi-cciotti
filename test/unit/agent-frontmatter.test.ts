@@ -1432,7 +1432,7 @@ Review only.
 });
 
 describe("agent frontmatter completionGuard", () => {
-	it("serializes disabled completion guard into agent frontmatter", () => {
+	it("omits the default-off completion guard from serialized frontmatter", () => {
 		const agent: AgentConfig = {
 			name: "test-runner",
 			description: "Test runner",
@@ -1446,10 +1446,10 @@ describe("agent frontmatter completionGuard", () => {
 		};
 
 		const serialized = serializeAgent(agent);
-		assert.match(serialized, /completionGuard: false/);
+		assert.doesNotMatch(serialized, /completionGuard:/);
 	});
 
-	it("omits enabled completion guard from serialized frontmatter", () => {
+	it("serializes an explicit completion guard opt-in into agent frontmatter", () => {
 		const agent: AgentConfig = {
 			name: "test-runner",
 			description: "Test runner",
@@ -1463,7 +1463,7 @@ describe("agent frontmatter completionGuard", () => {
 		};
 
 		const serialized = serializeAgent(agent);
-		assert.doesNotMatch(serialized, /completionGuard:/);
+		assert.match(serialized, /completionGuard: true/);
 	});
 
 	it("parses completionGuard from discovered agent frontmatter", () => {

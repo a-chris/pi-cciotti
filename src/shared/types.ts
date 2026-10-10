@@ -2267,13 +2267,6 @@ interface ExtensionChainConfig {
 	};
 }
 
-export interface ProactiveSkillSubagentsConfig {
-	enabled?: boolean;
-	minReferences?: number;
-	maxRecommendations?: number;
-	preferredAgent?: string;
-}
-
 export type InlineToolDisplay = "rich" | "summary";
 
 export type FleetViewPlacement = "aboveEditor" | "belowEditor";
@@ -2421,7 +2414,6 @@ export interface ExtensionConfig {
 	 *    are pending, which otherwise spams the session transcript.
 	 *  - \"off\": never log slow result-index scans. */
 	resultScanLogging?: "all" | "activity" | "off";
-	proactiveSkillSubagents?: ProactiveSkillSubagentsConfig | false;
 	/** Durable mission behavior. Missions are automatic by default; set enabled:false to disable auto-create. Explicit mission actions/fields still work. */
 	missions?: MissionStoreConfig;
 	/** Small fixed authority policy for the supported operational actions. */

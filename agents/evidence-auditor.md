@@ -3,6 +3,7 @@ name: evidence-auditor
 description: Independent evidence reviewer for checking whether important research claims are supported by their sources
 advertise: true
 tools: read, web_search, fetch_content, get_search_content, source_check
+completionGuard: false
 thinking: high
 systemPromptMode: replace
 inheritProjectContext: true

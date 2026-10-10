@@ -25,8 +25,8 @@ function assistantText(text: string): Message {
 	} as unknown as Message;
 }
 
-test("completionGuardEnabled defaults on for all agents and opts out only with false", () => {
-	assert.equal(completionGuardEnabled(undefined), true);
+test("completionGuardEnabled is off unless explicitly true", () => {
+	assert.equal(completionGuardEnabled(undefined), false);
 	assert.equal(completionGuardEnabled(true), true);
 	assert.equal(completionGuardEnabled(false), false);
 });
@@ -153,14 +153,20 @@ test("mutation-capable tools and MCP tools satisfy the expects-mutation contract
 });
 
 test("implementation tool contract rejects only-read-only worker launches", () => {
+	// The guard is off unless explicitly true; an explicit true with a no-mutation allowlist fails at launch.
 	assert.match(
 		validateImplementationToolContract({
 			agent: "worker",
 			tools: ["read", "grep", "find", "ls"],
+			completionGuard: true,
 		}) ?? "",
 		/completionGuard enabled, but its tool allowlist has no mutation-capable tools/,
 	);
-	// Guard is on by default for all agents; only an explicit opt-out passes.
+	// An absent flag is off: a read-only agent without the flag passes the contract.
+	assert.equal(validateImplementationToolContract({
+		agent: "worker",
+		tools: ["read", "grep", "find", "ls"],
+	}), undefined);
 	assert.equal(validateImplementationToolContract({
 		agent: "reviewer",
 		tools: ["read", "grep", "find", "ls"],
@@ -169,17 +175,20 @@ test("implementation tool contract rejects only-read-only worker launches", () =
 	assert.equal(validateImplementationToolContract({
 		agent: "worker",
 		tools: ["read", "edit"],
+		completionGuard: true,
 	}), undefined);
 	assert.match(
 		validateImplementationToolContract({
 			agent: "worker",
 			tools: ["read", "structured_output"],
+			completionGuard: true,
 		}) ?? "",
 		/completionGuard enabled, but its tool allowlist has no mutation-capable tools/,
 	);
 	assert.equal(validateImplementationToolContract({
 		agent: "worker",
 		tools: ["read", "/tmp/mutation-tools.ts"],
+		completionGuard: true,
 	}), undefined);
 	assert.equal(validateImplementationToolContract({
 		agent: "worker",
@@ -193,12 +202,14 @@ test("configured extensions satisfy the launch contract", () => {
 		agent: "worker",
 		tools: ["read", "grep", "find", "ls"],
 		requestedTools: ["read", "grep", "find", "ls", "bash", "edit", "write"],
+		completionGuard: true,
 	}) ?? "", /no mutation-capable tools/);
 	assert.equal(validateImplementationToolContract({
 		agent: "worker",
 		tools: ["read", "grep", "find", "ls"],
 		configuredExtensions: ["/tmp/mutation-extension.ts"],
 		requestedTools: ["read", "grep", "find", "ls"],
+		completionGuard: true,
 	}), undefined);
 });
 

@@ -202,7 +202,7 @@ describe("subagent control attention state", () => {
 		assert.equal(shouldNotifyControlEvent(custom, event), false);
 	});
 
-	it("formats control notices with a proactive hint and concrete commands", () => {
+	it("formats control notices with a hint and concrete commands", () => {
 		const event = buildControlEvent({ to: "needs_attention", runId: "78f659a3", agent: "worker" });
 
 		const message = formatControlNoticeMessage(event);

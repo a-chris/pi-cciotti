@@ -951,21 +951,22 @@ Advise only.
 		assert.match(readText(invalid), /config\.acceptanceRole must be 'read-only', 'writer', or false/);
 	});
 
-	it("creates agents with completion guard disabled", () => {
+	it("creates agents with completion guard opted in", () => {
 		const ctx = { cwd: tempDir, modelRegistry: { getAvailable: () => [] } };
 		const result = handleCreate(
-			{ config: { name: "test-runner", description: "Run tests", scope: "project", tools: "read, grep, bash, ls", completionGuard: false } },
+			{ config: { name: "test-runner", description: "Run tests", scope: "project", tools: "read, grep, bash, ls", completionGuard: true } },
 			ctx,
 		);
 
 		assert.equal(result.isError, false);
 		const filePath = path.join(tempDir, ".pi", "agents", "test-runner.md");
 		const content = fs.readFileSync(filePath, "utf-8");
-		assert.match(content, /^completionGuard: false$/m);
+		assert.match(content, /^completionGuard: true$/m);
 
 		const got = handleManagementAction("get", { agent: "test-runner" }, ctx);
 		assert.equal(got.isError, false);
-		assert.match(readText(got), /Completion guard: false/);
+		// The display line only fires for an explicit opt-out; an opt-in stays silent.
+		assert.doesNotMatch(readText(got), /Completion guard: false/);
 	});
 
 	it("rejects non-boolean completion guard config", () => {
@@ -1718,58 +1719,6 @@ Drive the failing test first.
 		assert.match(content, /systemPromptMode: append/);
 		assert.match(content, /inheritProjectContext: true/);
 		assert.match(content, /inheritSkills: false/);
-	});
-
-	it("lists proactive skill subagent suggestions from repeated configured skill use", () => {
-		const ctx = { cwd: tempDir, modelRegistry: { getAvailable: () => [] } };
-		fs.mkdirSync(path.join(tempDir, ".pi", "agents"), { recursive: true });
-		fs.mkdirSync(path.join(tempDir, ".pi", "skills", "deslop"), { recursive: true });
-		fs.writeFileSync(path.join(tempDir, ".pi", "skills", "deslop", "SKILL.md"), `---
-description: Cleanup review.
----
-
-Review for cleanup.
-`, "utf-8");
-		for (const name of ["cleanup-a", "cleanup-b"]) {
-			fs.writeFileSync(path.join(tempDir, ".pi", "agents", `${name}.md`), `---
-name: ${name}
-description: Cleanup ${name}
-skills: deslop
----
-
-Inspect cleanup.
-`, "utf-8");
-		}
-
-		const listed = handleManagementAction("list", {}, ctx);
-		const text = readText(listed);
-		assert.match(text, /Proactive skill subagent suggestions:/);
-		assert.match(text, /- deslop via reviewer/);
-		assert.match(text, /Cleanup review\./);
-	});
-
-	it("can disable proactive skill subagent suggestions in config", () => {
-		const ctx = {
-			cwd: tempDir,
-			modelRegistry: { getAvailable: () => [] },
-			config: { proactiveSkillSubagents: false },
-		};
-		fs.mkdirSync(path.join(tempDir, ".pi", "agents"), { recursive: true });
-		fs.mkdirSync(path.join(tempDir, ".pi", "skills", "deslop"), { recursive: true });
-		fs.writeFileSync(path.join(tempDir, ".pi", "skills", "deslop", "SKILL.md"), "Review for cleanup.\n", "utf-8");
-		for (const name of ["cleanup-a", "cleanup-b"]) {
-			fs.writeFileSync(path.join(tempDir, ".pi", "agents", `${name}.md`), `---
-name: ${name}
-description: Cleanup ${name}
-skills: deslop
----
-
-Inspect cleanup.
-`, "utf-8");
-		}
-
-		const listed = handleManagementAction("list", {}, ctx);
-		assert.doesNotMatch(readText(listed), /Proactive skill subagent suggestions:/);
 	});
 
 });

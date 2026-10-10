@@ -21,7 +21,7 @@ authorize a launch.
 - **Implementation handoff**: have `oracle` advise, then `worker` implement only after an approved direction
 - **Recon and planning**: use `scout`, then write a plan when needed
 - **Parallel exploration**: run multiple non-conflicting tasks concurrently
-- **Regular skill specialists**: when authorized delegation names or benefits from a relevant specialization, discovery suggestions may help select a small fresh-context fanout
+- **Regular skill specialists**: when the operator's request or instructions name a relevant specialization, use it to select a small fresh-context fanout
 - **Long-running work**: launch async/background runs and inspect them later. For mutation-capable work, bound the delivery slice and elapsed runtime, then request checkpoints after active tool work returns. Reserve hard tool-call caps for explicitly read-only children.
 - **Subagent control**: watch needs-attention signals and soft-interrupt only when a delegated run is genuinely blocked
 - **Agent authoring**: create, update, or override project agents. Treat saved chain records as legacy inspection or migration inputs, not as a current authoring target.
@@ -73,16 +73,16 @@ Council advisors are read-only. User or project `council-*` profiles choose allo
 
 Use this when the user wants adversarial review of a diff, plan, issue, file, or implemented work. Launch fresh-context `reviewer` agents with distinct angles generated from the actual target. Common angles are correctness/regressions, tests/validation, and simplicity/maintainability; adapt for TypeScript, UI, security, docs, or large structural changes. Reviewers should inspect files and diffs directly, return concise evidence-backed findings with file/line references, and avoid edits unless the user explicitly asks for a writer pass. Filter on evidence, not severity: report concrete current issues within the named review target, with source proof, a test or repro, or a contract contradiction. For a diff review, require that the issue is caused or made reachable by that diff. Label findings P0/P1/P2 and end with `Merge verdict: BLOCK`, `Merge verdict: OK`, or `Merge verdict: OK with notes`. Use `blockers only` only for final pre-merge re-checks after P1/P2 findings are already captured, or for explicit emergency hotfix tracks where non-blocking findings are intentionally deferred. For targeted follow-up, ask only whether the named finding was resolved, whether the fix introduced a new defect in the fix blast radius, and whether prior P1/P2 notes still stand. For bot or PR-comment triage, classify each comment as VALID, STALE, INVALID, or OUT-OF-POLICY against current HEAD, then assign P0/P1/P2 only to VALID comments. The parent synthesizes fixes worth doing now, optional improvements, and feedback to ignore/defer before applying anything.
 
-### Proactive skill-specialist technique
+### Skill-specialist technique
 
-Use this only within operator-authorized delegation when `{ action: "list" }` reports skill subagent suggestions relevant to the requested handoff. Availability is a selection hint, not authority or a command to fan out.
+Use this only within operator-authorized delegation when the operator's request or instructions name a skill specialization relevant to the requested handoff. A named specialization is a selection hint, not authority or a command to fan out.
 
 Default guardrails:
 
-- Keep the fanout small: usually one or two skill-specialist children, never more than the listed recommendations or configured cap.
+- Keep the fanout small: usually one or two skill-specialist children, never more than the specializations named in the request.
 - Prefer `context: "fresh"` and include only the files, diff, plan, URL, or request details each child needs. Use forked context only when private/session history is essential and appropriate to share.
 - Use read-only agents for analysis/review unless implementation was explicitly requested; do not create several writers in the same worktree.
-- Skip proactive skill subagents for tiny questions, direct commands, highly private requests, or when the user asks not to delegate.
+- Skip a skill-specialist fanout for tiny questions, direct commands, highly private requests, or when the user asks not to delegate.
 - Make cost and concurrency visible by using an ordinary `subagent(...)` call rather than hidden/background automation.
 
 Example shape:

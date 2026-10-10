@@ -113,6 +113,8 @@ Each entry is resolved with the same fuzzy matching as `model` (bare ids, separa
 
 Which failures advance the chain: quota/credit and usage-limit errors, auth failures, HTTP 401/429/5xx, connection and stream errors, timeouts, unavailable or unknown models, and empty/no-output attempts — all only before the child has called a tool. Which never do: context overflow, tool-call failures, runs stopped or timed out, and workflow-permit runs (fallback is rejected for those with an explicit error). One compaction-abort resume per run stays pinned to the same model.
 
+One outage costs one failed attempt, not one per launch: when a model fails retryably and the chain moves on, that model is marked unhealthy for 30 minutes in a small state file shared with detached background runners. While the mark lives, later launches go straight to the first healthy candidate — with a console warning naming the skip — instead of re-trying the dead primary first. The mark expires automatically, so a recovered provider is picked back up without a restart, and agents without a fallback are never affected.
+
 Bounding and observability: a fallback retry starts only while the run deadline has not passed and no stop/abort signal is raised, and usage is aggregated across attempts. When a fallback happens, the run output carries a note like `[fallback] openai/gpt-5.6-luna failed: … Retrying with anthropic/claude-sonnet-4.` and the result reports the model that finally served. Persistent model exclusions and read-only HTTP 429 session continuation are not part of this mechanism.
 
 ## Fast mode

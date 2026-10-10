@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, beforeEach } from "node:test";
 import {
 	buildModelCandidates,
 	formatModelAttemptNote,
@@ -16,6 +16,7 @@ import {
 	resolveSubagentModelOverride,
 } from "../../src/runs/shared/model-resolution.ts";
 import { resolveModelScopesForAgent } from "../../src/runs/shared/model-scope.ts";
+import { clearModelHealth, recordUnhealthyModel } from "../../src/runs/shared/model-health.ts";
 
 const models = [
 	{ provider: "openai", id: "gpt-5-mini", fullId: "openai/gpt-5-mini" },
@@ -133,6 +134,8 @@ describe("context overflow classification", () => {
 });
 
 describe("fallback model candidates", () => {
+	beforeEach(() => clearModelHealth());
+
 	it("orders the resolved primary ahead of fuzzy-resolved fallbacks", () => {
 		const { candidates, requestedModel } = buildModelCandidates("gpt-5-mini", ["claude-sonnet-4", "anthropic/claude-sonnet-4"], models);
 		// The duplicate of the resolved second entry is dropped.
@@ -148,6 +151,19 @@ describe("fallback model candidates", () => {
 	it("keeps a chain of only fallbacks when no primary resolves", () => {
 		assert.deepEqual(buildModelCandidates(undefined, ["claude-sonnet-4"], models).candidates, ["anthropic/claude-sonnet-4"]);
 		assert.deepEqual(buildModelCandidates(undefined, undefined, models).candidates, []);
+	});
+
+	it("starts below a recently failed primary while an alternative remains", () => {
+		recordUnhealthyModel("openai/gpt-5-mini");
+		assert.deepEqual(
+			buildModelCandidates("gpt-5-mini", ["claude-sonnet-4"], models).candidates,
+			["anthropic/claude-sonnet-4"],
+		);
+		clearModelHealth();
+		assert.deepEqual(
+			buildModelCandidates("gpt-5-mini", ["claude-sonnet-4"], models).candidates,
+			["openai/gpt-5-mini", "anthropic/claude-sonnet-4"],
+		);
 	});
 
 	it("resolves explicit primaries strictly while still appending fallbacks", () => {

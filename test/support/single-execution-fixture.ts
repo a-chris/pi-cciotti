@@ -26,6 +26,7 @@ import {
 } from "./helpers.ts";
 import type { SubagentState } from "../../src/shared/types.ts";
 import type { ChildRuntimeConfig } from "../../src/runs/shared/child-runtime-config.ts";
+import { clearModelHealth } from "../../src/runs/shared/model-health.ts";
 
 interface ProgressSummary {
 	agent: string;
@@ -244,6 +245,7 @@ export function installSingleExecutionHooks() {
 		previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 		process.env.PI_CODING_AGENT_DIR = agentDir;
 		mockPi.reset();
+		clearModelHealth();
 	});
 
 	afterEach(() => {

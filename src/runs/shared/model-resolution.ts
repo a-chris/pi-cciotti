@@ -1,5 +1,6 @@
 import { splitKnownThinkingSuffix as splitThinkingSuffix, type ModelInfo as AvailableModelInfo } from "../../shared/model-info.ts";
 import { checkModelScope, type ModelScopeCheckRule, type ModelScopeViolation, type ModelSource } from "./model-scope.ts";
+import { trimUnhealthyLeadingCandidates, UNHEALTHY_MODEL_TTL_MS } from "./model-health.ts";
 
 export type { AvailableModelInfo };
 
@@ -454,7 +455,11 @@ export function buildModelCandidates(
 		seen.add(resolved);
 		candidates.push(resolved);
 	}
-	return { candidates, ...(primary.requestedModel ? { requestedModel: primary.requestedModel } : {}) };
+	const trimmed = trimUnhealthyLeadingCandidates(candidates);
+	if (trimmed.length < candidates.length) {
+		console.warn(`[pi-cciotti] Skipping recently failed model '${candidates[0]}' (retryable failure within the last ${Math.round(UNHEALTHY_MODEL_TTL_MS / 60_000)} minutes); starting with '${trimmed[0]}'.`);
+	}
+	return { candidates: trimmed, ...(primary.requestedModel ? { requestedModel: primary.requestedModel } : {}) };
 }
 
 const MODEL_UNAVAILABLE_PATTERN = /(?:model.*(?:not found|unavailable|disabled)|unknown model)/i;

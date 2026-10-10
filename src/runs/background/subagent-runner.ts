@@ -93,6 +93,7 @@ import { buildTimeoutRecoverySummary, collectTrackedMutationEvidence, snapshotTr
 import { collectDynamicResults, DynamicFanoutError, materializeDynamicParallelStep, validateDynamicCollection } from "../shared/dynamic-fanout.ts";
 import { claimRunFanoutBatch, getRunFanoutBudgetSnapshot } from "../shared/run-fanout-budget.ts";
 import { nestedSummaryFromAsyncStatus, projectNestedEvents, resolveNestedAsyncDir, writeNestedEvent } from "../shared/nested-events.ts";
+import { recordUnhealthyModel } from "../shared/model-health.ts";
 import { formatModelAttemptNote, formatSubagentModelVerificationError, isContextOverflow, isRetryableModelFailureAttempt } from "../shared/model-resolution.ts";
 import { markProcessTerminalCandidateLeaseRelease, processTerminalPath, writeProcessTerminalCandidate, type ProcessTerminalCandidate } from "./process-terminal.ts";
 import { createSteeringStatus, recordSteeringRequest, steeringStatus, terminalSteeringNoticeState, unconsumedSteerReason, updateSteeringTarget } from "./steering.ts";
@@ -1301,6 +1302,7 @@ export async function runSingleStepInner(
 		if (ctx.deadlineAt !== undefined && Date.now() >= ctx.deadlineAt) break singleLaunch;
 		const nextModel = candidates[modelIndex + 1];
 		if (!nextModel || !isRetryableModelFailureAttempt({ error, messages: run.messages, toolCount: run.toolCount })) break singleLaunch;
+		recordUnhealthyModel(candidate ?? run.model ?? step.model);
 		attemptNotes.push(formatModelAttemptNote({
 			model: candidate ?? run.model ?? step.model ?? "default",
 			error,

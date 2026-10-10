@@ -70,6 +70,7 @@ import { formatChildModelResolutionDiagnostic, isChildModelResolutionFailure } f
 import { planAbortRecovery } from "../shared/abort-recovery.ts";
 import { buildTimeoutRecoverySummary, collectTrackedMutationEvidence, snapshotTrackedMutations } from "../shared/mutation-evidence.ts";
 import { captureSingleOutputSnapshot, extractChildWrittenOutput, finalizeSingleOutput, formatSavedOutputReference, hasSingleOutputChangedSinceSnapshot, resolveSingleOutput, validateFileOnlyOutputMode, type SingleOutputSnapshot } from "../shared/single-output.ts";
+import { recordUnhealthyModel } from "../shared/model-health.ts";
 import {
 	buildModelCandidates,
 	formatModelAttemptNote,
@@ -1854,6 +1855,7 @@ async function runSyncCompletionInner(
 			toolCount: attemptResult.progressSummary?.toolCount,
 		});
 		if (!retryable) break modelLoop;
+		recordUnhealthyModel(attemptResult.model ?? candidate);
 		const nextModel = modelsToTry[modelIndex + 1];
 		const nextModelLabel = nextModel
 			? applyThinkingSuffix(nextModel, options.thinkingOverride ?? agent.thinking, options.thinkingOverride !== undefined)

@@ -312,4 +312,59 @@ describe("subagent control attention state", () => {
 		});
 		assert.equal(claimControlNotification(resolveControlConfig(), terminalEvent, seen), true);
 	});
+
+	it("keeps sibling nested descendants on distinct notification keys", () => {
+		// A nested event's runId is the owning run, so the nested id is the only
+		// thing separating two stalling siblings. Identical keys make every
+		// key-based dedupe drop one child's notice entirely.
+		const sibling = (nestedRunId: string, agent: string) => buildControlEvent({
+			to: "needs_attention",
+			runId: "wf-1",
+			agent,
+			ts: 1000,
+			lastActivityAt: 100,
+			message: `${agent} stopped making progress: no observed activity for 90s`,
+			reason: "nested_idle",
+			nestedRunId,
+			nestingPath: [{ runId: "wf-1", stepIndex: 0 }],
+		});
+		const first = sibling("child-a", "builder");
+		const second = sibling("child-b", "tester");
+
+		assert.match(controlNotificationKey(first), /^wf-1:nested:child-a:needs_attention:nested_idle:[a-f0-9]{8}$/);
+		assert.notEqual(controlNotificationKey(first), controlNotificationKey(second), "one sibling's notice must not swallow the other's");
+
+		const seen = new Set<string>();
+		assert.equal(claimControlNotification(resolveControlConfig(), first, seen), true);
+		assert.equal(claimControlNotification(resolveControlConfig(), second, seen), true, "both siblings get delivered");
+		assert.equal(claimControlNotification(resolveControlConfig(), sibling("child-a", "builder"), seen), false, "the same child still dedupes");
+	});
+
+	it("routes a nested notice's nudge at the nested run and its controls at the owning run", () => {
+		const event = buildControlEvent({
+			to: "needs_attention",
+			runId: "wf-1",
+			agent: "builder",
+			ts: 1000,
+			lastActivityAt: 100,
+			message: "builder stopped making progress: no observed activity for 90s",
+			reason: "nested_idle",
+			nestedRunId: "child-b",
+			nestingPath: [{ runId: "wf-1", stepIndex: 0 }, { runId: "child-a", stepIndex: 2 }],
+		});
+
+		const message = formatControlNoticeMessage(event);
+
+		assert.match(message, /Nested subagent not healthy: builder/);
+		assert.match(message, /^Run: wf-1$/m);
+		assert.match(message, /Nesting: child-b under child-a step 2/);
+		// id-scoped resume/steer resolve nested runs, so the nudge targets the child.
+		assert.match(message, /Routed nested nudge: subagent_control\(\{ action: "resume", id: "child-b", message: /);
+		// status and stop act on the owning run, which is what those verbs resolve.
+		assert.match(message, /Status: subagent_control\(\{ action: "status", id: "wf-1" \}\)/);
+		assert.match(message, /Stop run: subagent_control\(\{ action: "stop", id: "wf-1" \}\)/);
+		// A resume aimed at the owning run would error: it is live, and resume only
+		// revives paused/completed/failed runs.
+		assert.equal(message.includes('action: "resume", id: "wf-1"'), false);
+	});
 });

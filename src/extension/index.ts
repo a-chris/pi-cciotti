@@ -48,6 +48,7 @@ import { registerPromptTemplateDelegationBridge } from "../slash/prompt-template
 import { registerSlashSubagentBridge } from "../slash/slash-bridge.ts";
 import { hasLiveSubagentWork, registerPiWebSessionLiveness } from "../integrations/pi-web-session-liveness.ts";
 import { createRetainedNestedRouteTracker } from "../runs/background/retained-nested-route-tracker.ts";
+import { resolveControlConfig } from "../runs/shared/subagent-control.ts";
 import { registerSubagentRpcBridge } from "./rpc.ts";
 import { clearSlashSnapshots, getSlashRenderableSnapshot, resolveSlashMessageDetails, restoreSlashFinalSnapshots, type SlashMessageDetails } from "../slash/slash-live-state.ts";
 import { resolveWaitToolConfig } from "../runs/background/subagent-wait.ts";
@@ -511,6 +512,8 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 	};
 	const { ensurePoller, refreshWidget, handleStarted, handleComplete, resetJobs, restoreActiveJobs, dispose: disposeAsyncJobTracker } = createAsyncJobTracker(pi, state, DIRS.async, {
 		widgetEnabled: asyncWidgetEnabled,
+		controlConfig: resolveControlConfig(config.control, undefined),
+		wakeOnNestedAttention: config.control?.wakeOnNestedAttention === true,
 		onJobTerminal: () => refreshResultDelivery(),
 	});
 	const resultWatcher = createResultWatcher(

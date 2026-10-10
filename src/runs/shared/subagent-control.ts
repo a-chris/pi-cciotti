@@ -4,6 +4,7 @@ import {
 	type ControlEvent,
 	type ControlEventType,
 	type ControlNotificationChannel,
+	type NestedRunAddress,
 	type ResolvedControlConfig,
 } from "../../shared/types.ts";
 import { isToolTimeoutExempt } from "./tool-timeout.ts";
@@ -130,6 +131,8 @@ export function buildControlEvent(input: {
 	runId: string;
 	agent: string;
 	index?: number;
+	nestedRunId?: string;
+	nestingPath?: NestedRunAddress["path"];
 	ts?: number;
 	lastActivityAt?: number;
 	message?: string;
@@ -165,6 +168,8 @@ export function buildControlEvent(input: {
 		runId: input.runId,
 		agent: input.agent,
 		...(input.index !== undefined ? { index: input.index } : {}),
+		...(input.nestedRunId ? { nestedRunId: input.nestedRunId } : {}),
+		...(input.nestingPath?.length ? { nestingPath: input.nestingPath } : {}),
 		message,
 		reason: input.reason ?? (type === "active_long_running" ? "active_long_running" : "idle"),
 		...(input.turns !== undefined ? { turns: input.turns } : {}),
@@ -188,7 +193,12 @@ export function shouldNotifyControlEvent(config: ResolvedControlConfig, event: C
 }
 
 export function controlNotificationKey(event: ControlEvent): string {
-	const childKey = event.index !== undefined ? `${event.runId}:${event.index}` : event.runId;
+	// A nested event's runId is the owning run, so without the nested id two
+	// stalling siblings of one run would share a key and one notice would be
+	// silently dropped by every key-based dedupe downstream.
+	const childKey = event.nestedRunId
+		? `${event.runId}:nested:${event.nestedRunId}`
+		: event.index !== undefined ? `${event.runId}:${event.index}` : event.runId;
 	const contextHash = createHash("sha256").update(formatControlNudge(event)).digest("hex").slice(0, 8);
 	return `${childKey}:${event.type}:${event.reason ?? "idle"}:${contextHash}`;
 }
@@ -237,6 +247,25 @@ export function formatControlNoticeMessage(event: ControlEvent): string {
 	const nudgeMessage = formatControlNudge(event);
 	const steerCommand = `subagent_control({ action: "steer", id: "${runTarget}", message: ${JSON.stringify(nudgeMessage)} })`;
 	const nestedResumeCommand = `subagent_control({ action: "resume", id: "${runTarget}", message: ${JSON.stringify(nudgeMessage)} })`;
+	if (event.nestedRunId) {
+		const trail = event.nestingPath?.slice(1).map((address) => `${address.runId} step ${address.stepIndex ?? 0}`).join(" > ");
+		const facts = formatLongRunningFacts(event);
+		// Both ids are controllable: id-scoped steer and resume resolve nested
+		// runs and route the message into the child; run-scoped commands reach the
+		// owning run, and stop interrupts it when the child cannot be reached.
+		const nestedNudgeCommand = `subagent_control({ action: "resume", id: "${event.nestedRunId}", message: ${JSON.stringify(nudgeMessage)} })`;
+		return [
+			`Nested subagent not healthy: ${event.agent}`,
+			`Run: ${runTarget}`,
+			trail ? `Nesting: ${event.nestedRunId} under ${trail}` : `Nesting: ${event.nestedRunId}`,
+			`Signal: ${event.message}`,
+			facts ? `Facts: ${facts}` : undefined,
+			"Hint: Inspect status first. Routed resume on the nested id nudges that child directly; the run commands act on the owning run, and stop interrupts it if the child cannot be revived.",
+			`Status: subagent_control({ action: "status", id: "${runTarget}" })`,
+			`Routed nested nudge: ${nestedNudgeCommand}`,
+			`Stop run: ${`subagent_control({ action: "stop", id: "${runTarget}" })`}`,
+		].filter((line): line is string => Boolean(line)).join("\n");
+	}
 	if (event.type === "active_long_running") {
 		const facts = formatLongRunningFacts(event);
 		return [

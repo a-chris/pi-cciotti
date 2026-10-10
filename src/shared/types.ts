@@ -310,6 +310,10 @@ export interface ControlConfig {
 	activeNoticeAfterTurns?: number;
 	activeNoticeAfterTokens?: number;
 	failedToolAttemptsBeforeAttention?: number;
+	/** Operator-owned: wake the parent turn when a nested descendant stalls or dies.
+	 * Deliberately absent from the per-run control schema - a launch cannot own the
+	 * health of descendants it does not address. */
+	wakeOnNestedAttention?: boolean;
 	notifyOn?: ControlEventType[];
 	notifyChannels?: ControlNotificationChannel[];
 }
@@ -364,7 +368,7 @@ export interface ControlEvent {
 	nestedRunId?: string;
 	nestingPath?: NestedRunAddress["path"];
 	message: string;
-	reason?: "idle" | "completion_guard" | "active_long_running" | "tool_failures" | "time_threshold" | "turn_threshold" | "token_threshold" | "tool_open_threshold";
+	reason?: "idle" | "completion_guard" | "active_long_running" | "tool_failures" | "time_threshold" | "turn_threshold" | "token_threshold" | "tool_open_threshold" | "nested_idle" | "nested_unreachable";
 	turns?: number;
 	tokens?: number;
 	toolCount?: number;

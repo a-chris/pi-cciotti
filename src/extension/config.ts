@@ -152,6 +152,7 @@ function validateControlConfig(value: unknown): void {
 		"activeNoticeAfterTurns",
 		"activeNoticeAfterTokens",
 		"failedToolAttemptsBeforeAttention",
+		"wakeOnNestedAttention",
 		"notifyOn",
 		"notifyChannels",
 	]);
@@ -163,6 +164,9 @@ function validateControlConfig(value: unknown): void {
 	}
 	for (const key of ["needsAttentionAfterMs", "activeNoticeAfterMs", "activeNoticeAfterTurns", "activeNoticeAfterTokens", "failedToolAttemptsBeforeAttention"]) {
 		validatePositiveConfigDelay(config[key], `config.control.${key}`);
+	}
+	if (config.wakeOnNestedAttention !== undefined && typeof config.wakeOnNestedAttention !== "boolean") {
+		throw new Error("config.control.wakeOnNestedAttention must be a boolean");
 	}
 	const validateList = (key: "notifyOn" | "notifyChannels", allowed: readonly string[]): void => {
 		const raw = config[key];

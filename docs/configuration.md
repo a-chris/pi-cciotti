@@ -291,6 +291,18 @@ Global default for the async single-agent `checkpointBeforeDeadlineMs` launch op
 
 An explicit `subagent` call value wins over this default. Choose a value at least as long as the child's longest expected tool call; a steer cannot land inside one. When the deadline leaves less than one second of run time before the checkpoint, the checkpoint is disarmed and the run behaves as if the option were absent. The global config value must be a positive integer no greater than `2147483647`; invalid values fail config loading rather than silently disabling the checkpoint.
 
+## `control.wakeOnNestedAttention`
+
+```json
+{ "control": { "wakeOnNestedAttention": true } }
+```
+
+The async job tracker checks every running background run's nested descendants (workflow children, and children of children) **once a minute itself, from observable status** — a dead or wedged child may never write a self-report, so waiting for one is exactly the wrong dependency. A descendant is reported to the parent session when its recorded PID no longer exists while the run still reports `running`, when its tool call has been open longer than `control.activeNoticeAfterMs`, or when it has had no observed activity longer than `control.needsAttentionAfterMs` — scaled by its thinking level unless you set that window explicitly. The checks reuse the same primitives and windows the child runners themselves use, so a child that never wrote a verdict — dead, wedged, or not yet past its first turn (startup grace) — is handled on facts alone, with no second stall rule. A descendant is reported once per reason: repeats wait until the reason changes (stalled to dead, or into a tool wedge) or activity proves the child worked since, so a stuck child does not repeat itself every minute while a later genuine stall is still reported. The report carries identity and timing facts only: agent name, run id, nesting trail, how long since the last observed activity. It never opens a child transcript, prompt, or output.
+
+By default (`false`) the notice is visible without starting a parent turn, because a wake costs parent context and the parent may be mid-tool-call anyway. Set `wakeOnNestedAttention: true` to wake the parent orchestrator instead. The notice routes both ways: the nudge command targets the nested child's own id, which `subagent_control` resolves and delivers into that child, while `status` and `stop` name the owning background run, which is what those verbs act on.
+
+This respects the rest of `control`: `enabled: false` silences nested health reporting along with the other control notices, and `notifyOn` still filters the event types. A top-level run's own attention notices are unchanged. Config is read once at extension load, so a change needs a Pi reload; `subagent doctor` reports the resolved state under `Runtime`.
+
 ## `globalConcurrencyLimit`
 
 ```json

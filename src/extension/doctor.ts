@@ -219,6 +219,7 @@ export function buildDoctorReport(input: DoctorReportInput): string {
 		"Runtime",
 		`- cwd: ${input.cwd}`,
 		`- delegation level: ${resolveDelegationLevel(input.config.delegationLevel)} (${input.config.delegationLevel ? "config" : "default"})`,
+		`- nested child health: ${input.config.control?.enabled === false ? "disabled with control notices" : input.config.control?.wakeOnNestedAttention === true ? "checks stalled, wedged, or dead children every minute and wakes the parent" : "checks stalled, wedged, or dead children every minute without waking the parent"}`,
 		lineFromCheck("async support", () => `- async support: ${deps.isAsyncAvailable() ? "available" : "unavailable"}`),
 		...formatSessionLines(input),
 		"",

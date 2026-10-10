@@ -44,7 +44,7 @@ describe("M4 config-enriched keys: validated and wired", () => {
 			toolTimeoutMs: 5_000,
 			checkpointBeforeDeadlineMs: 60_000,
 			toolBudget: { soft: 40, hard: 60, block: ["read", "grep"] },
-			control: { enabled: true, needsAttentionAfterMs: 90_000, notifyChannels: ["event"] },
+			control: { enabled: true, needsAttentionAfterMs: 90_000, notifyChannels: ["event"], wakeOnNestedAttention: true },
 		}));
 		const config = loadConfig();
 		assert.equal(config.timeoutMs, 45_000);
@@ -53,6 +53,7 @@ describe("M4 config-enriched keys: validated and wired", () => {
 		assert.deepEqual(config.toolBudget, { soft: 40, hard: 60, block: ["read", "grep"] });
 		assert.equal(config.control?.needsAttentionAfterMs, 90_000);
 		assert.deepEqual(config.control?.notifyChannels, ["event"]);
+		assert.equal(config.control?.wakeOnNestedAttention, true);
 	});
 
 	it("rejects a hand-edited value for every enriched key", () => {
@@ -67,6 +68,7 @@ describe("M4 config-enriched keys: validated and wired", () => {
 			['{"control": []}', /config\.control must be a JSON object/],
 			['{"control": {"needsAttentionAfterMs": 0}}', /config\.control\.needsAttentionAfterMs must be a positive integer/],
 			['{"control": {"notifyChannels": ["carrier-pigeon"]}}', /config\.control\.notifyChannels must be an array/],
+			['{"control": {"wakeOnNestedAttention": "always"}}', /config\.control\.wakeOnNestedAttention must be a boolean/],
 			['{"control": {"watchdogMode": "strict"}}', /config\.control\.watchdogMode is not supported/],
 		];
 		for (const [json, expected] of invalid) {

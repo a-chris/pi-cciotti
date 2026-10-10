@@ -77,6 +77,47 @@ describe("subagent control notice delivery", () => {
 		assert.deepEqual(recorder.sent[0]?.options, { triggerTurn: false });
 	});
 
+	it("reports a nested descendant without waking the parent by default", () => {
+		const recorder = makeRecorder();
+
+		handleSubagentControlNotice({
+			pi: recorder.pi,
+			state: makeState(),
+			visibleControlNotices: new Set(),
+			details: { source: "nested", event: needsAttentionEvent({ reason: "nested_idle" }) },
+		});
+
+		assert.equal(recorder.sent.length, 1, "the operator still sees the stall");
+		assert.deepEqual(recorder.sent[0]?.options, { triggerTurn: false }, "a nested stall must not spend a parent turn unasked");
+	});
+
+	it("wakes the parent for a nested descendant when the operator opted in", () => {
+		const recorder = makeRecorder();
+
+		handleSubagentControlNotice({
+			pi: recorder.pi,
+			state: makeState(),
+			visibleControlNotices: new Set(),
+			details: { source: "nested", wakeParent: true, event: needsAttentionEvent({ reason: "nested_unreachable" }) },
+		});
+
+		assert.deepEqual(recorder.sent[0]?.options, { triggerTurn: true });
+	});
+
+	it("delivers both siblings of a shared owning run without dedupe collision", () => {
+		// A nested event's runId is the owning run; delivery dedupes by event key
+		// per session, so two stalling siblings must differ on the nested id.
+		const recorder = makeRecorder();
+		const shared = new Set<string>();
+		const sibling = (nestedRunId: string, agent: string) => needsAttentionEvent({ index: undefined, reason: "nested_idle", agent, nestedRunId });
+
+		handleSubagentControlNotice({ pi: recorder.pi, state: makeState(), visibleControlNotices: shared, details: { source: "nested", event: sibling("child-a", "builder") } });
+		handleSubagentControlNotice({ pi: recorder.pi, state: makeState(), visibleControlNotices: shared, details: { source: "nested", event: sibling("child-b", "tester") } });
+		handleSubagentControlNotice({ pi: recorder.pi, state: makeState(), visibleControlNotices: shared, details: { source: "nested", event: sibling("child-a", "builder") } });
+
+		assert.equal(recorder.sent.length, 2, "each sibling is delivered once, and the repeat is deduped");
+	});
+
 	it("does not queue a foreground notice that Pi could flush after completion", () => {
 		const state = makeState();
 		state.foregroundControls.set("run-1", {

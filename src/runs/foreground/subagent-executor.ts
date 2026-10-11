@@ -3,6 +3,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { Static } from "typebox";
+import type { SubagentLaunchParams } from "../../extension/schemas.ts";
 import { discoverAgents, findBlockingAgentDiagnostic, formatUnknownAgentError, resolveAgentName, unknownAgentDiagnosticContext, type AgentConfig, type AgentDiscoveryDiagnostic, type AgentScope, type UnknownAgentDiagnosticContext } from "../../agents/agents.ts";
 import { getArtifactsDir, getProjectArtifactPackagingWarning, getProjectSubagentsDir } from "../../shared/artifacts.ts";
 import { writeAtomicJson } from "../../shared/atomic-json.ts";
@@ -282,39 +284,54 @@ interface TaskParam {
 	toolBudget?: ToolBudgetConfig;
 }
 
-export interface SubagentParamsLike {
-	action?: string;
-	id?: string;
-	runId?: string;
-	dir?: string;
-	handoffPath?: string;
-	index?: number;
-	childId?: string;
-	view?: "fleet" | "transcript";
-	lines?: number;
-	topic?: string;
+/**
+ * Internal-only launch fields: host metadata and executor seams that no public
+ * surface (model facade, RPC allowlist, or workflow child) can set. The public
+ * launch surface lives on `SubagentLaunchParams`; this extension adds only the
+ * private keys, so the two together still describe every executor input.
+ */
+export interface SubagentParamsInternal {
+	// Durable-run tombstones retained for the public-execution rejection shims
+	// (issue #20 owns removing the checkpoints themselves).
 	chainName?: string;
-	config?: unknown;
+	chain?: ChainStep[];
+	tasks?: TaskParam[];
+	step?: ChainStep;
+	concurrency?: number;
+	chainDir?: string;
 	name?: string;
 	type?: string;
-	agent?: string;
-	task?: string;
+	scope?: string;
+	target?: string;
+	config?: unknown;
 	capabilities?: boolean;
-	extensionBindings?: ExtensionBindings;
+	additional?: number;
+	focus?: boolean;
+	missionId?: string;
 	/** Retained async child run id. Valid only on workflow runs.run items. */
 	resume?: string;
-	message?: string;
+	/** Existing manifest for the worktree.discard management action. */
+	handoffPath?: string;
+	// Internal launch seams: config-derived or set by an internal caller, never by
+	// the model facade, an RPC allowlist, or a workflow child.
+	share?: boolean;
+	artifacts?: boolean;
+	includeProgress?: boolean;
+	sessionDir?: string;
+	agentScope?: unknown;
+	maxOutput?: MaxOutputConfig;
+	/** Internal recovery provenance for a resolved model override. */
+	modelOrigin?: ModelOrigin;
+	thinking?: string | false;
+	clarify?: boolean;
+	foregroundOnly?: boolean;
+	control?: ControlConfig;
 	steeringRecovery?: boolean;
-	mode?: SteerDeliveryMode | "plan" | "apply";
-	repo?: string;
-	workflowScript?: string;
-	workflowScriptPath?: string;
+	isolation?: "none" | "worktree";
+	preflight?: import("../../shared/types.ts").WorkflowPreflight;
 	globalConcurrencyLimit?: number;
 	maxSubagentSpawnsPerRun?: number;
-	preflight?: import("../../shared/types.ts").WorkflowPreflight;
-	isolation?: "none" | "worktree";
-	step?: ChainStep;
-	/** Internal workflow ownership metadata; not part of the public schema. */
+	// Internal workflow ownership metadata; not part of the public schema.
 	workflowParentRunId?: string;
 	workflowKey?: string;
 	workflowChildAsyncId?: string;
@@ -330,59 +347,13 @@ export interface SubagentParamsLike {
 	runFanoutAdmitted?: boolean;
 	/** Internal inherited tool/agent ceiling for delegated child launches. */
 	capabilityCeiling?: ResolvedSubagentCapabilityCeiling;
-	/** Internal durable-run compatibility fields. Public callers must use workflowScript. */
-	chain?: ChainStep[];
-	tasks?: TaskParam[];
-	concurrency?: number;
-	worktree?: boolean;
-	/** Git ref used as the managed worktree base. */
-	baseRef?: string;
-	context?: "fresh" | "fork" | "summary";
-	/** Current state of the work and what led here. Consumed only when the
-	 * resolved context mode is fork|summary; fresh launches keep it absent. */
-	prequel?: string;
-	async?: boolean;
-	foregroundOnly?: boolean;
-	timeoutMs?: number;
-	maxRuntimeMs?: number;
-	/** Async runs only: steer the child to checkpoint and stop this many ms before the run deadline. */
-	checkpointBeforeDeadlineMs?: number;
-	/** Optional hard per-tool-call timeout (ms). Known-fast tools also have a default. */
-	toolTimeoutMs?: number;
-	toolBudget?: ToolBudgetConfig;
-	clarify?: boolean;
-	share?: boolean;
-	control?: ControlConfig;
-	sessionDir?: string;
-	cwd?: string;
-	maxOutput?: MaxOutputConfig;
-	artifacts?: boolean;
-	includeProgress?: boolean;
-	model?: string;
-	/** Internal recovery provenance for a resolved model override. */
-	modelOrigin?: ModelOrigin;
-	fast?: boolean;
-	thinking?: string | false;
-	/** Public named workflow resource. Resolved before entering the workflow sandbox. */
-	workflow?: string;
-	args?: Record<string, unknown>;
-	scope?: string;
-	target?: string;
-	focus?: boolean;
-	skill?: string | string[] | boolean;
-	output?: string | boolean;
-	/** Internal-only; not part of the public tool schema. Wired for single-run reads (chain steps use their own field). */
-	reads?: string[] | false;
-	outputMode?: "inline" | "file-only";
-	outputSchema?: JsonSchemaObject | false;
-	agentScope?: unknown;
-	chainDir?: string;
-	acceptance?: AcceptanceInput;
-	gate?: string;
-	additional?: number;
-	missionId?: string;
-	mission?: unknown;
 }
+
+/**
+ * The executor's input contract, derived from the single surviving launch schema
+ * (`SubagentLaunchParams`) and widened by the internal-only fields above.
+ */
+export type SubagentParamsLike = Static<typeof SubagentLaunchParams> & SubagentParamsInternal;
 
 function rememberParentModel(state: { currentSessionId?: string | null; lastParentModel?: ParentModel }, sessionId: string | null, model: unknown): ParentModel | undefined {
 	if (state.currentSessionId !== sessionId) delete state.lastParentModel;

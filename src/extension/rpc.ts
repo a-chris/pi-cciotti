@@ -2,6 +2,7 @@ import * as path from "node:path";
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Compile } from "typebox/compile";
+import type { Static } from "typebox";
 import { resolveAsyncRunLocation } from "../runs/background/async-resume.ts";
 import { deliverStopRequest } from "../runs/background/control-channel.ts";
 import { reconcileAsyncRun } from "../runs/background/stale-run-reconciler.ts";
@@ -21,7 +22,16 @@ import {
 } from "../shared/types.ts";
 import { sanitizeDisplayText, truncateDisplayText } from "../shared/display-text.ts";
 import { readStatus } from "../shared/utils.ts";
-import { SubagentParams } from "./schemas.ts";
+import {
+	RpcInterruptParams,
+	RpcManageParams,
+	RpcPingParams,
+	RpcResumeParams,
+	RpcSpawnParams,
+	RpcStatusParams,
+	RpcSteerParams,
+	RpcStopParams,
+} from "./schemas.ts";
 import { normalizePublicSubagentExecution } from "./public-execution.ts";
 import { ASYNC_STATUS_SNAPSHOT_KIND, ASYNC_STATUS_SNAPSHOT_VERSION, buildAsyncStatusSnapshotForState } from "../runs/background/async-status-snapshot.ts";
 import { isStoppableAsyncStatusStep, resolveAsyncStatusChild, stopStoppableAsyncStatusChildren, type ResolvedAsyncStatusChild } from "../runs/shared/child-identity.ts";
@@ -164,7 +174,7 @@ interface FleetCandidate {
 	goal?: unknown;
 }
 
-type StatusRpcParams = Pick<SubagentParamsLike, "id" | "runId" | "dir" | "index" | "view" | "lines">;
+type StatusRpcParams = Static<typeof RpcStatusParams>;
 
 function buildFleetStatus(
 	state: SubagentState | undefined,
@@ -321,7 +331,14 @@ class SubagentRpcError extends Error {
 	}
 }
 
-const subagentParamsValidator = Compile(SubagentParams);
+const rpcPingValidator = Compile(RpcPingParams);
+const rpcSpawnValidator = Compile(RpcSpawnParams);
+const rpcStatusValidator = Compile(RpcStatusParams);
+const rpcSteerValidator = Compile(RpcSteerParams);
+const rpcResumeValidator = Compile(RpcResumeParams);
+const rpcInterruptValidator = Compile(RpcInterruptParams);
+const rpcStopValidator = Compile(RpcStopParams);
+const rpcManageValidator = Compile(RpcManageParams);
 
 export function subagentRpcReplyEvent(requestId: string): string {
 	return `${SUBAGENT_RPC_REPLY_EVENT_PREFIX}${requestId}`;
@@ -344,12 +361,18 @@ function assertRecordParams(params: unknown, method: SubagentRpcMethod): Record<
 	return params;
 }
 
-function assertSubagentParams(params: SubagentParamsLike, label: string): void {
-	if (subagentParamsValidator.Check(params)) return;
-	const messages = [...subagentParamsValidator.Errors(params)]
+interface RpcParamsValidator {
+	Check(value: unknown): boolean;
+	Errors(value: unknown): Iterable<{ message: string }>;
+}
+
+/** Reject any key outside the method's allowlist, or any shape the schema rejects, with the existing `invalid_params` reply contract. */
+function assertMethodParams(validator: RpcParamsValidator, params: Record<string, unknown>, method: SubagentRpcMethod): void {
+	if (validator.Check(params)) return;
+	const messages = [...validator.Errors(params)]
 		.slice(0, 4)
 		.map((error) => error.message);
-	throw new SubagentRpcError("invalid_params", `${label}: ${messages.join("; ") || "invalid subagent parameters"}`);
+	throw new SubagentRpcError("invalid_params", `RPC ${method} params: ${messages.join("; ") || "invalid subagent parameters"}`);
 }
 
 function textFromToolResult(result: AgentToolResult<Details>): string {
@@ -389,6 +412,7 @@ function normalizeTargetParams(params: unknown, method: SubagentRpcMethod): Pick
 
 function normalizeStatusParams(params: unknown): StatusRpcParams {
 	const input = assertRecordParams(params, "status");
+	assertMethodParams(rpcStatusValidator, input, "status");
 	const output: StatusRpcParams = normalizeTargetParamsFromRecord(input);
 	if (input.view !== undefined) output.view = input.view as StatusRpcParams["view"];
 	if (input.lines !== undefined) output.lines = input.lines as number;
@@ -468,7 +492,8 @@ async function executeChecked(
 	method: SubagentRpcMethod,
 	params: SubagentParamsLike,
 ): Promise<{ text: string; details?: Details; isError?: boolean }> {
-	assertSubagentParams(params, `RPC ${method} params`);
+	// Each method's normalizer has already validated the raw params against its
+	// own allowlist; this is the trusted hand-off to the executor.
 	const controller = new AbortController();
 	const result = await options.execute(`rpc-${method}-${requestId}`, params, controller.signal, undefined, ctx);
 	failIfToolError(result);
@@ -477,6 +502,7 @@ async function executeChecked(
 
 function manageParams(params: unknown): SubagentParamsLike {
 	const input = assertRecordParams(params, "manage");
+	assertMethodParams(rpcManageValidator, input, "manage");
 	if (typeof input.action !== "string" || !(SUBAGENT_RPC_MANAGEMENT_ACTIONS as readonly string[]).includes(input.action)) {
 		throw new SubagentRpcError(
 			"invalid_params",
@@ -494,7 +520,6 @@ function manageParams(params: unknown): SubagentParamsLike {
 		action,
 		...(typeof input.id === "string" ? { id: input.id.trim() } : {}),
 	};
-	assertSubagentParams(output, "RPC manage params");
 	return output;
 }
 
@@ -508,11 +533,19 @@ function spawnParams(params: unknown): SubagentParamsLike {
 	if (input.async === false) {
 		throw new SubagentRpcError("invalid_params", "RPC spawn only supports detached async launches; omit async or set async: true.");
 	}
+	assertMethodParams(rpcSpawnValidator, input, "spawn");
 	return { ...(normalized.params as SubagentParamsLike), async: true };
+}
+
+function interruptParams(params: unknown): Pick<SubagentParamsLike, "id" | "runId" | "dir" | "index"> {
+	const input = assertRecordParams(params, "interrupt");
+	assertMethodParams(rpcInterruptValidator, input, "interrupt");
+	return normalizeTargetParamsFromRecord(input);
 }
 
 function steerParams(params: unknown): SubagentParamsLike {
 	const input = assertRecordParams(params, "steer");
+	assertMethodParams(rpcSteerValidator, input, "steer");
 	if (typeof input.message !== "string" || !input.message.trim())
 		throw new SubagentRpcError("invalid_params", "RPC steer requires a non-empty message.");
 	const target = normalizeTargetParams(input, "steer");
@@ -529,6 +562,7 @@ function steerParams(params: unknown): SubagentParamsLike {
 
 function resumeParams(params: unknown): SubagentParamsLike {
 	const input = assertRecordParams(params, "resume");
+	assertMethodParams(rpcResumeValidator, input, "resume");
 	if (typeof input.message !== "string" || !input.message.trim())
 		throw new SubagentRpcError("invalid_params", "RPC resume requires a non-empty message.");
 	const target = normalizeTargetParams(input, "resume");
@@ -556,8 +590,8 @@ function stopAsyncRun(
 		throw new SubagentRpcError("invalid_params", "RPC stop childId must be a non-empty string without newlines and at most 256 characters.");
 	}
 	const childId = typeof rawChildId === "string" ? rawChildId : undefined;
+	assertMethodParams(rpcStopValidator, input, "stop");
 	const target = normalizeTargetParams(input, "stop");
-	assertSubagentParams({ action: "status", ...target }, "RPC stop target params");
 	const asyncDirRoot = options.asyncDirRoot ?? DIRS.async;
 	const resultsDir = options.resultsDir ?? DIRS.results;
 	let location;
@@ -693,7 +727,10 @@ async function handleRequest(
 	fleetKeys: FleetKeyState,
 ): Promise<unknown> {
 	const ctx = options.getContext();
-	if (request.method === "ping") return pingData(ctx);
+	if (request.method === "ping") {
+		assertMethodParams(rpcPingValidator, assertRecordParams(request.params, "ping"), "ping");
+		return pingData(ctx);
+	}
 	if (!ctx) throw new SubagentRpcError("no_active_session", "No active extension context for subagent RPC.");
 
 	if (request.method === "manage") {
@@ -744,7 +781,7 @@ async function handleRequest(
 		return executeChecked(options, ctx, request.requestId, request.method, steerParams(request.params));
 	}
 	if (request.method === "interrupt") {
-		return executeChecked(options, ctx, request.requestId, request.method, { action: "interrupt", ...normalizeTargetParams(request.params, "interrupt") });
+		return executeChecked(options, ctx, request.requestId, request.method, { action: "interrupt", ...interruptParams(request.params) });
 	}
 	if (request.method === "stop") {
 		return stopAsyncRun(request.params, options, ctx);

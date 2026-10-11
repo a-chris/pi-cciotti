@@ -2,7 +2,7 @@
  * Facade normalization (M1).
  *
  * The model sees three small tools; each maps onto the existing internal
- * SubagentParams contract and hands off to the same public execution boundary
+ * SubagentParamsLike contract and hands off to the same public execution boundary
  * (executor.executePublic) the extension has always used. No bridge, preflight,
  * or extension consumer is affected: they keep using internal contracts directly.
  */

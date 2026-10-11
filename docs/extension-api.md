@@ -109,17 +109,30 @@ pi.events.emit("subagents:rpc:v1:request", {
   method: "spawn",
   params: {
     workflowScript: `return runs.run("main", { agent: "reviewer", task: "Review the current diff" })`,
-    context: "fresh"
+    worktree: true
   }
 });
 ```
 
 The RPC methods are `ping`, `status`, `manage`, `spawn`, `steer`, `interrupt`, `stop`, and `resume`. `status`, `manage`, `steer`, `interrupt`, and `resume` reuse normal package-owned actions.
 
+Every method validates `params` against its own allowlist and rejects any unknown field with `error.code: invalid_params` before dispatch. The allowlists are:
+
+- `spawn`: `agent`, `task`, `cwd`, `async`, `output`, `outputMode`, `reads`, `prequel`, `worktree`, `baseRef`, `workflow`, `args`, `workflowScript`, `workflowScriptPath`, `timeoutMs` (`async: true` is accepted; `async: false` is rejected because RPC spawn is async-only).
+- `status`: `id`, `runId`, `dir`, `index`, `view`, `lines`.
+- `steer`: `message`, `mode`, `id`, `runId`, `dir`, `index`.
+- `resume`: `message`, `output`, `outputMode`, `id`, `runId`, `dir`, `index`.
+- `interrupt`: `id`, `runId`, `dir`, `index`.
+- `stop`: `id`, `runId`, `dir`, `index`, `childId`.
+- `manage`: `action`, `id`.
+- `ping`: no params.
+
+Per-call policy fields (`model`, `context`, `skill`, `fast`, `outputSchema`, `acceptance`, `toolBudget`, `toolTimeoutMs`, `maxRuntimeMs`, `checkpointBeforeDeadlineMs`) are deliberately not accepted by RPC `spawn`: policy rides with the agent and configuration, not the call. A `workflowScript` child may still set them on its own `runs.run`/`runs.all` item.
+
 Method notes:
 
 - `manage` is reserved for future narrow management actions; today it rejects all actions as unsupported until one is added. Mission, agent, config, worktree, and arbitrary management actions are rejected before executor dispatch. `ping.capabilities.managementActions` advertises the empty allowlist.
-- `spawn` accepts structured single-child execution (`agent`, `task?`), inline `workflowScript`, or `workflowScriptPath` and is async-only: omit `async` or set `async: true`, omit `clarify`, and do not pass management `action` values. Relative script paths resolve against the request `cwd`. It goes through the same executor as the `subagent` tool, so agent discovery, validation, session attribution, configured spawn caps, child-safety depth, artifacts, and async status all behave the same.
+- `spawn` accepts structured single-child execution (`agent`, `task?`), inline `workflowScript`, or `workflowScriptPath` and is async-only: omit `async` or set `async: true`, omit `clarify`, and do not pass management `action` values. Any other field is rejected as an unknown param. Relative script paths resolve against the request `cwd`. It goes through the same executor as the `subagent` tool, so agent discovery, validation, session attribution, configured spawn caps, child-safety depth, artifacts, and async status all behave the same.
 - `steer` requires an async run `id` (plus optional child `index`) and a non-empty `message`; its reply preserves the normal acknowledged-delivery result. Optional `mode` values are `steer` (default), `follow_up`, and `auto`, and receipts include `deliveryStatus: "delivered" | "queued"`. RPC steering disables the direct tool's pause-and-revive recovery in every mode so an extension keeps authority over the exact child it spawned; `ping.capabilities.nonRecoveringSteer` advertises this guarantee.
 - `resume` requires a run target and non-empty `message`. It delegates to the existing revival path, which validates current-session ownership, persisted session/recovery metadata, stopped/live state, capability ceilings, and the exclusive session lease before returning the new async run details. Callers may request a `file-only` output path for the revived result without overriding its model, tools, or budgets. `ping.capabilities.resume` advertises this seam.
 - `stop` targets current-session top-level async runs through the stop control channel and records a `stopped` lifecycle instead of reporting a timeout.

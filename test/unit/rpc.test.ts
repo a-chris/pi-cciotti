@@ -1118,3 +1118,82 @@ describe("subagent extension RPC bridge", () => {
 		}
 	});
 });
+
+describe("subagent RPC per-method param allowlists", () => {
+	function bridgeWithRecorder() {
+		const events = new FakeEvents();
+		const executed: unknown[] = [];
+		const bridge = registerSubagentRpcBridge({
+			events,
+			getContext: () => ctx(),
+			execute: async (_id, params) => {
+				executed.push(params);
+				return { content: [{ type: "text", text: "ok" }], details: { mode: "single", results: [] } } as any;
+			},
+		});
+		return { events, executed, bridge };
+	}
+
+	// One accidental allowlist inclusion would fake a pass, so each method is probed
+	// with several formerly pool-only keys that no surface should accept anymore.
+	const probes = ["share", "artifacts", "repo", "model", "acceptance"] as const;
+
+	async function assertRejectsUnknown(method: string, base: Record<string, unknown>) {
+		for (const probe of probes) {
+			const { events, executed, bridge } = bridgeWithRecorder();
+			const reply = await request(events, `${method}-unknown-${probe}`, method, { ...base, [probe]: true });
+			assert.equal(reply.success, false, `${method} should reject ${probe}`);
+			assert.equal((reply as { error?: { code?: string } }).error?.code, "invalid_params", `${method} ${probe} should be invalid_params`);
+			assert.equal(executed.length, 0, `${method} ${probe} should not reach the executor`);
+			bridge.dispose();
+		}
+	}
+
+	it("rejects unknown keys on spawn", async () => {
+		await assertRejectsUnknown("spawn", { agent: "worker", task: "work" });
+	});
+
+	it("rejects unknown keys on status", async () => {
+		await assertRejectsUnknown("status", { id: "run-1" });
+	});
+
+	it("rejects unknown keys on steer", async () => {
+		await assertRejectsUnknown("steer", { id: "run-1", message: "keep going" });
+	});
+
+	it("rejects unknown keys on interrupt", async () => {
+		await assertRejectsUnknown("interrupt", { id: "run-1" });
+	});
+
+	it("rejects unknown keys on resume", async () => {
+		await assertRejectsUnknown("resume", { id: "run-1", message: "keep going" });
+	});
+
+	it("rejects unknown keys on stop", async () => {
+		await assertRejectsUnknown("stop", { id: "run-1" });
+	});
+
+	it("rejects unknown keys on manage", async () => {
+		await assertRejectsUnknown("manage", { action: "x" });
+	});
+
+	it("rejects unknown keys on ping", async () => {
+		await assertRejectsUnknown("ping", {});
+	});
+
+	it("still accepts valid minimal payloads per method", async () => {
+		for (const [method, params] of [
+			["spawn", { agent: "worker", task: "work" }],
+			["status", { id: "run-1" }],
+			["steer", { id: "run-1", message: "keep going" }],
+			["interrupt", { id: "run-1" }],
+			["resume", { id: "run-1", message: "keep going" }],
+		] as const) {
+			const { events, executed, bridge } = bridgeWithRecorder();
+			const reply = await request(events, `${method}-valid`, method, params);
+			assert.equal(reply.success, true, `${method} should accept a minimal valid payload`);
+			assert.equal(executed.length, 1);
+			bridge.dispose();
+		}
+	});
+});

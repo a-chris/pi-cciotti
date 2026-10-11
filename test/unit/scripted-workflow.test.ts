@@ -227,6 +227,120 @@ describe("scripted workflow runtime", () => {
 		assert.equal(validateWorkflowScript('return runs.run("child", { baseRef() { return "HEAD"; } });').ok, false);
 	});
 
+	const forbiddenChildFields = [
+		["context", '"fork"'],
+		["model", '"openai/gpt-5-mini"'],
+		["skill", '"tmux, safe-bash"'],
+		["fast", "true"],
+	] as const;
+
+	function childPolicyScript(call: "run" | "all", fields: string): string {
+		return [
+			call === "run" ? 'return runs.run("child", {' : "return runs.all([{",
+			'  key: "child", agent: "worker", task: "Check",',
+			`  ${fields}`,
+			call === "run" ? "});" : "}]);",
+		].join("\n");
+	}
+
+	it("rejects literal child overrides of agent-owned policy with source locations offline", () => {
+		for (const call of ["run", "all"] as const) {
+			for (const [field, value] of forbiddenChildFields) {
+				const script = childPolicyScript(call, `${field}: ${value}`);
+				const result = validateWorkflowScript(script);
+				assert.equal(result.ok, false, script);
+				assert.equal(result.errors.length, 1, script);
+				assert.equal(result.errors[0]?.line, 3, script);
+				assert.equal(result.errors[0]?.column, 2 + field.length + 3, script);
+				const owner = call === "run" ? "runs.run" : "runs.all item";
+				assert.ok(result.errors[0]!.message.startsWith(`${owner} does not accept ${field} per child:`), result.errors[0]!.message);
+				assert.match(result.errors[0]!.message, /context, model, skill, fast are agent-owned policy declared on the agent definition/);
+			}
+		}
+		const multiple = validateWorkflowScript(childPolicyScript("run", 'model: "openai/gpt-5-mini", skill: false, fast: true'));
+		assert.equal(multiple.ok, false);
+		assert.equal(multiple.errors.length, 1);
+		assert.match(multiple.errors[0]!.message, /runs\.run does not accept model, skill, fast per child:/);
+	});
+
+	it("rejects statically named accessor properties that shadow agent-owned policy", () => {
+		for (const accessor of ['get model() { return "openai/gpt-5-mini"; }', "set model(value) {}", "get skill() { return false; }"]) {
+			const result = validateWorkflowScript(`return runs.run("child", { agent: "worker", task: "Check", ${accessor} });`);
+			assert.equal(result.ok, false, accessor);
+			assert.equal(result.errors.length, 1, accessor);
+			assert.match(result.errors[0]!.message, /^runs\.run does not accept (?:model|skill) per child:/, accessor);
+			assert.equal(result.errors[0]!.line, 1, accessor);
+			assert.ok((result.errors[0]!.column ?? 0) > 1, accessor);
+		}
+		assert.deepEqual(validateWorkflowScript('return runs.run("child", { agent: "worker", task: "Check", get baseRef() { return "HEAD"; } });'), { ok: true, errors: [] });
+	});
+
+	it("accepts the closed child field set and leaves dynamic params to runtime rejection", () => {
+		const closedFields = [
+			'agent: "worker"',
+			'task: "Check"',
+			'label: "Map behavior"',
+			'cwd: "/tmp"',
+			"async: false",
+			'output: "out.md"',
+			"worktree: false",
+			'prequel: "Current state"',
+			'reads: ["src/a.ts"]',
+			'acceptance: { verify: "tests pass" }',
+			'outputSchema: { type: "object" }',
+			"timeoutMs: 1000",
+			"toolBudget: { tokens: 1000 }",
+			'baseRef: "HEAD"',
+			'isolation: "none"',
+			'outputMode: "text"',
+		].join(",\n  ");
+		assert.deepEqual(validateWorkflowScript(`return runs.run("child", {\n  ${closedFields}\n});`), { ok: true, errors: [] });
+		assert.deepEqual(validateWorkflowScript(`return runs.all([{ key: "child", ${closedFields} }]);`), { ok: true, errors: [] });
+		assert.deepEqual(validateWorkflowScript(`const extra = args.extra; return runs.run("child", { agent: "worker", task: "Check", ...extra });`), { ok: true, errors: [] });
+		assert.deepEqual(validateWorkflowScript(`return runs.all(args.items.map((item) => ({ key: item.key, agent: "worker", task: "Check", ...item })));`), { ok: true, errors: [] });
+	});
+
+	it("rejects agent-owned policy overrides at runtime on both call surfaces", async () => {
+		const scripts = [
+			...forbiddenChildFields.flatMap(([field, value]) => [
+				childPolicyScript("run", `${field}: ${value}`),
+				childPolicyScript("all", `${field}: ${value}`),
+			]),
+			`const extra = args.extra; return runs.run("child", { agent: "worker", task: "Check", ...extra });`,
+			`return runs.all(args.items.map((item) => ({ key: item.key, agent: "worker", task: "Check", ...item })));`,
+		];
+		for (const script of scripts) {
+			let launched = false;
+			await assert.rejects(
+				runWorkflowScript({
+					script,
+					args: { extra: { model: "openai/gpt-5-mini" }, items: [{ key: "child", fast: true }] },
+					async launch(key) { launched = true; return { key, ok: true, output: "unexpected", artifactPaths: [] }; },
+					async status(key) { return { key, ok: true, output: "ok", artifactPaths: [] }; },
+				}),
+				(error: unknown) => error instanceof WorkflowScriptError
+					&& /(?:runs\.run|runs\.all item \d+) does not accept (?:context|model|skill|fast) per child: context, model, skill, fast are agent-owned policy declared on the agent definition and cannot be set on a workflow child\./.test(error.message),
+				script,
+			);
+			assert.equal(launched, false, script);
+		}
+	});
+
+	it("launches a workflow child carrying the closed field set", async () => {
+		const launches: Record<string, unknown>[] = [];
+		const result = await runWorkflowScript({
+			script: `return runs.run("child", { agent: "worker", task: "Check", cwd: "/tmp", async: false, output: "out.md", worktree: false, prequel: "Current state", reads: ["src/a.ts"], acceptance: { verify: "tests pass" }, outputSchema: { type: "object" }, timeoutMs: 1000, toolBudget: { tokens: 1000 }, baseRef: "HEAD", isolation: "none", outputMode: "text" });`,
+			async launch(key, params) { launches.push(params); return { key, ok: true, output: "done", artifactPaths: [] }; },
+			async status(key) { return { key, ok: true, output: "ok", artifactPaths: [] }; },
+		});
+		assert.equal(result.value.output, "done");
+		assert.equal(launches.length, 1);
+		assert.deepEqual(
+			{ cwd: launches[0]?.cwd, worktree: launches[0]?.worktree, baseRef: launches[0]?.baseRef, timeoutMs: launches[0]?.timeoutMs, outputMode: launches[0]?.outputMode },
+			{ cwd: "/tmp", worktree: false, baseRef: "HEAD", timeoutMs: 1000, outputMode: "text" },
+		);
+	});
+
 	it("validates runs.host shape offline without executing it", () => {
 		assert.deepEqual(validateWorkflowScript(`return runs.host("tests", { kind: "command", command: "npm test", timeoutMs: 1000, output: "reports/tests.log", role: "ci" });`), { ok: true, errors: [] });
 		for (const script of [

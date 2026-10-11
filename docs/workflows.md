@@ -50,6 +50,8 @@ For multi-step or parallel work, make exactly one top-level `subagent` workflow 
 
 Workflow-level child controls default onto each `runs.run`/`runs.all` launch; explicit child fields override them. See [retained children](tool-reference.md#retained-children) for follow-up challenges and [output binding](tool-reference.md#output-mode-details) for durable artifacts.
 
+Child fields are a closed set: `key` (and its display `label`), `agent`, `task`, and the execution controls `cwd`, `async`, `output`, `worktree`, `prequel`, `reads`, `acceptance`, `outputSchema`, `timeoutMs`, `toolBudget`, `gate`, `baseRef`, `isolation`, and `outputMode`. `context`, `model`, `skill`, and `fast` are agent-owned policy: declare them on the agent definition, not on a child. A child that sets one is rejected before launch.
+
 Child results cross into the script as plain JSON data. Non-JSON host metadata is omitted, so use returned fields such as `runId`, `ok`, `output`, and `structuredOutput` for workflow control.
 
 Scripts are supplied as `source`: either an inline statement body or `{ path }` to load one from a
@@ -109,7 +111,7 @@ subagent_workflow({
 
 These controls are opt-in. Avoid tight hard budgets for mutation-capable workers unless the workflow has an explicit checkpoint and handoff path.
 
-A script that fails to parse returns a tool error with line and column data when available. Validation checks syntax, portable nested-async rules, literal `runs.run` and `runs.all` keys and child `baseRef` values, duplicate literal keys in one `runs.all` group, direct keyed access to a known `runs.all` result, and statically clear non-JSON boundary values. Dynamic keys and other runtime-only values are accepted without a warning. Validation does not discover agents, launch children, or create run artifacts.
+A script that fails to parse returns a tool error with line and column data when available. Validation checks syntax, portable nested-async rules, literal `runs.run` and `runs.all` keys and child `baseRef` values, per-child `context`/`model`/`skill`/`fast` overrides of agent-owned policy, duplicate literal keys in one `runs.all` group, direct keyed access to a known `runs.all` result, and statically clear non-JSON boundary values. Dynamic keys and other runtime-only values are accepted without a warning. Validation does not discover agents, launch children, or create run artifacts.
 
 ```js
 subagent_workflow({ source: `

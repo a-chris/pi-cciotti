@@ -24,7 +24,7 @@ export default function registerSmokeProvider(pi: ExtensionAPI) {
 			const messages = JSON.stringify(context.messages);
 			const revival = mode === "revival" && /REVIVAL_[AB]/.test(messages);
 			const failingRevival = mode === "revival" && messages.includes("REVIVAL_FAIL");
-			const waiting = !failingRevival && (revival || ["shared-run", "parallel-stop", "targeted-controls", "steer", "interrupt", "stop", "child-stop", "child-timeout", "run-timeout"].includes(mode ?? "")) ? waitForRelease(options?.signal) : undefined;
+			const waiting = !failingRevival && (revival || ["targeted-controls", "steer", "interrupt", "stop", "child-stop", "child-timeout", "run-timeout"].includes(mode ?? "")) ? waitForRelease(options?.signal) : undefined;
 			fs.appendFileSync("/stage/lifecycle.jsonl", JSON.stringify({ event: "request", case: process.env.PI_STANDALONE_CASE, pid: process.pid, messages: context.messages }) + "\n");
 			await waiting;
 			if (failingRevival) return fauxAssistantMessage("", { stopReason: "error", errorMessage: "fixture revival failure" });
@@ -34,14 +34,7 @@ export default function registerSmokeProvider(pi: ExtensionAPI) {
 			return fauxAssistantMessage(`standalone child response verified ${label}`);
 		},
 		async (context, options) => {
-			const shared = mode === "shared-run" || mode === "parallel-stop";
-			const waiting = shared ? waitForRelease(options?.signal) : undefined;
-			fs.appendFileSync("/stage/lifecycle.jsonl", JSON.stringify({ event: shared ? "request" : "followup", case: process.env.PI_STANDALONE_CASE, pid: process.pid, messages: context.messages }) + "\n");
-			await waiting;
-			if (shared) {
-				const label = ["LEFT", "RIGHT"].find((name) => JSON.stringify(context.messages).includes(name));
-				return fauxAssistantMessage(`standalone child response verified ${label}`);
-			}
+			fs.appendFileSync("/stage/lifecycle.jsonl", JSON.stringify({ event: "followup", case: process.env.PI_STANDALONE_CASE, pid: process.pid, messages: context.messages }) + "\n");
 			return fauxAssistantMessage("standalone child response verified after steering");
 		},
 	]);

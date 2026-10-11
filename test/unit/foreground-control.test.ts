@@ -36,7 +36,7 @@ describe("foreground child control", () => {
 	it("tracks concurrent children independently and promotes the latest active child", () => {
 		const control: ForegroundRunControl = {
 			runId: "parallel-run",
-			mode: "parallel",
+			mode: "workflow",
 			startedAt: 1,
 			updatedAt: 1,
 			activeChildren: new Map(),
@@ -109,7 +109,7 @@ describe("foreground child control", () => {
 	it("settles scheduling only after every owner releases", () => {
 		const control: ForegroundRunControl = {
 			runId: "owned-run",
-			mode: "parallel",
+			mode: "workflow",
 			startedAt: 1,
 			updatedAt: 1,
 			schedulingOwners: 1,

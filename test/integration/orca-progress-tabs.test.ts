@@ -133,7 +133,7 @@ describe("Orca progress-tab observer", () => {
 		assert.equal(args[args.indexOf("--title") + 1], "subagents · worker · 1");
 	});
 
-	it("uses one observer tab for a background parallel run", { skip: process.platform === "win32" ? "Orca progress tabs are not supported on Windows" : undefined }, async () => {
+	it("uses one observer tab for a background workflow run", { skip: process.platform === "win32" ? "Orca progress tabs are not supported on Windows" : undefined }, async () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-cciotti-orca-parallel-"));
 		tempDirs.push(dir);
 		const asyncDir = path.join(dir, "async");
@@ -151,19 +151,14 @@ describe("Orca progress-tab observer", () => {
 		fs.writeFileSync(configPath, JSON.stringify({
 			id: "orca-observer-parallel",
 			sessionId: "session-orca-parallel",
-			steps: [{
-				parallel: [
-					{ agent: "worker", task: "One", systemPrompt: "Use native Pi", systemPromptMode: "replace", inheritProjectContext: false, inheritSkills: false },
-					{ agent: "reviewer", task: "Two", systemPrompt: "Use native Pi", systemPromptMode: "replace", inheritProjectContext: false, inheritSkills: false },
-				],
-				concurrency: 2,
-			}],
+			workflowScript: "return await runs.all([{ key: 'one', agent: 'worker', task: 'One' }, { key: 'two', agent: 'reviewer', task: 'Two' }]);",
+			steps: [{ agent: "workflow", task: "Fan out two children" }],
 			resultPath,
 			cwd: dir,
 			placeholder: "{previous}",
 			artifactConfig: { enabled: false },
 			asyncDir,
-			resultMode: "parallel",
+			resultMode: "workflow",
 			childSessionFactoryModule: RUNNER_CHILD_SESSION_FACTORY,
 		}));
 		const repo = path.resolve(import.meta.dirname, "../..");
@@ -185,14 +180,13 @@ describe("Orca progress-tab observer", () => {
 		const captureFiles = fs.readdirSync(captures);
 		assert.equal(captureFiles.length, 1);
 		const args = JSON.parse(fs.readFileSync(path.join(captures, captureFiles[0]!), "utf-8")) as string[];
-		assert.equal(args[args.indexOf("--title") + 1], "subagents · parallel-worker-reviewer · 1");
+		assert.match(args[args.indexOf("--title") + 1] ?? "", /^subagents · workflow · \d+$/);
 		const progressDir = path.join(TEMP_ROOT_DIR, "orca-progress");
 		const log = fs.readdirSync(progressDir).find((name) => name.startsWith("orca-observer-parallel-0-") && name.endsWith(".log"));
 		assert.ok(log);
 		const text = fs.readFileSync(path.join(progressDir, log), "utf-8");
-		assert.match(text, /2 children/);
-		assert.match(text, /child 1\/2 · worker/);
-		assert.match(text, /child 2\/2 · reviewer/);
+		assert.match(text, /1 child/);
+		assert.match(text, /child 1\/1 · workflow/);
 	});
 
 	it("allocates unique worktree-wide numbers across concurrent processes and nested cwd values", { skip: process.platform === "win32" ? "Orca progress tabs are not supported on Windows" : undefined }, async () => {

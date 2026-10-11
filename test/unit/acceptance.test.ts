@@ -69,7 +69,7 @@ describe("acceptance gates", () => {
 		assert.equal(resolveEffectiveAcceptance({ agentName: "worker", task: "Implement the fix", mode: "single" }).level, "checked");
 		for (const resolved of [
 			resolveEffectiveAcceptance({ agentName: "worker", task: "Implement the fix", mode: "single", async: true }),
-			resolveEffectiveAcceptance({ agentName: "worker", task: "Fix each item", mode: "chain", dynamic: true }),
+			resolveEffectiveAcceptance({ agentName: "worker", task: "Fix each item", mode: "workflow", dynamic: true }),
 		]) {
 			assert.equal(resolved.level, "checked");
 			assert.equal(resolved.review && resolved.review !== false ? resolved.review.required : undefined, true);
@@ -152,20 +152,20 @@ describe("acceptance gates", () => {
 			agentName: "explorer",
 			acceptanceRole: "read-only",
 			task: "Explore each target",
-			mode: "chain",
+			mode: "workflow",
 			dynamic: true,
 		}).level, "none");
 		assert.equal(resolveEffectiveAcceptance({
 			agentName: "worker",
 			acceptanceRole: "writer",
 			task: "Review only; do not edit files",
-			mode: "chain",
+			mode: "workflow",
 			dynamicGroup: true,
 		}).level, "none");
 		const dynamicReviewer = resolveEffectiveAcceptance({
 			agentName: "reviewer",
 			task: "Review each target",
-			mode: "chain",
+			mode: "workflow",
 			dynamic: true,
 		});
 		assert.equal(dynamicReviewer.level, "none");

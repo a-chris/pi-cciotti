@@ -27,7 +27,7 @@ describe("async status snapshot", () => {
 			sessionFile: `/session-file/${privateNeedle}.jsonl`,
 			sessionId: "session-a",
 			status: "running",
-			mode: "parallel",
+			mode: "single",
 			agents: ["worker"],
 			description: `task ${privateNeedle}`,
 			startedAt: 100,
@@ -93,7 +93,7 @@ describe("async status snapshot", () => {
 			asyncId: "workflow-1",
 			asyncDir: "/tmp/workflow-1",
 			status: "running",
-			mode: "workflow",
+			mode: "single",
 			agents: [],
 			hostSteps: [{
 				version: 1,

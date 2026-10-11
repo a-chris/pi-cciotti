@@ -453,7 +453,7 @@ function stepStateLine(mode: SubagentRunMode, index: number | undefined, step: A
 	const modelThinking = formatModelThinking(step.model, step.thinking);
 	const context = contextModeLabel(step.context);
 	const parts = [
-		`${mode === "parallel" ? "Agent" : "Step"}: ${index} (${fleetChildDisplayName(step)})${context ? ` ${context}` : ""}`,
+		`Step: ${index} (${fleetChildDisplayName(step)})${context ? ` ${context}` : ""}`,
 		step.status,
 		formatActivityFacts(step),
 		modelThinking,

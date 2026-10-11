@@ -387,60 +387,6 @@ describe("async run status inspection", () => {
 		}
 	});
 
-	it("shows parallel mode and aggregate progress for top-level async parallel runs", () => {
-		const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-run-status-parallel-"));
-		try {
-			const asyncRoot = path.join(root, "runs");
-			const asyncDir = path.join(asyncRoot, "run-parallel");
-			fs.mkdirSync(asyncDir, { recursive: true });
-			const runOutputPath = path.join(asyncDir, "combined-output.log");
-			const firstStepOutputPath = path.join(asyncDir, "output-0.log");
-			const secondStepOutputPath = path.join(asyncDir, "output-1.log");
-			fs.writeFileSync(firstStepOutputPath, "reviewer one", "utf-8");
-			fs.writeFileSync(secondStepOutputPath, "reviewer two", "utf-8");
-			fs.writeFileSync(path.join(asyncDir, "status.json"), JSON.stringify({
-				runId: "run-parallel",
-				mode: "parallel",
-				state: "running",
-				error: "top-level async status error",
-				pid: 12345,
-				startedAt: 100,
-				lastUpdate: 100,
-				currentStep: 0,
-				outputFile: runOutputPath,
-				chainStepCount: 1,
-				parallelGroups: [{ start: 0, count: 3, stepIndex: 0 }],
-				steps: [
-					{ agent: "reviewer", sessionName: "  reviewer: Inspect the first result  ", status: "running", startedAt: 100, model: "openai-codex/gpt-5.5:high" },
-					{ agent: "reviewer", status: "running", startedAt: 100, model: "anthropic/claude-haiku-4-5", thinking: "low" },
-					{ agent: "reviewer", status: "pending" },
-				],
-			}, null, 2), "utf-8");
-
-			const result = inspectSubagentStatus({ id: "run-parallel" }, {
-				asyncDirRoot: asyncRoot,
-				resultsDir: path.join(root, "results"),
-				kill: () => true,
-				now: () => 200,
-			});
-
-			const text = textContent(result);
-			assert.match(text, /Mode: parallel/);
-			assert.match(text, /Error: top-level async status error/);
-			assert.match(text, /Progress: 2 agents running · 0\/3 done/);
-			assert.match(text, new RegExp(`Output: ${runOutputPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
-			assert.match(text, /Agent 1\/3: reviewer: Inspect the first result running \(gpt-5\.5 · thinking high\)/);
-			assert.match(text, /Agent 2\/3: reviewer running \(claude-haiku-4-5 · thinking low\)/);
-			assert.match(text, /Agent 3\/3: reviewer pending/);
-			assert.doesNotMatch(text, /openai-codex\/gpt-5\.5/);
-			assert.match(text, new RegExp(`  Output: ${firstStepOutputPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
-			assert.match(text, new RegExp(`  Output: ${secondStepOutputPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
-			assert.doesNotMatch(text, /Step 1: reviewer/);
-		} finally {
-			fs.rmSync(root, { recursive: true, force: true });
-		}
-	});
-
 	it("tails a readable transcript from async output artifacts", () => {
 		const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-run-status-transcript-"));
 		try {
@@ -490,7 +436,7 @@ describe("async run status inspection", () => {
 			fs.writeFileSync(wrongOutputPath, "WRONG_CHILD_OUTPUT", "utf-8");
 			fs.writeFileSync(path.join(asyncDir, "status.json"), JSON.stringify({
 				runId: "run-indexed-transcript",
-				mode: "parallel",
+				mode: "workflow",
 				state: "running",
 				startedAt: 100,
 				lastUpdate: 200,
@@ -511,7 +457,7 @@ describe("async run status inspection", () => {
 
 			const text = textContent(result);
 			assert.equal(result.isError, undefined);
-			assert.match(text, /Agent: 1 \(reviewer\) \| pending/);
+			assert.match(text, /Step: 1 (reviewer) | pending/);
 			assert.match(text, /Recent output from status\.json:/);
 			assert.match(text, /RIGHT_CHILD_RECENT/);
 			assert.doesNotMatch(text, /WRONG_CHILD_OUTPUT/);
@@ -747,65 +693,6 @@ describe("async run status inspection", () => {
 			assert.match(text, /Session read failed .*Refusing to read symlink session transcript path/);
 			assert.match(text, new RegExp(`Session: ${linkedSession.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
 			assert.doesNotMatch(text, /OUTSIDE_SESSION_SENTINEL/);
-		} finally {
-			fs.rmSync(root, { recursive: true, force: true });
-		}
-	});
-
-	it("shows an active read-only fleet view with transcript commands", () => {
-		const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-run-status-fleet-"));
-		try {
-			const asyncRoot = path.join(root, "runs");
-			const asyncDir = path.join(asyncRoot, "run-fleet");
-			fs.mkdirSync(asyncDir, { recursive: true });
-			fs.writeFileSync(path.join(asyncDir, "output-0.log"), "worker output", "utf-8");
-			fs.writeFileSync(path.join(asyncDir, "status.json"), JSON.stringify({
-				runId: "run-fleet",
-				mode: "parallel",
-				state: "running",
-				startedAt: 100,
-				lastUpdate: 200,
-				currentStep: 0,
-				chainStepCount: 1,
-				parallelGroups: [{ start: 0, count: 2, stepIndex: 0 }],
-				steps: [
-					{ agent: "worker", sessionName: "  worker: Inspect fleet  ", label: "Fleet check", status: "running", startedAt: 100 },
-					{ agent: "reviewer", status: "pending" },
-				],
-			}, null, 2), "utf-8");
-			updateActiveRunIndex(asyncDir, "running");
-			const state = {
-				foregroundControls: new Map([["fg-run", {
-					runId: "fg-run",
-					mode: "single",
-					startedAt: 100,
-					updatedAt: 250,
-					currentAgent: "scout",
-					sessionName: "  foreground: Inspect fleet  ",
-					currentIndex: 0,
-					lastActivityAt: 240,
-				}]]),
-			} as unknown as SubagentState;
-
-			const result = inspectSubagentStatus({ view: "fleet" }, {
-				asyncDirRoot: asyncRoot,
-				resultsDir: path.join(root, "results"),
-				state,
-				kill: () => true,
-				now: () => 250,
-			});
-
-			const text = textContent(result);
-			assert.equal(result.isError, undefined);
-			assert.match(text, /Subagent fleet: 2 tracked/);
-			assert.match(text, /Foreground runs:/);
-			assert.match(text, /fg-run \| running \| foreground: Inspect fleet/);
-			assert.doesNotMatch(text, /fg-run \| running \| scout/);
-			assert.match(text, /Async runs:/);
-			assert.match(text, /0\. worker: Inspect fleet \| running/);
-			assert.match(text, /run-fleet \| running .*\| parallel \| 1 agent running · 0\/2 done/);
-			assert.match(text, /status: subagent_control\(\{ action: "status", id: "run-fleet" \}\)/);
-			assert.doesNotMatch(text, /view: "transcript"/);
 		} finally {
 			fs.rmSync(root, { recursive: true, force: true });
 		}
@@ -1370,48 +1257,6 @@ describe("async run status inspection", () => {
 			fs.rmSync(root, { recursive: true, force: true });
 		}
 	});
-
-	it("labels chain parallel group children with logical step and agent numbers", () => {
-		const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-run-status-chain-parallel-"));
-		try {
-			const asyncRoot = path.join(root, "runs");
-			const asyncDir = path.join(asyncRoot, "run-chain");
-			fs.mkdirSync(asyncDir, { recursive: true });
-			fs.writeFileSync(path.join(asyncDir, "status.json"), JSON.stringify({
-				runId: "run-chain",
-				mode: "chain",
-				state: "running",
-				pid: 12345,
-				startedAt: 100,
-				lastUpdate: 100,
-				currentStep: 1,
-				chainStepCount: 3,
-				parallelGroups: [{ start: 1, count: 2, stepIndex: 1 }],
-				steps: [
-					{ agent: "scout", status: "complete", startedAt: 100 },
-					{ agent: "reviewer", status: "running", startedAt: 100 },
-					{ agent: "auditor", status: "pending" },
-					{ agent: "writer", status: "pending" },
-				],
-			}, null, 2), "utf-8");
-
-			const result = inspectSubagentStatus({ id: "run-chain" }, {
-				asyncDirRoot: asyncRoot,
-				resultsDir: path.join(root, "results"),
-				kill: () => true,
-				now: () => 200,
-			});
-
-			const text = textContent(result);
-			assert.match(text, /Step 1\/3: scout complete/);
-			assert.match(text, /Step 2\/3 Agent 1\/2: reviewer running/);
-			assert.match(text, /Step 2\/3 Agent 2\/2: auditor pending/);
-			assert.match(text, /Step 3\/3: writer pending/);
-		} finally {
-			fs.rmSync(root, { recursive: true, force: true });
-		}
-	});
-
 
 	it("does not advertise a workflow steering command without a live foreground route", () => {
 		const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-run-status-workflow-route-"));

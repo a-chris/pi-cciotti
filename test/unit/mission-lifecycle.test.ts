@@ -85,14 +85,6 @@ describe("mission launch lifecycle", () => {
 			});
 			assert.equal(disabled, undefined);
 
-			const parallelOnly = prepareMissionLaunch({
-				params: { chain: [{ parallel: [{ task: "" }, { task: "Review parallel work" }] }] },
-				projectRoot: test.projectRoot,
-				config: test.missionConfig,
-			});
-			assert.ok(parallelOnly);
-			assert.equal(readMission(parallelOnly.location, parallelOnly.missionId).objective, PROMPT_REDACTED);
-
 			assert.throws(() => prepareMissionLaunch({
 				params: { missionId: "" },
 				projectRoot: test.projectRoot,

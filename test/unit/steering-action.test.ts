@@ -580,13 +580,13 @@ describe("acknowledged steering action", () => {
 	it("reports partial multi-child delivery without interrupting the run", async () => {
 		const runId = `steer-partial-${Date.now().toString(36)}`;
 		const asyncDir = path.join(ASYNC_DIR, runId);
-		writeStatus(asyncDir, runningStatus(runId, "parallel", 2));
+		writeStatus(asyncDir, runningStatus(runId, "workflow", 2));
 		let killed = false;
 		try {
 			const action = steerAsyncRun({ state: createState(), runId, message: "correct course", location: { asyncDir }, ackTimeoutMs: 500, kill: (_pid, signal) => { if (signal !== 0) killed = true; return true; } });
 			const request = await readRequest(asyncDir);
 			assert.deepEqual(request.targetIndexes, [0, 1]);
-			const status = runningStatus(runId, "parallel", 2);
+			const status = runningStatus(runId, "workflow", 2);
 			projectRequest(status, request, ["delivered", "failed"]);
 			writeStatus(asyncDir, status);
 			const result = await action;

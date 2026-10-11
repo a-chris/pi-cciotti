@@ -32,7 +32,7 @@ if (root) {
 		if (target.includes(`${path.sep}result-pending${path.sep}`) && target.endsWith(".tmp")) {
 			resultAttempts++;
 			if (!fs.existsSync(path.join(root, "release"))) {
-				if (resultAttempts >= 2) {
+				if (resultAttempts >= (earlyTerminal ? 1 : 2)) {
 					const status = JSON.parse(fs.readFileSync(path.join(asyncDir, "status.json"), "utf8"));
 					barrier("blocked.json", {
 						state: status.state, statusDeferred,

@@ -605,7 +605,7 @@ export function installAsyncExecutionHooks(): void {
 
 export type { AsyncExecutionResult, AsyncResultPayload, AsyncStatusPayload, MockPiCallRecord };
 export {
-	available, isAsyncAvailable, executeAsyncSingle, executeAsyncChain,
+	available, isAsyncAvailable, executeAsyncSingle,
 	resolveTargetedAsyncRun, readStatus, pruneStatusCacheForAsyncRoot,
 	ASYNC_DIR, RESULTS_DIR, TEMP_ROOT_DIR, createSubagentExecutor,
 	tempDir, mockPi, makeAsyncExecutor, readAsyncPayload, launchProtocolTest,

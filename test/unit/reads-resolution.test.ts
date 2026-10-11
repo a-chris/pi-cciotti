@@ -3,11 +3,11 @@ import * as assert from "node:assert";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { expandHomePath, resolveChainPath } from "../../src/shared/settings.ts";
+import { expandHomePath, resolveTaskFilePath } from "../../src/shared/settings.ts";
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-reads-resolution-"));
 const homeDir = path.join(tmpDir, "home");
-const chainDir = path.join(tmpDir, "chain");
+const baseDir = path.join(tmpDir, "base");
 const originalHome = process.env.HOME;
 const originalUserProfile = process.env.USERPROFILE;
 
@@ -47,20 +47,20 @@ describe("reads path resolution", () => {
 		});
 	});
 
-	describe("resolveChainPath", () => {
+	describe("resolveTaskFilePath", () => {
 		test("expands ~ before resolving", () => {
 			assert.equal(
-				resolveChainPath("~/.zprofile", chainDir),
+				resolveTaskFilePath("~/.zprofile", baseDir),
 				path.join(homeDir, ".zprofile"),
 			);
 		});
 
 		test("passes absolute paths through", () => {
-			assert.equal(resolveChainPath("/etc/hosts", chainDir), "/etc/hosts");
+			assert.equal(resolveTaskFilePath("/etc/hosts", baseDir), "/etc/hosts");
 		});
 
-		test("prepends chainDir to repository-relative paths", () => {
-			assert.equal(resolveChainPath("docs/x.md", chainDir), path.join(chainDir, "docs/x.md"));
+		test("prepends baseDir to repository-relative paths", () => {
+			assert.equal(resolveTaskFilePath("docs/x.md", baseDir), path.join(baseDir, "docs/x.md"));
 		});
 	});
 });

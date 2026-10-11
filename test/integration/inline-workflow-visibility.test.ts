@@ -116,7 +116,7 @@ it("covers flat materialized leaf cards only after every row renders and checks 
 	const h = harness(10);
 	try {
 		const [alpha, beta] = materialize(h);
-		beta.mode = "parallel"; beta.agents = ["beta-worker", "second-beta-worker"];
+		beta.agents = ["beta-worker", "second-beta-worker"];
 		beta.steps = beta.agents.map((agent) => ({ agent, status: "running" }));
 		h.setExpanded(true);
 		assert.match(h.asyncText(), /alpha-worker/);
@@ -190,14 +190,14 @@ it("retains materialized cards for incomplete, nested, uncertain and non-running
 		const h = harness(kind === "budget" ? 2 : kind === "multi-row-budget" ? 3 : 20);
 		try {
 			const [alpha, beta] = materialize(h);
-			if (kind === "multi-row-budget") { beta.mode = "parallel"; beta.agents = ["beta-worker", "second-beta-worker"]; }
+			if (kind === "multi-row-budget") { beta.mode = "workflow"; beta.agents = ["beta-worker", "second-beta-worker"]; }
 			if (kind === "wrapper") alpha.mode = "workflow";
 			if (kind === "grandchild") h.state.asyncJobs.set("grandchild", { ...beta, asyncId: "grandchild", parentWorkflowRunId: alpha.asyncId });
 			if (kind === "nested") alpha.nestedChildren = [{ id: "nested", agent: "nested-worker", state: "running" }];
 			if (kind === "terminal") alpha.status = "complete";
 			if (kind === "parent") h.job.status = "queued";
 			if (kind === "foreground") h.state.foregroundControls.set("unknown", { runId: "unknown", mode: "single", startedAt: 1000, updatedAt: 1000, parentWorkflowRunId: h.job.asyncId });
-			if (kind === "chain") { alpha.mode = "chain"; alpha.agents = ["alpha-worker", "pending-worker"]; }
+			if (kind === "chain") { alpha.mode = "workflow"; alpha.agents = ["alpha-worker", "pending-worker"]; }
 			if (kind === "external") alpha.steps = [{ agent: "alpha-worker", status: "running", runner: {
 				type: "external-job", provider: "test", options: {}, capabilities: { stop: false, steer: false, resume: false, structuredOutput: false, toolEvents: false },
 			} }];

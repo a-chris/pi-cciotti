@@ -4658,6 +4658,10 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			if (spawnBudgetErrors.length > 0) {
 				return buildRequestedModeError(requestParams, `workflowScript validation failed before child launch; no children launched. ${spawnBudgetErrors.map((error) => error.message).join(" ")}`);
 			}
+			const childPolicyErrors = spawnBudgetValidation.errors.filter((error) => error.kind === "agent-owned-policy");
+			if (childPolicyErrors.length > 0) {
+				return buildRequestedModeError(requestParams, `workflowScript validation failed before child launch; no children launched. ${childPolicyErrors.map((error) => error.message).join(" ")}`);
+			}
 			for (const warning of spawnBudgetValidation.warnings ?? []) console.warn(`[pi-cciotti] ${warning.message}`);
 			const acceptanceErrors = validateAcceptanceInput(requestParams.acceptance);
 			if (acceptanceErrors.length > 0) return buildRequestedModeError(requestParams, acceptanceErrors.join(" "));

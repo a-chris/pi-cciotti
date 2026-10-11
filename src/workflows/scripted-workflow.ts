@@ -24,7 +24,7 @@ export interface WorkflowScriptValidationError {
 	message: string;
 	line?: number;
 	column?: number;
-	kind?: "spawn-budget";
+	kind?: "spawn-budget" | "agent-owned-policy";
 }
 
 export interface WorkflowScriptValidationWarning {
@@ -390,6 +390,18 @@ function describeGateAcceptanceConflict(gate, acceptance) {
   return " Both fields were present: gate=" + render(gate) + " acceptance=" + render(acceptance) + ".";
 }
 
+// Agent-owned policy: these child fields would silently override the agent
+// definition, so static validation and validateRunCall both reject them.
+const AGENT_OWNED_CHILD_KEYS = ["context", "model", "skill", "fast"];
+
+function agentOwnedChildKeyMessage(owner, keys) {
+  return owner + " does not accept " + keys.join(", ") + " per child: " + AGENT_OWNED_CHILD_KEYS.join(", ") + " are agent-owned policy declared on the agent definition and cannot be set on a workflow child.";
+}
+
+function agentOwnedChildKeys(params) {
+  return AGENT_OWNED_CHILD_KEYS.filter((field) => Object.prototype.hasOwnProperty.call(params, field));
+}
+
 function validateRunCall(key, params, label, fingerprints) {
   if (typeof key !== "string" || !runKeyPattern.test(key)) throw new Error(label + " has an invalid key.");
   if (hostKeys.has(key)) throw new Error("Workflow key '" + key + "' is already used by runs.host.");
@@ -399,6 +411,8 @@ function validateRunCall(key, params, label, fingerprints) {
     throw new Error(label + " accepts one child via { agent, task } and execution controls only" + hint);
   }
   if (Object.prototype.hasOwnProperty.call(params, "clarify")) throw new Error(label + " does not support clarify UI.");
+  const agentOwnedKeys = agentOwnedChildKeys(params);
+  if (agentOwnedKeys.length) throw new Error(agentOwnedChildKeyMessage(label, agentOwnedKeys));
   if (params.worktree !== undefined && typeof params.worktree !== "boolean") throw new Error(label + " worktree must be true or false.");
   if (params.baseRef !== undefined && (typeof params.baseRef !== "string" || !validGitRef(params.baseRef))) throw new Error(label + " baseRef must be a valid Git ref: use HEAD or a supported named ref (for example, refs/heads/main). Full 40/64-character commit IDs and revision expressions are unsupported.");
   if (params.gate !== undefined && (typeof params.gate !== "string" || !params.gate.trim())) throw new Error(label + " gate must be a non-empty command string.");
@@ -1355,6 +1369,33 @@ function validateStaticBaseRef(params: AstNode, owner: string): WorkflowScriptVa
 	return [];
 }
 
+// Agent-owned policy, duplicated from the worker source (like runKeyPattern and
+// validGitRef) because static validation runs outside WORKER_SOURCE.
+const AGENT_OWNED_CHILD_KEYS = ["context", "model", "skill", "fast"];
+
+function agentOwnedChildKeyMessage(owner: string, keys: string[]): string {
+	return owner + " does not accept " + keys.join(", ") + " per child: " + AGENT_OWNED_CHILD_KEYS.join(", ") + " are agent-owned policy declared on the agent definition and cannot be set on a workflow child.";
+}
+
+// Reject agent-owned policy keys that are statically decidable in a child params
+// object literal. Dynamic construction is left to the validateRunCall backstop.
+function validateStaticChildPolicyKeys(params: AstNode, owner: string): WorkflowScriptValidationError[] {
+	if (params.type !== "ObjectExpression" || !Array.isArray(params.properties)) return [];
+	const offending: string[] = [];
+	let locationNode: AstNode | undefined;
+	for (const property of params.properties) {
+		// Accessor keys (get/set) name the same agent-owned policy, so inspect every
+		// statically named property kind and point at its value when present.
+		if (!astNode(property) || property.type !== "Property" || (property.kind !== "init" && property.kind !== "get" && property.kind !== "set")) continue;
+		const key = staticPropertyKey(property);
+		if (key === undefined || !AGENT_OWNED_CHILD_KEYS.includes(key) || offending.includes(key)) continue;
+		offending.push(key);
+		if (!locationNode) locationNode = astNode(property.value) ? property.value : astNode(property.key) ? property.key : undefined;
+	}
+	if (!offending.length || !locationNode) return [];
+	return [{ message: agentOwnedChildKeyMessage(owner, offending), kind: "agent-owned-policy", ...nodeLocation(locationNode) }];
+}
+
 function directRunsAllKeys(call: AstNode): Array<{ key: string; node: AstNode }> {
 	const args = Array.isArray(call.arguments) ? call.arguments : [];
 	const items = astNode(args[0]) && args[0].type === "ArrayExpression" && Array.isArray(args[0].elements) ? args[0].elements : [];
@@ -1510,6 +1551,7 @@ export function validateWorkflowScript(script: string, options: WorkflowScriptVa
 			if (keyNode && key !== undefined && !KEY_PATTERN.test(key)) errors.push({ message: "runs.run key must be 1-128 characters using letters, numbers, '.', '_' or '-', and start with a letter or number.", ...nodeLocation(keyNode) });
 			if (astNode(args[1])) {
 				errors.push(...validateStaticBaseRef(args[1], "runs.run"));
+				errors.push(...validateStaticChildPolicyKeys(args[1], "runs.run"));
 				const message = definitelyNonJson(args[1]);
 				if (message) errors.push({ message: `runs.run params are invalid: ${message}.`, ...nodeLocation(args[1]) });
 			}
@@ -1520,6 +1562,7 @@ export function validateWorkflowScript(script: string, options: WorkflowScriptVa
 			if (astNode(args[0]) && args[0].type === "ArrayExpression" && Array.isArray(args[0].elements)) {
 				for (const item of args[0].elements) if (astNode(item)) {
 					errors.push(...validateStaticBaseRef(item, "runs.all item"));
+					errors.push(...validateStaticChildPolicyKeys(item, "runs.all item"));
 					const message = definitelyNonJson(item);
 					if (message) errors.push({ message: `runs.all item params are invalid: ${message}.`, ...nodeLocation(item) });
 				}

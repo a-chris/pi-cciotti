@@ -461,7 +461,23 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 		assert.equal(mockPi.callCount(), 3, "wrong-then-right must not spawn");
 	});
 
-	it("treats legacy workflow child profile context as absent, resolving from the agent default", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
+	it("fails closed before launching any child when a later runs.run sets agent-owned policy", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
+		mockPi.onCall({ output: "Agent-owned policy must not launch" });
+		const result = await makeExecutor([makeAgent("echo")]).execute(
+			"workflow-child-policy-preflight",
+			{ async: false, workflowScript: `await runs.run("ok", { agent: "echo", task: "Valid work", async: false });\nreturn runs.run("bad", { agent: "echo", task: "Invalid work", model: "openai/gpt-5-mini" });` },
+			new AbortController().signal,
+			undefined,
+			makeMinimalCtx(tempDir),
+		);
+
+		assert.equal(result.isError, true);
+		assert.match(result.content[0]?.text ?? "", /validation failed before child launch; no children launched\. .*runs\.run does not accept model per child:/);
+		assert.equal(result.details?.results?.length, 0);
+		assert.equal(mockPi.callCount(), 0, "a policy-violating workflow must not launch the valid child that precedes it");
+	});
+
+	it("rejects a workflow child that sets agent-owned context policy", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {
 		mockPi.onCall({ output: "Workflow child completed" });
 		const result = await makeExecutor([makeAgent("echo", { defaultContext: "fresh" })]).execute(
 			"workflow-profile-context",
@@ -471,8 +487,9 @@ describe("single sync execution", { skip: !available ? "pi packages not availabl
 			makeMinimalCtx(tempDir),
 		);
 
-		assert.equal(result.isError, undefined, result.content[0]?.text ?? "workflow failed");
-		assert.equal(result.details?.results?.[0]?.context, "fresh");
+		assert.equal(result.isError, true);
+		assert.match(result.content[0]?.text ?? "", /validation failed before child launch; no children launched\. .*runs\.run does not accept context per child:/);
+		assert.equal(mockPi.callCount(), 0, "a rejected child policy must not launch");
 	});
 
 	it("reports a user-requested foreground detach without supervisor guidance", { skip: !createSubagentExecutor ? "executor not importable" : undefined }, async () => {

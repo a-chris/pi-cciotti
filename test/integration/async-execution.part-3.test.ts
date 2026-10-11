@@ -1031,7 +1031,6 @@ export default function() {
 
 	it("async workflows snapshot the parent model before workflow setup reads session data", { skip: !isAsyncAvailable() || !createSubagentExecutor ? "jiti or executor not available" : undefined }, async () => {
 		mockPi.onCall({ output: "Inherited model work" });
-		mockPi.onCall({ output: "Explicit model work" });
 		const state = {
 			baseCwd: tempDir,
 			currentSessionId: null,
@@ -1059,7 +1058,7 @@ export default function() {
 
 		const launch = await executor.execute(
 			"workflow-parent-model",
-			{ workflowScript: `await runs.run("inherited", { agent: "worker", task: "Do inherited work" }); return runs.run("explicit", { agent: "worker", task: "Do explicit work", model: "openai/gpt-5-mini" });`, async: true },
+			{ workflowScript: `return runs.run("inherited", { agent: "worker", task: "Do inherited work" });`, async: true },
 			new AbortController().signal,
 			undefined,
 			context,
@@ -1070,9 +1069,7 @@ export default function() {
 		const payload = await readAsyncPayload(launch.details.asyncId);
 		assert.equal(payload.success, true);
 		const inheritedArgs = readMockPiArgsMatching(mockPi, "Do inherited work");
-		const explicitArgs = readMockPiArgsMatching(mockPi, "Do explicit work");
 		assert.equal(inheritedArgs[inheritedArgs.indexOf("--model") + 1], "router/openai-personal");
-		assert.equal(explicitArgs[explicitArgs.indexOf("--model") + 1], "openai/gpt-5-mini");
 	});
 
 	it("background single runs inherit the parent session model when no model is set", { skip: !isAsyncAvailable() ? "jiti not available" : undefined }, async () => {

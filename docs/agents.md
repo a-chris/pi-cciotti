@@ -364,15 +364,11 @@ Discovery uses project-first precedence:
 6. User packages and user settings packages via `package.json -> pi.skills`
 7. `~/.pi/agent/settings.json -> skills`
 
-Use agent defaults, override them at runtime, or disable them:
+Skill policy is configured on the agent definition; a workflow child cannot override it. For chains, `skill` at the top level is additive across the chain's children, and `false` disables skills for the whole chain.
 
 ```ts
 { source: `return runs.run("main", { agent: "scout", task: "..." })` }
-{ source: `return runs.run("main", { agent: "scout", task: "...", skill: "tmux, safe-bash" })` }
-{ source: `return runs.run("main", { agent: "scout", task: "...", skill: false })` }
 ```
-
-For chains, `skill` at the top level is additive. A step-level `skill` overrides that step; `false` disables skills for that step.
 
 Available skills use this shape in the child prompt:
 

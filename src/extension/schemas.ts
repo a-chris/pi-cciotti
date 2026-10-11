@@ -289,7 +289,7 @@ export const SubagentDelegationParams = keepTopLevelParameterDescriptions(Type.O
 // --- subagent_workflow (run a workflow) ------------------------------------
 const workflowDescriptions = {
 	workflow: "Named workflow resource, e.g. \"review\", \"run-ci\", \"perl\" (unattended: plan then execute in one run), or \"perla\" (plan, stop for approval, then execute).",
-	source: "Inline script body, or { path } to a script file.",
+	source: "Inline script body, or { path } to a script file. Child items take key, agent, task, and execution controls; context, model, skill, and fast are agent-owned policy on the agent definition, not per child.",
 	args: "Bounded JSON inputs for the workflow.",
 	// Workflows are background UNLESS async:false (`asyncWorkflow = async !== false`,
 	// subagent-executor.ts:4732) - unlike delegation, asyncByDefault does not gate

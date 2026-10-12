@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { registerPinnedTool } from "../../extension/declaration-pinning.ts";
 import { SubagentWaitParams } from "../../extension/schemas.ts";
 import type { Details, SubagentState } from "../../shared/types.ts";
 import { resolveWaitToolConfig, waitForSubagents } from "./subagent-wait.ts";
@@ -43,5 +44,5 @@ export function registerWaitTool(
 		parameters: SubagentWaitParams,
 		execute,
 	};
-	pi.registerTool(primaryTool);
+	registerPinnedTool(pi, primaryTool);
 }

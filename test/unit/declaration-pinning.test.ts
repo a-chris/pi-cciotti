@@ -36,19 +36,9 @@ function systemEntry(message: Record<string, unknown>): Record<string, unknown> 
 	return { type: "message", id: "e1", parentId: null, timestamp: "2026-01-01T00:00:00.000Z", message };
 }
 
+/** The module reads only the session manager's entry list, so the context is that alone. */
 function createContext(entries: Record<string, unknown>[]): unknown {
-	return {
-		cwd: process.cwd(),
-		hasUI: false,
-		ui: {},
-		modelRegistry: { getAvailable: () => [] },
-		sessionManager: {
-			getSessionId: () => "pinning-session",
-			getSessionFile: () => null,
-			getLeafId: () => null,
-			getEntries: () => entries,
-		},
-	};
+	return { sessionManager: { getEntries: () => entries } };
 }
 
 function freshTool(overrides: Partial<FakeTool> = {}): FakeTool {
@@ -73,14 +63,9 @@ function recordedToolJson(overrides: Record<string, unknown> = {}): Record<strin
 	};
 }
 
+/** A system entry carrying this tool declaration and the rendered prompt sections. */
 function declarationEntry(tools: Record<string, unknown>[], sections: Record<string, string | null>) {
-	return systemEntry({
-		role: "system",
-		content: "",
-		sections,
-		toolsAdded: tools,
-		timestamp: 1,
-	});
+	return systemEntry({ role: "system", content: "", sections, toolsAdded: tools, timestamp: 1 });
 }
 
 function fireHandlers(pi: FakePi, ctx: unknown): void {

@@ -77,7 +77,7 @@ function pinnedTool(
 
   const snippet = recorded.snippet ?? fresh.promptSnippet;
   const guidelines = recordedGuidelines(recorded.rules, fresh.promptGuidelines);
-  if (rendersSame(fresh, recorded, snippet, guidelines)) return undefined;
+  if (rendersSame(fresh, recorded.tool, snippet, guidelines)) return undefined;
 
   return {
     ...fresh,
@@ -90,11 +90,11 @@ function pinnedTool(
 /** Whether the fresh definition already renders exactly what the transcript records. */
 function rendersSame(
   fresh: ToolDefinition<any, any>,
-  recorded: RecordedDeclaration,
+  recorded: RecordedTool,
   snippet: string | undefined,
   guidelines: string[],
 ): boolean {
-  if (!declarationsMatch(fresh, recorded.tool)) return false;
+  if (!declarationsMatch(fresh, recorded)) return false;
   return (
     oneLine(fresh.promptSnippet) === oneLine(snippet) &&
     sameLines(normalizeGuidelines(fresh.promptGuidelines), guidelines)
@@ -128,7 +128,7 @@ function recordedDeclaration(
   return {
     tool: declaration,
     snippet: sectionLine(sections.tools, name),
-    rules: sections.rules ?? undefined,
+    rules: sections.rules,
   };
 }
 
@@ -213,10 +213,8 @@ function sectionLine(tools: string | undefined, name: string): string | undefine
 function recordedGuidelines(rules: string | undefined, fresh: string[] | undefined): string[] {
   const bullets = normalizeGuidelines(fresh);
   if (bullets.length === 0) return bullets;
-  const candidates = [
-    ...bullets,
-    ...DELEGATION_LEVELS.map(delegationLevelGuideline).filter((line) => !bullets.includes(line)),
-  ];
+  // Order does not matter here: `kept` follows the recorded list and dedupes as it goes.
+  const candidates = [...bullets, ...DELEGATION_LEVELS.map(delegationLevelGuideline)];
   if (!rules) return bullets;
 
   const kept: string[] = [];
@@ -230,16 +228,14 @@ function recordedGuidelines(rules: string | undefined, fresh: string[] | undefin
 
 /** Match pi's declaration comparison: name, description, parameters, constrained sampling. */
 function declarationsMatch(fresh: ToolDefinition<any, any>, recorded: RecordedTool): boolean {
-  return serialize(fresh) === serialize(recorded);
-}
-
-function serialize(tool: RecordedTool): string {
-  return JSON.stringify({
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.parameters ?? null,
-    constrainedSampling: tool.constrainedSampling ?? null,
-  });
+  const declarationJson = (tool: RecordedTool) =>
+    JSON.stringify({
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters ?? null,
+      constrainedSampling: tool.constrainedSampling ?? null,
+    });
+  return declarationJson(fresh) === declarationJson(recorded);
 }
 
 function signatureOf(tool: ToolDefinition<any, any>): string {

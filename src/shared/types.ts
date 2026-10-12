@@ -386,7 +386,7 @@ export interface ControlEvent {
 
 export type SubagentResultStatus = "completed" | "failed" | "paused" | "stopped" | "detached" | "blocked";
 export type SubagentOutputState = "present" | "absent" | "unknown";
-export type SubagentRunMode = "single" | "parallel" | "chain" | "workflow";
+export type SubagentRunMode = "single" | "workflow";
 export type SubagentResultMode = SubagentRunMode;
 
 export interface WorktreeNaming {
@@ -455,7 +455,7 @@ export interface ParallelHandoffGroup {
 export interface ParallelHandoffManifest {
 	version: 1;
 	runId: string;
-	mode: "single" | "parallel" | "chain";
+	mode: "single" | "workflow";
 	source: "foreground" | "async";
 	cwd: string;
 	createdAt: number;
@@ -1520,7 +1520,6 @@ export interface AsyncStartedEvent {
 	task?: string;
 	/** Workflow-level caller task, falling back to the first child task. */
 	goal?: string;
-	chain?: string[];
 	chainStepCount?: number;
 	parallelGroups?: AsyncParallelGroupStatus[];
 	workflowGraph?: WorkflowGraphSnapshot;
@@ -2261,12 +2260,6 @@ interface TopLevelParallelConfig {
 	concurrency?: number;
 }
 
-interface ExtensionChainConfig {
-	dynamicFanout?: {
-		maxItems?: number;
-	};
-}
-
 export type InlineToolDisplay = "rich" | "summary";
 
 export type FleetViewPlacement = "aboveEditor" | "belowEditor";
@@ -2395,7 +2388,6 @@ export interface ExtensionConfig {
 	/** Opt-in native tool permissions. Bash remains outside this policy. */
 	permissions?: import("../runs/shared/permissions.ts").PermissionConfig;
 	parallel?: TopLevelParallelConfig;
-	chain?: ExtensionChainConfig;
 	worktreeSetupHook?: string;
 	worktreeSetupHookTimeoutMs?: number;
 	worktreeBaseDir?: string;
@@ -2501,13 +2493,13 @@ export const TEMP_ROOT_DIR = configuredTempRoot
 	: path.join(os.tmpdir(), `pi-cciotti-${resolveTempScopeId()}`);
 export const RESULTS_DIR = path.join(TEMP_ROOT_DIR, "async-subagent-results");
 export const ASYNC_DIR = path.join(TEMP_ROOT_DIR, "async-subagent-runs");
-export const CHAIN_RUNS_DIR = path.join(TEMP_ROOT_DIR, "chain-runs");
+export const WORKFLOW_RUNS_DIR = path.join(TEMP_ROOT_DIR, "workflow-runs");
 export const TEMP_ARTIFACTS_DIR = path.join(TEMP_ROOT_DIR, "artifacts");
 
 export const DIRS = {
 	results: RESULTS_DIR,
 	async: ASYNC_DIR,
-	chain: CHAIN_RUNS_DIR,
+	workflow: WORKFLOW_RUNS_DIR,
 	artifacts: TEMP_ARTIFACTS_DIR,
 };
 export const WIDGET_KEY = "subagent-async";

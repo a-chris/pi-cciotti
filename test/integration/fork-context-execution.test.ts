@@ -937,52 +937,6 @@ describe("fork context execution wiring", { skip: !available ? "subagent executo
 		assert.equal(mockPi.callCount(), 0);
 	});
 
-	it("preflights static default-fork chain steps even when the chain also has dynamic fanout", async () => {
-		const parentSessionFile = path.join(tempDir, "parent-dynamic-chain-fail.jsonl");
-		fs.writeFileSync(parentSessionFile, '{"type":"session","version":1,"id":"parent","timestamp":"2026-04-16T00:00:00.000Z","cwd":"/tmp"}\n', "utf-8");
-		const manager = {
-			getSessionId: () => "session-123",
-			getSessionFile: () => parentSessionFile,
-			getLeafId: () => "leaf-fail",
-			openSession: () => ({
-				createBranchedSession: () => {
-					throw new Error("branch write failed");
-				},
-			}),
-		};
-		const executor = makeExecutorWithDiscoverAgents(() => ({
-			agents: [
-				{ name: "scout", description: "Scout", defaultContext: "fresh" },
-				{ name: "worker", description: "Worker", completionGuard: false, defaultContext: "fork" },
-			],
-			projectAgentsDir: null,
-		}));
-
-		const result = await executor.execute(
-			"id",
-			{
-				chain: [
-					{ agent: "scout", task: "scan" },
-					{ agent: "worker", task: "write" },
-					{
-						expand: { from: { output: "items", path: "$" } },
-						parallel: { agent: "scout", task: "inspect item" },
-						collect: { as: "inspections" },
-					},
-				],
-				clarify: false,
-			},
-			new AbortController().signal,
-			undefined,
-			makeCtx(manager),
-		);
-
-		assert.equal(result.isError, true);
-		assert.match(result.content[0]?.text ?? "", /Failed to create forked subagent session/);
-		assert.match(result.content[0]?.text ?? "", /branch write failed/);
-		assert.equal(mockPi.callCount(), 0);
-	});
-
 
 
 	it("reports unknown top-level parallel agents before default-fork preconditions", async () => {

@@ -67,7 +67,7 @@ describe("agent discovery snapshots", () => {
 			subagents: { agentOverrides: { "scope-hidden": { disabled: true } } },
 		});
 
-		const snapshot = discoverAgentSnapshot(project, "both", undefined, { includeChains: false });
+		const snapshot = discoverAgentSnapshot(project, "both", undefined);
 		assert.equal(snapshot.effective.agents.find((agent) => agent.name === "shared")?.source, "project");
 		assert.equal(snapshot.effective.agents.some((agent) => agent.name === "scope-hidden"), false);
 		assert.equal(snapshot.all.user.some((agent) => agent.name === "shared"), true);
@@ -86,7 +86,7 @@ describe("agent discovery snapshots", () => {
 			definition: { description: "Runtime hidden collision", systemPrompt: "Runtime." },
 		});
 		try {
-			const snapshot = discoverAgentSnapshot(project, "project", undefined, { includeChains: false });
+			const snapshot = discoverAgentSnapshot(project, "project", undefined);
 			const configured = [...snapshot.all.builtin, ...snapshot.all.package, ...snapshot.all.user, ...snapshot.all.project];
 			assert.equal(snapshot.effective.agents.some((agent) => agent.name === "scope-hidden"), false);
 			assert.throws(
@@ -98,22 +98,16 @@ describe("agent discovery snapshots", () => {
 		}
 	});
 
-	it("invalidates agent and chain projections when files change or appear", () => {
+	it("invalidates agent projections when files change or appear", () => {
 		const agentPath = path.join(project, ".pi", "agents", "fresh.md");
-		const chainPath = path.join(project, ".pi", "chains", "fresh.chain.md");
 		writeAgent(agentPath, "fresh", "Initial agent");
-		fs.mkdirSync(path.dirname(chainPath), { recursive: true });
-		fs.writeFileSync(chainPath, "---\nname: fresh-chain\ndescription: Initial chain\n---\n\n## fresh\nInspect\n", "utf-8");
 
 		const first = discoverAgentSnapshot(project, "both");
 		assert.equal(first.effective.agents.find((agent) => agent.name === "fresh")?.description, "Initial agent");
-		assert.equal(first.all.chains.find((chain) => chain.name === "fresh-chain")?.description, "Initial chain");
 
 		writeAgent(agentPath, "fresh", "Updated agent");
-		fs.writeFileSync(chainPath, "---\nname: fresh-chain\ndescription: Updated chain\n---\n\n## fresh\nInspect\n", "utf-8");
 		const updated = discoverAgentSnapshot(project, "both");
 		assert.equal(updated.effective.agents.find((agent) => agent.name === "fresh")?.description, "Updated agent");
-		assert.equal(updated.all.chains.find((chain) => chain.name === "fresh-chain")?.description, "Updated chain");
 
 		fs.rmSync(agentPath);
 		const addedPath = path.join(project, ".pi", "agents", "added.md");
@@ -133,7 +127,7 @@ describe("agent discovery snapshots", () => {
 
 		for (const scope of ["user", "project"] as const) {
 			const direct = discoverAgents(project, scope);
-			const snapshot = discoverAgentSnapshot(project, scope, undefined, { includeChains: false }).effective;
+			const snapshot = discoverAgentSnapshot(project, scope, undefined).effective;
 			assert.deepEqual(snapshot, direct);
 		}
 	});
@@ -156,7 +150,7 @@ describe("agent discovery snapshots", () => {
 		fs.mkdirSync(path.dirname(userSettingsPath), { recursive: true });
 		fs.writeFileSync(userSettingsPath, "{ malformed", "utf-8");
 
-		const snapshot = discoverAgentSnapshot(project, "project", undefined, { includeChains: false });
+		const snapshot = discoverAgentSnapshot(project, "project", undefined);
 		assert.equal(snapshot.effective.agents.some((agent) => agent.name === "project-agent"), true);
 		assert.equal(snapshot.all.project.some((agent) => agent.name === "project-agent"), true);
 	});
@@ -179,8 +173,8 @@ describe("agent discovery snapshots", () => {
 
 		const directUser = discoverAgents(project, "user").agents.find((agent) => agent.name === "shared");
 		const directProject = discoverAgents(project, "project").agents.find((agent) => agent.name === "shared");
-		const snapshotUser = discoverAgentSnapshot(project, "user", undefined, { includeChains: false }).effective.agents.find((agent) => agent.name === "shared");
-		const snapshotProject = discoverAgentSnapshot(project, "project", undefined, { includeChains: false }).effective.agents.find((agent) => agent.name === "shared");
+		const snapshotUser = discoverAgentSnapshot(project, "user", undefined).effective.agents.find((agent) => agent.name === "shared");
+		const snapshotProject = discoverAgentSnapshot(project, "project", undefined).effective.agents.find((agent) => agent.name === "shared");
 
 		assert.equal(directUser?.packageSourceName, "user-package");
 		assert.equal(directProject?.packageSourceName, "project-package");
@@ -194,7 +188,7 @@ describe("agent discovery snapshots", () => {
 		fs.writeFileSync(settingsPath, "{ malformed", "utf-8");
 
 		assert.throws(
-			() => discoverAgentSnapshot(project, "both", undefined, { includeChains: false }),
+			() => discoverAgentSnapshot(project, "both", undefined),
 			(error: unknown) => error instanceof Error
 				&& error.message.includes(settingsPath)
 				&& error.message.includes("Failed to parse settings file"),
@@ -221,16 +215,7 @@ describe("agent discovery snapshots", () => {
 		assert.equal(nearest.agents.some((agent) => agent.name === "outer"), false);
 	});
 
-	it("does not parse chains on the ordinary effective discovery fast path", () => {
-		const agentPath = path.join(project, ".pi", "agents", "worker.md");
-		const chainPath = path.join(project, ".pi", "chains", "broken.chain.md");
-		writeAgent(agentPath, "worker", "Worker");
-		fs.mkdirSync(path.dirname(chainPath), { recursive: true });
-		fs.writeFileSync(chainPath, "not a valid chain", "utf-8");
 
-		assert.equal(discoverAgents(project, "both").agents.some((agent) => agent.name === "worker"), true);
-		assert.equal(discoverAgentsAll(project).chainDiagnostics.some((diagnostic) => diagnostic.filePath === chainPath), true);
-	});
 });
 
 const sliceTestRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -286,7 +271,7 @@ discoverAgents(cwd, "both");
 const c2 = count; count = 0;
 discoverAgentsAll(cwd);
 const c3 = count;
-console.log(JSON.stringify({ chainMaterialize: c1, noChain: c2, reuseChains: c3 }));`;
+console.log(JSON.stringify({ allProjections: c1, effective: c2, reuseEffective: c3 }));`;
 
 		const output = execFileSync(
 			process.execPath,
@@ -294,7 +279,7 @@ console.log(JSON.stringify({ chainMaterialize: c1, noChain: c2, reuseChains: c3 
 			{ env: { HOME: home, USERPROFILE: home, PI_CODING_AGENT_DIR: path.join(home, ".pi", "agent"), PI_OFFLINE: "true", PROJECT_DIR: home }, encoding: "utf8", stdio: "pipe" }
 		);
 		const result = JSON.parse(output.toString().trim());
-		assert.equal(result.reuseChains, result.noChain, "after chains are materialized, warm discoverAgentsAll must equal warm discoverAgents(syscalls)");
+		assert.equal(result.reuseEffective, result.effective, "after one cold scan, warm discoverAgentsAll must equal warm discoverAgents(syscalls)");
 	});
 
 	it("cache still detects new agent files after warm hit", () => {
@@ -326,31 +311,6 @@ result = discoverAgentsAll(cwd);
 		const finalLine = lines[lines.length - 1];
 		const finalResult = JSON.parse(finalLine ?? "");
 		assert.ok(finalResult.foundFresh, "discoverAgentsAll must detect newly written agent files (invalidation still works)");
-	});
-
-	it("cold includeChains=true still materializes chains", () => {
-		fs.mkdirSync(path.join(projectDir, ".pi", "chains"), { recursive: true });
-		fs.writeFileSync(
-			path.join(projectDir, ".pi", "chains", "test-chain.chain.md"),
-			"---\nname: test-chain\ndescription: Test chain\n---\n\n## test-chain\nInspect\n",
-			"utf-8"
-		);
-
-		const script = `\
-import path from "node:path";
-import { discoverAgentSnapshot, clearAgentDiscoveryCache } from "${AGENTS_MODULE.replace(/\\/g, "/")}";
-clearAgentDiscoveryCache();
-const cwd = process.env.PROJECT_DIR + "/project";
-const snapshot = discoverAgentSnapshot(cwd, "both", undefined, { includeChains: true });
-console.log(JSON.stringify({ chainNames: snapshot.all.chains.map(c => c.name) }));`;
-
-		const output = execFileSync(
-			process.execPath,
-			["--experimental-strip-types", "--input-type=module", "--eval", script],
-			{ env: { HOME: home, USERPROFILE: home, PI_CODING_AGENT_DIR: path.join(home, ".pi", "agent"), PI_OFFLINE: "true", PROJECT_DIR: home }, encoding: "utf8", stdio: "pipe" }
-		);
-		const result = JSON.parse(output.toString().trim());
-		assert.ok(result.chainNames.includes("test-chain"), "chains must be materialized on cold includeChains=true call");
 	});
 });
 

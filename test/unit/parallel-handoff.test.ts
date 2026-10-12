@@ -54,7 +54,7 @@ describe("parallel handoff", () => {
 				diffs: [], results: [],
 				manifestPath,
 				runId: "run-pending",
-				mode: "parallel",
+				mode: "workflow",
 				source: "foreground",
 				cwd: "/repo",
 				stepIndex: 0,
@@ -83,7 +83,7 @@ describe("parallel handoff", () => {
 			const first = writeParallelHandoffGroup({
 				manifestPath,
 				runId: "run-1",
-				mode: "chain",
+				mode: "workflow",
 				source: "async",
 				cwd: "/repo",
 				stepIndex: 2,
@@ -114,7 +114,7 @@ describe("parallel handoff", () => {
 			const second = writeParallelHandoffGroup({
 				manifestPath,
 				runId: "run-1",
-				mode: "chain",
+				mode: "workflow",
 				source: "async",
 				cwd: "/repo",
 				stepIndex: 1,
@@ -151,7 +151,7 @@ describe("parallel handoff", () => {
 			const reference = writeParallelHandoffGroup({
 				manifestPath,
 				runId: "run-missing-diff",
-				mode: "parallel",
+				mode: "workflow",
 				source: "foreground",
 				cwd: "/repo",
 				stepIndex: 0,
@@ -183,7 +183,7 @@ describe("parallel handoff", () => {
 			const manifestPath = path.join(dir, "handoff.json");
 			const common = {
 				manifestPath,
-				mode: "parallel" as const,
+				mode: "workflow" as const,
 				source: "foreground" as const,
 				cwd: "/repo",
 				stepIndex: 0,

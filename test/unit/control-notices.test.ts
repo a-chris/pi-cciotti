@@ -122,7 +122,7 @@ describe("subagent control notice delivery", () => {
 		const state = makeState();
 		state.foregroundControls.set("run-1", {
 			runId: "run-1",
-			mode: "parallel",
+			mode: "workflow",
 			startedAt: 0,
 			updatedAt: 0,
 			currentAgent: "worker",

@@ -8,7 +8,7 @@ import { SUBAGENT_ASYNC_COMPLETE_EVENT, type SubagentState } from "../../src/sha
 import registerSubagentNotify from "../../src/runs/background/notify.ts";
 import { makeAgent } from "../support/helpers.ts";
 import {
-	installAsyncExecutionHooks, available, isAsyncAvailable, executeAsyncSingle, executeAsyncChain,
+	installAsyncExecutionHooks, available, isAsyncAvailable, executeAsyncSingle,
 	ASYNC_DIR, RESULTS_DIR, tempDir, mockPi,
 } from "../support/async-execution-fixture.ts";
 
@@ -39,117 +39,9 @@ function publicationState(sessionId: string, owner: string): SubagentState {
 
 describe("native runner result publication", { skip: !available ? "pi packages unavailable" : undefined }, () => {
 	installAsyncExecutionHooks();
-	it("renews Darwin delivery after early native failure and deferred indexed publication", { timeout: 15_000, skip: !isAsyncAvailable() ? "jiti unavailable" : undefined }, async (t) => {
-		const root = path.join(tempDir, "early-terminal-barriers");
-		fs.mkdirSync(root);
-		fs.writeFileSync(path.join(root, "early-terminal"), "");
-		const id = "early-terminal-publication";
-		const sessionId = "publication-session";
-		const owner = "publication-owner";
-		const asyncDir = path.join(ASYNC_DIR, id);
-		const state = publicationState(sessionId, owner);
-		let delivered = 0;
-		let terminalRefreshes = 0;
-		let demandTick: (() => void) | undefined;
-		let trackerTick!: () => void;
-		let complete!: () => void;
-		const completion = new Promise<void>((resolve) => { complete = resolve; });
-		const pi = { events: { on: () => () => {}, emit(event: string) {
-			if (event === SUBAGENT_ASYNC_COMPLETE_EVENT) complete();
-		} }, sendMessage() { delivered++; } };
-		const notifier = registerSubagentNotify(pi, state, { batchConfig: { enabled: false } });
-		const watcher = createResultWatcher(pi, state, RESULTS_DIR, 60_000, {
-			platform: "darwin", coalesceDelayMs: 0, notifier,
-			// index.ts wiring: no foreground controls, scheduled observations or missions in this fixture.
-			hasDeliveryDemand: () => [...state.asyncJobs.values()].some((job) => job.status === "queued" || job.status === "running") || state.foregroundControls.size > 0,
-			timers: {
-				setTimeout, clearTimeout,
-				setInterval: ((handler: () => void, delay: number) => {
-					assert.equal(delay, 3000);
-					demandTick = handler;
-					return { unref() {} } as ReturnType<typeof setInterval>;
-				}) as typeof setInterval,
-				clearInterval: (() => { demandTick = undefined; }) as typeof clearInterval,
-			},
-		});
-		const tracker = createAsyncJobTracker(pi, state, ASYNC_DIR, {
-			platform: "darwin", resultsDir: RESULTS_DIR, widgetEnabled: false,
-			pollIntervalMs: 0, completionRetentionMs: 60_000,
-			onJobTerminal: () => { terminalRefreshes++; watcher.refreshResultDelivery(); },
-		});
-		const oldOptions = process.env.NODE_OPTIONS;
-		const oldRoot = process.env.RESULT_PUBLICATION_TEST_ROOT;
-		try {
-			process.env.NODE_OPTIONS = `${oldOptions ?? ""} --import=${new URL("../support/result-publication-capacity-preload.mjs", import.meta.url).href}`;
-			process.env.RESULT_PUBLICATION_TEST_ROOT = root;
-			mockPi.onCall({ output: "targets", structuredOutput: { items: [{ path: "a.ts" }, { path: "b.ts" }] } });
-			const receipt = executeAsyncChain(id, {
-				chain: [
-					{ agent: "producer", task: "Produce targets", as: "targets", outputSchema: { type: "object" } },
-					{
-						expand: { from: { output: "targets", path: "/items" }, item: "target", maxItems: 2 },
-						parallel: { agent: "reviewer", task: "Review {target.path}", output: "shared.md" },
-						collect: { as: "reviews" }, concurrency: 2,
-					},
-				],
-				agents: [makeAgent("producer", { completionGuard: false }), makeAgent("reviewer", { completionGuard: false })],
-				ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: sessionId, completionOwnerId: owner },
-				artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
-				shareEnabled: false, acceptance: false,
-			});
-			assert.notEqual(receipt.isError, true);
-			// Capture only the real tracker's liveness callback; execute it at explicit filesystem boundaries.
-			const intervalMock = t.mock.method(globalThis, "setInterval", ((handler: () => void) => {
-				trackerTick = handler;
-				return { unref() {} } as ReturnType<typeof setInterval>;
-			}) as typeof setInterval);
-			tracker.handleStarted({ id, asyncDir, sessionId, completionOwnerId: owner, mode: "chain" });
-			intervalMock.mock.restore();
-			watcher.startResultWatcher();
-			await fileBarrier(path.join(root, "blocked.json"));
-			await fileBarrier(path.join(root, "terminal.json"));
-			const early = JSON.parse(fs.readFileSync(path.join(asyncDir, "status.json"), "utf8"));
-			assert.equal(early.state, "failed", "early failure remains visible while publication is blocked");
-			assert.match(early.error, /materialized 2 items that resolve output to the same path/);
-			trackerTick();
-			assert.equal(state.asyncJobs.get(id)?.status, "failed");
-			assert.equal(terminalRefreshes, 1);
-			assert.equal(state.cleanupTimers.has(id), false, "retain the early terminal publisher beyond display retention");
-			assert.ok(demandTick);
-			demandTick(); // Real Darwin scan-before-stop callback, not elapsed silence.
-			assert.equal(demandTick, undefined);
-			assert.equal(delivered, 0);
-			assert.equal(fs.existsSync(path.join(RESULTS_DIR, "result-index", "sessions", sessionId, `${id}.json`)), false);
-			fs.writeFileSync(path.join(root, "release"), "");
-			await fileBarrier(path.join(root, "drained.json"));
-			const index = JSON.parse(fs.readFileSync(path.join(RESULTS_DIR, "result-index", "sessions", sessionId, `${id}.json`), "utf8"));
-			assert.equal(index.runId, id, "deferred publication committed its session index");
-			const publicPath = path.join(RESULTS_DIR, `${id}.json`);
-			const publishedPath = fs.existsSync(publicPath) ? publicPath : path.join(RESULTS_DIR, "result-pending", sessionId, `${id}.json`);
-			const published = JSON.parse(fs.readFileSync(publishedPath, "utf8"));
-			assert.equal(published.completionOwnerId, owner);
-			assert.equal(published.success, false);
-			assert.equal(mockPi.callCount(), 1, "dynamic failure occurs before reviewer children start");
-			trackerTick(); // Final failed-to-failed refresh through the actual tracker.
-			assert.equal(state.asyncJobs.get(id)?.status, "failed");
-			assert.equal(terminalRefreshes, 2, "settled publication renews delivery exactly once");
-			await completion;
-			assert.equal(delivered, 1, "actual notifier send, without an injected result refresh");
-			trackerTick();
-			assert.equal(terminalRefreshes, 2);
-			assert.equal(state.cleanupTimers.has(id), true, "settlement retires the publication obligation");
-			assert.equal(state.watcher, null, "Darwin has no native result watcher");
-			assert.equal(demandTick, undefined);
-			assert.equal(state.watcherRestartTimer, null);
-		} finally {
-			fs.writeFileSync(path.join(root, "release"), "");
-			tracker.resetJobs();
-			watcher.stopResultWatcher();
-			notifier.dispose();
-			if (oldOptions === undefined) delete process.env.NODE_OPTIONS; else process.env.NODE_OPTIONS = oldOptions;
-			if (oldRoot === undefined) delete process.env.RESULT_PUBLICATION_TEST_ROOT; else process.env.RESULT_PUBLICATION_TEST_ROOT = oldRoot;
-		}
-	});
+	// The former "early native failure" case drove its failure through a chain
+	// dynamic-expansion conflict; the Darwin renewal and deferred indexed
+	// publication paths it exercised stay covered by the cases below.
 	for (const terminal of ["failed", "stopped"] as const) {
 		it(`keeps consumed ${terminal} publication settled before the first terminal refresh`, (t) => {
 			const id = `consumed-${terminal}`;

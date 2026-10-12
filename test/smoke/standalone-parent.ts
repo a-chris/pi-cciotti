@@ -6,7 +6,6 @@ import { parseFrontmatter, parseFrontmatterList } from "../../src/agents/frontma
 import registerSubagents from "../../index.js";
 import { requestAsyncInterrupt, requestAsyncSteer, requestAsyncStop } from "../../src/runs/background/control-channel.js";
 import { verifyRevival } from "./standalone-revival.ts";
-import { verifySharedRun } from "./standalone-shared.ts";
 
 function waitForFile(file: string, predicate: (text: string) => boolean): Promise<void> {
 	return new Promise((resolve) => {
@@ -43,7 +42,7 @@ export default function registerSmoke(pi: ExtensionAPI) {
 		try {
 			assert.ok(tool, "the real extension must register its public subagent tool");
 			const mode = process.env.PI_STANDALONE_SMOKE_MODE ?? "single";
-			assert.ok(["single", "workflow", "targeted-controls", "steer", "interrupt", "stop", "child-stop", "child-timeout", "run-timeout", "tool-timeout", "sdk-init-failure", "persistence-failure", "authorization-failure", "missing-bootstrap", "revival", "shared-run", "parallel-stop"].includes(mode), `unimplemented parent smoke mode: ${mode}`);
+			assert.ok(["single", "workflow", "targeted-controls", "steer", "interrupt", "stop", "child-stop", "child-timeout", "run-timeout", "tool-timeout", "sdk-init-failure", "persistence-failure", "authorization-failure", "missing-bootstrap", "revival"].includes(mode), `unimplemented parent smoke mode: ${mode}`);
 			const expectedDeclaredTools = mode === "tool-timeout" ? ["bash"] : [];
 			// The default bridge adds upward coordination to nonempty menus, not explicit empty ones.
 			const expectedRuntimeTools = mode === "tool-timeout" ? ["bash", "bg_wait"] : [];
@@ -59,12 +58,6 @@ export default function registerSmoke(pi: ExtensionAPI) {
 				workflowScript: `return await runs.run("child-deadline", { agent: "binary-smoke", task: "Wait for cancellation.", timeoutMs: 8000 });`,
 			} : { agent: "binary-smoke", task: "Return the scripted response." };
 			fs.writeFileSync("/stage/parent-initialized", String(process.pid));
-			if (mode === "shared-run" || mode === "parallel-stop") {
-				await verifySharedRun(host, ctx, mode, waitForFile, notification);
-				assert.equal(notifications, 1);
-				console.log(`PASS standalone native async ${mode}: two SDK sessions, one host, observed shutdown`);
-				process.exit(0);
-			}
 			const startupFailure = mode === "persistence-failure" || mode === "authorization-failure";
 			if (startupFailure) assert.equal(JSON.parse(fs.readFileSync("/stage/startup-hook-ready.json", "utf8")).pid, process.pid);
 			const launching = tool.execute("standalone-smoke", {

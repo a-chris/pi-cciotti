@@ -16,17 +16,6 @@ interface SlashSnapshot {
 	version: number;
 }
 
-interface SequentialChainStepLike {
-	agent: string;
-	task?: string;
-}
-
-interface ParallelChainStepLike {
-	parallel: Array<{ agent: string; task?: string }>;
-}
-
-type ChainStepLike = SequentialChainStepLike | ParallelChainStepLike;
-
 const liveSnapshots = new Map<string, SlashSnapshot>();
 const finalSnapshots = new Map<string, SlashSnapshot>();
 let versionCounter = 1;
@@ -79,94 +68,6 @@ function createPlaceholderResult(
 	};
 }
 
-function buildParallelInitialResult(params: SubagentParamsLike): AgentToolResult<Details> {
-	const tasks = params.tasks ?? [];
-	return {
-		content: [{ type: "text", text: tasks.map((task) => `${task.agent}: ${task.task}`).join("\n\n") }],
-		details: {
-			mode: "parallel",
-			...(params.async ? { background: true } : {}),
-			...(params.context === "fresh" || params.context === "fork" || params.context === "summary" ? { context: params.context } : {}),
-			results: tasks.map((task, index) => createPlaceholderResult(task.agent, task.task, "running", index)),
-			progress: tasks.map((task, index) => {
-				const sessionName = deriveChildSessionName({ agent: task.agent, task: task.task });
-				return {
-					index,
-					agent: task.agent,
-					...(sessionName ? { sessionName } : {}),
-					status: "running" as const,
-					task: task.task,
-					recentTools: [],
-					recentOutput: [],
-					toolCount: 0,
-					tokens: 0,
-					durationMs: 0,
-				};
-			}),
-		},
-	};
-}
-
-function isParallelChainStep(step: ChainStepLike): step is ParallelChainStepLike {
-	return "parallel" in step && Array.isArray(step.parallel);
-}
-
-function chainStepLabel(step: ChainStepLike): string {
-	if (isParallelChainStep(step)) {
-		return `[${step.parallel.map((entry) => entry.agent).join("+")}]`;
-	}
-	return step.agent;
-}
-
-function flattenChainResults(chain: ChainStepLike[], fallbackTask: string | undefined): SingleResult[] {
-	const results: SingleResult[] = [];
-	let flatIndex = 0;
-	for (const step of chain) {
-		if (isParallelChainStep(step)) {
-			for (const task of step.parallel) {
-				results.push(createPlaceholderResult(task.agent, task.task ?? fallbackTask ?? "", results.length === 0 ? "running" : "pending", flatIndex));
-				flatIndex++;
-			}
-			continue;
-		}
-		results.push(createPlaceholderResult(step.agent, step.task ?? fallbackTask ?? "", results.length === 0 ? "running" : "pending", flatIndex));
-		flatIndex++;
-	}
-	return results;
-}
-
-function buildChainInitialResult(params: SubagentParamsLike): AgentToolResult<Details> {
-	const chain = (params.chain ?? []) as ChainStepLike[];
-	const results = flattenChainResults(chain, params.task);
-	return {
-		content: [{
-			type: "text",
-			text: results.map((result, index) => `Step ${index + 1}: ${result.agent}\n${result.task}`).join("\n\n"),
-		}],
-		details: {
-			mode: "chain",
-			...(params.async ? { background: true } : {}),
-			...(params.context === "fresh" || params.context === "fork" || params.context === "summary" ? { context: params.context } : {}),
-			results,
-			progress: results.map((result, index) => ({
-				index,
-				agent: result.agent,
-				...(result.sessionName ? { sessionName: result.sessionName } : {}),
-				status: index === 0 ? "running" as const : "pending" as const,
-				task: result.task,
-				recentTools: [],
-				recentOutput: [],
-				toolCount: 0,
-				tokens: 0,
-				durationMs: 0,
-			})),
-			chainAgents: chain.map((step) => chainStepLabel(step)),
-			totalSteps: chain.length,
-			currentStepIndex: 0,
-		},
-	};
-}
-
 function buildSingleInitialResult(params: SubagentParamsLike): AgentToolResult<Details> {
 	const preview = previewSimpleWorkflowRun(params.workflowScript) ?? {};
 	const agent = params.agent ?? preview.agent ?? "subagent";
@@ -196,11 +97,7 @@ function buildSingleInitialResult(params: SubagentParamsLike): AgentToolResult<D
 }
 
 export function buildSlashInitialResult(requestId: string, params: SubagentParamsLike): SlashMessageDetails {
-	const result = (params.tasks?.length ?? 0) > 0
-		? buildParallelInitialResult(params)
-		: (params.chain?.length ?? 0) > 0
-			? buildChainInitialResult(params)
-			: buildSingleInitialResult(params);
+	const result = buildSingleInitialResult(params);
 	liveSnapshots.set(requestId, { result, version: nextVersion() });
 	finalSnapshots.delete(requestId);
 	return { requestId, result };
@@ -223,12 +120,10 @@ export function applySlashUpdate(requestId: string, update: SlashSubagentUpdate)
 	if (!snapshot) return;
 	const progress = update.progress;
 	if (!progress || !snapshot.result.details) return;
-	const currentStepIndex = progress.findIndex((entry) => entry.status === "running");
 	const nextDetails: Details = {
 		...snapshot.result.details,
 		progress,
 		results: cloneResultsWithProgress(snapshot.result.details.results, progress),
-		...(snapshot.result.details.mode === "chain" && currentStepIndex >= 0 ? { currentStepIndex } : {}),
 	};
 	liveSnapshots.set(requestId, {
 		result: {

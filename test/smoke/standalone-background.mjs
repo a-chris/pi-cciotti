@@ -16,7 +16,7 @@ if (process.platform !== "linux" || process.arch !== "x64") {
 const source = fileURLToPath(new URL("../../", import.meta.url));
 const binary = process.argv[2];
 const mode = process.argv[4] ?? "single";
-assert.ok(["single", "workflow", "targeted-controls", "steer", "interrupt", "stop", "child-stop", "child-timeout", "run-timeout", "tool-timeout", "sdk-init-failure", "persistence-failure", "authorization-failure", "missing-bootstrap", "revival", "shared-run", "parallel-stop", "bootstrap-errors"].includes(mode), "unknown standalone smoke mode");
+assert.ok(["single", "workflow", "targeted-controls", "steer", "interrupt", "stop", "child-stop", "child-timeout", "run-timeout", "tool-timeout", "sdk-init-failure", "persistence-failure", "authorization-failure", "missing-bootstrap", "revival", "bootstrap-errors"].includes(mode), "unknown standalone smoke mode");
 assert.ok(binary && path.isAbsolute(binary) && fs.existsSync(binary), "an existing absolute Pi binary path is required on Linux x64");
 const release = JSON.parse(fs.readFileSync(new URL("standalone-release.json", import.meta.url), "utf8"));
 assert.equal(process.platform, release.platform, "requires Linux/bubblewrap");

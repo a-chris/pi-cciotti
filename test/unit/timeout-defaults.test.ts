@@ -44,13 +44,6 @@ describe("single-agent launch timeout wiring", () => {
 		assert.match(result.error!, /aliases/);
 	});
 
-	it("does not apply the async default to async chains (children are bounded individually)", () => {
-		assert.deepEqual(
-			resolveSingleAgentLaunchTimeout({ agent: "worker", task: "x", chain: [{ agent: "worker", task: "y" }] }, true),
-			{},
-		);
-	});
-
 	it("does not apply the async default to async parallel tasks", () => {
 		assert.deepEqual(
 			resolveSingleAgentLaunchTimeout({ agent: "worker", task: "x", tasks: [{ agent: "worker", task: "y" }] }, true),
@@ -65,13 +58,6 @@ describe("single-agent launch timeout wiring", () => {
 		);
 	});
 
-	it("explicit top-level timeout still applies to async chains", () => {
-		assert.deepEqual(
-			resolveSingleAgentLaunchTimeout({ agent: "worker", task: "x", chain: [{ agent: "worker", task: "y" }], timeoutMs: 5_000 }, true),
-			{ timeoutMs: 5_000 },
-		);
-	});
-
 	const NINETY_MIN = 90 * 60 * 1000;
 
 	it("applies the global config default in place of the foreground backstop", () => {
@@ -83,10 +69,6 @@ describe("single-agent launch timeout wiring", () => {
 	it("applies the global config default to composite foreground runs (parallel/chain)", () => {
 		assert.deepEqual(
 			resolveSingleAgentLaunchTimeout({ agent: "worker", task: "x", tasks: [{ agent: "worker", task: "y" }] }, false, NINETY_MIN),
-			{ timeoutMs: NINETY_MIN },
-		);
-		assert.deepEqual(
-			resolveSingleAgentLaunchTimeout({ agent: "worker", task: "x", chain: [{ agent: "worker", task: "y" }] }, false, NINETY_MIN),
 			{ timeoutMs: NINETY_MIN },
 		);
 	});

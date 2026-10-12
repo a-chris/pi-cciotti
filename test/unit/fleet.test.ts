@@ -142,7 +142,7 @@ describe("native subagent fleet", () => {
 			const state = stateForTest();
 			state.foregroundControls.set("foreground-live", {
 				runId: "foreground-live",
-				mode: "chain",
+				mode: "workflow",
 				startedAt: 10,
 				updatedAt: 30,
 				currentAgent: "scout",
@@ -348,7 +348,7 @@ describe("native subagent fleet", () => {
 		const control = {
 			runId: "prompt-run",
 			sessionId: "session-current",
-			mode: "parallel" as const,
+			mode: "workflow" as const,
 			startedAt: 10,
 			updatedAt: 20,
 			activeChildren: new Map([
@@ -1297,7 +1297,7 @@ describe("native subagent fleet", () => {
 			const now = Date.now();
 			state.foregroundControls.set("foreground-live", {
 				runId: "foreground-live",
-				mode: "parallel",
+				mode: "workflow",
 				startedAt: now - 1_000,
 				updatedAt: now,
 				cwd: effectiveCwd,

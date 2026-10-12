@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import { writePrivateAtomicJson } from "../shared/atomic-json.ts";
 import { PROMPT_REDACTED } from "../shared/utils.ts";
-import type { Details, SubagentRunMode } from "../shared/types.ts";
+import type { Details } from "../shared/types.ts";
 import { validateMissionLaunch } from "./actions.ts";
 import type { MissionArtifact, MissionRecord, MissionRunLink, MissionRunMode, MissionStatus, MissionStoreConfig, MissionStoreLocation } from "./types.ts";
 import { createMission, MissionNotFoundError, missionRecordPath, readMission, resolveMissionStoreLocation, updateMission, validateMissionId } from "./store.ts";
@@ -16,7 +16,6 @@ export interface MissionLaunchParams {
 	mission?: unknown;
 	task?: string;
 	tasks?: Array<{ task?: string }>;
-	chain?: Array<{ task?: string; parallel?: Array<{ task?: string }> | { task?: string } }>;
 }
 
 export interface MissionLaunchBinding {
@@ -37,16 +36,9 @@ interface PersistedMissionBinding {
 }
 
 function workflowObjective(params: MissionLaunchParams): string | undefined {
-	const objective = params.task?.trim()
+	return params.task?.trim()
 		|| params.tasks?.find((task) => task.task?.trim())?.task?.trim()
-		|| params.chain?.find((step) => step.task?.trim())?.task?.trim();
-	if (objective) return objective;
-	for (const step of params.chain ?? []) {
-		const parallel = Array.isArray(step.parallel) ? step.parallel : step.parallel ? [step.parallel] : [];
-		const task = parallel.find((child) => child.task?.trim())?.task?.trim();
-		if (task) return task;
-	}
-	return undefined;
+		|| undefined;
 }
 
 export function prepareMissionLaunch(input: {
@@ -90,6 +82,11 @@ function toolResultIsError(result: AgentToolResult<Details>): boolean {
 
 function missionRunModeForResult(mode: Details["mode"]): MissionRunMode {
 	return mode === "management" ? "external" : mode;
+}
+
+function missionModeForEvent(mode: unknown): MissionRunMode {
+	if (mode === "single" || mode === "workflow") return mode;
+	return "external";
 }
 
 function runStatusForResult(result: AgentToolResult<Details>): string {
@@ -351,7 +348,7 @@ export function syncMissionFromAsyncCompletion(value: unknown): MissionRecord | 
 	const workflowChildTerminal = !["running", "queued", "active", "paused"].includes(workflowChildStatus);
 	return updateMission(binding.location, binding.missionId, {
 		status: missionStatusForRun(current, runId, runStatus),
-		addRuns: [{ runId, mode: typeof event.mode === "string" && ["single", "parallel", "chain", "workflow"].includes(event.mode) ? event.mode as SubagentRunMode : "external", asyncDir: event.asyncDir, status: runStatus, completedAt, ...(usage && usage.tokens > 0 ? { usage } : {}) }],
+		addRuns: [{ runId, mode: missionModeForEvent(event.mode), asyncDir: event.asyncDir, status: runStatus, completedAt, ...(usage && usage.tokens > 0 ? { usage } : {}) }],
 		addArtifacts: artifacts,
 		...(workflowRunId && workflowKey ? { upsertWorkflowChildren: [{
 			workflowRunId,

@@ -17,7 +17,6 @@ import { readProcessTerminal, sanitizeProcessTerminal } from "./process-terminal
 import { formatWaitSubscriptions } from "./wait-subscriptions.ts";
 import { resolveAsyncRunLocation } from "./async-resume.ts";
 import { resolveSubagentRunId } from "./run-id-resolver.ts";
-import { flatToLogicalStepIndex, normalizeParallelGroups } from "./parallel-groups.ts";
 import { reconcileAsyncRun, reconcileNestedAsyncDescendants } from "./stale-run-reconciler.ts";
 import { attachRootChildrenToSteps, findNestedRouteForRootId, projectNestedRegistryForRoot, type NestedRunResolutionScope } from "../shared/nested-events.ts";
 import { readMissionBinding } from "../../missions/lifecycle.ts";
@@ -143,15 +142,7 @@ function formatResumeGuidance(runId: string | undefined, children: Array<{ agent
 
 function stepLineLabel(status: AsyncStatus, index: number): string {
 	const steps = status.steps ?? [];
-	if (status.mode === "parallel") return `Agent ${index + 1}/${steps.length || 1}`;
 	if (status.mode === "workflow") return `Workflow child ${steps[index]?.workflowKey ?? index + 1}`;
-	if (status.mode === "chain") {
-		const chainStepCount = status.chainStepCount ?? (steps.length || 1);
-		const groups = normalizeParallelGroups(status.parallelGroups, steps.length, chainStepCount);
-		const group = groups.find((candidate) => index >= candidate.start && index < candidate.start + candidate.count);
-		if (group) return `Step ${group.stepIndex + 1}/${chainStepCount} Agent ${index - group.start + 1}/${group.count}`;
-		return `Step ${flatToLogicalStepIndex(index, chainStepCount, groups) + 1}/${chainStepCount}`;
-	}
 	return `Step ${index + 1}`;
 }
 

@@ -288,7 +288,8 @@ export const SubagentControlParams = Type.Object({
 	id: Type.Optional(Type.String({ description: "Run id/prefix; required for run-targeting actions." })),
 	action: Type.Optional(Type.String({ enum: [...SUBAGENT_CONTROL_ACTIONS], description: "What to do; omitted = status." })),
 	message: Type.Optional(Type.String({ description: "Guidance for steer/resume." })),
-	topic: Type.Optional(Type.String({ enum: [...SUBAGENT_GUIDE_TOPICS], description: "Guide topic served by the guide action. Omit to read the overview." })),
+	// Bare topics and `<topic>/<section>` addresses (see subagent-guide.ts); `overview` is whole-document only.
+	topic: Type.Optional(Type.String({ pattern: `^(?:${SUBAGENT_GUIDE_TOPICS.join("|")})(?:/[a-z0-9-]+)?$`, description: "Guide topic: `<topic>/<section>` reads one; bare docs topics return a TOC. Omit=overview." })),
 	agent: Type.Optional(Type.String({ description: "Agent name for `get` and `models`." })),
 	mission: Type.Optional(Type.Unsafe({ ...MissionLaunchOverride, description: "Mission object for `mission.create`: `title` or `summary` (exactly one), optional `objective`, `goal: true` requires `budget.tokens`, optional `labels`." })),
 });

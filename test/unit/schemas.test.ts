@@ -325,7 +325,7 @@ describe("facade schemas", { skip: !schemasAvailable ? "typebox not available" :
 			"list", "get", "models", "guide", "mission.create",
 		]);
 		assert.equal(props.topic?.type, "string");
-		assert.deepEqual(props.topic?.enum, [...SUBAGENT_GUIDE_TOPICS]);
+		assert.equal(props.topic?.enum, undefined, "topic is a pattern, not a closed enum: it must accept section addresses");
 		assert.ok(Boolean(props.topic?.description), "topic should carry a description");
 		// The verbs must be drivable: get/models read agent, mission.create reads mission.
 		assert.equal(props.agent?.type, "string");
@@ -334,6 +334,27 @@ describe("facade schemas", { skip: !schemasAvailable ? "typebox not available" :
 		assert.equal(hasAnyOfType(props.mission, "boolean"), true);
 		assert.match(String(props.mission?.description ?? ""), /mission\.create/);
 		assert.ok(!(props.action?.enum as readonly string[]).includes("validate"), "validate left the model surface together with its script input");
+	});
+
+	it("accepts bare topics and section addresses on the control guide topic", () => {
+		// The guide reader serves bare docs topics as a table of contents and
+		// `<topic>/<section>` as one bounded section, so the control schema has to
+		// accept both shapes while still rejecting anything the reader cannot resolve.
+		const topic = properties(schemas.SubagentControlParams as JsonSchemaNode).topic;
+		assert.ok(topic?.pattern, "topic should carry a pattern");
+		const pattern = new RegExp(String(topic.pattern));
+		for (const name of SUBAGENT_GUIDE_TOPICS) assert.match(name, pattern, `${name} should be a valid guide topic`);
+		for (const address of ["workflows/scripted-workflows-source", "tool-reference/bg-wait", "agents/advisory-runner-data-boundary"]) {
+			assert.match(address, pattern, `${address} should be a valid section address`);
+		}
+		for (const rejected of ["unknown", "tool-reference/UPPER", "tool-reference/", "workflows/no-such-section/", "guide", "/workflows"]) {
+			assert.doesNotMatch(rejected, pattern, `${rejected} should be rejected`);
+		}
+		if (CompileSchema) {
+			const validator = CompileSchema(schemas.SubagentControlParams);
+			assert.equal(validator.Check({ action: "guide", topic: "workflows/scripted-workflows-source" }), true, "a section address must compile as a valid call");
+			assert.equal(validator.Check({ action: "guide", topic: "unknown" }), false, "an unrelated topic must fail schema validation");
+		}
 	});
 
 	/**

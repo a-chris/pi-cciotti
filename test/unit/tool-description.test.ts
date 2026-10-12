@@ -40,10 +40,12 @@ describe("subagent facade tool descriptions", () => {
 		}
 	});
 
-	it("points each description at guide topics for depth", () => {
-		assert.match(SUBAGENT_DELEGATION_DESCRIPTION, /guide topics tool-reference, agents/);
-		assert.match(SUBAGENT_WORKFLOW_DESCRIPTION, /guide topic workflows/);
-		assert.match(SUBAGENT_CONTROL_DESCRIPTION, /guide topic tool-reference/);
+	it("points each description at guide section addresses for depth", () => {
+		// Bare topics now return a table of contents, so the descriptions name the
+		// section each tool's depth actually lives in.
+		assert.match(SUBAGENT_DELEGATION_DESCRIPTION, /guide topics tool-reference\/execution-examples, agents\/overriding-builtins-and-custom-agents/);
+		assert.match(SUBAGENT_WORKFLOW_DESCRIPTION, /guide topic workflows\/scripted-workflows-source/);
+		assert.match(SUBAGENT_CONTROL_DESCRIPTION, /guide topic tool-reference\/status-and-control-actions/);
 	});
 
 	it("keeps delegation authorization guidance on the delegation tool", () => {
@@ -101,14 +103,19 @@ describe("subagent facade tool descriptions", () => {
 	 * Two guards, because they catch different regressions.
 	 *
 	 * The description cap stops prose inflation: the three descriptions were
-	 * 368 + 288 + 234 = 890 characters and are now 408. The shape cap is the backstop
-	 * for anything the per-form rules above do not recognize, such as a new bloated
-	 * parameter: the three serialized tools totalled 3,457 before de-glossing and
-	 * 3,077 now, of which ~140 is the corrected `async` wording.
+	 * 368 + 288 + 234 = 890 characters and were 408 after de-glossing. Replacing
+	 * the bare guide topics with section addresses grew them to 518 (the reader now
+	 * serves a table of contents or one bounded section per topic, so the pointers
+	 * name a section instead of a whole document). The shape cap is the backstop for
+	 * anything the per-form rules above do not recognize, such as a new bloated
+	 * parameter: the three serialized tools totalled 3,457 before de-glossing, 3,373
+	 * before this change, and 3,514 now — the extra ~140 is the control `topic` param
+	 * moving from a bare-topic enum to the section-address pattern plus the longer
+	 * description pointers.
 	 *
 	 * Both bounds sit above today's value and below the regressions they exist to
 	 * catch, verified by mutation: reverting the descriptions trips the gloss rule and
-	 * the 500 cap, and a 447-character parameter description trips the 3,400 cap.
+	 * the 550 cap, and a bloated parameter description trips the 3,650 cap.
 	 * Raising either number should come with a measured before/after.
 	 */
 	it("keeps the whole model-facing tool surface inside its budget", () => {
@@ -119,8 +126,8 @@ describe("subagent facade tool descriptions", () => {
 		];
 		const total = tools.reduce((sum, [description, schema]) => sum + description.length + JSON.stringify(schema).length, 0);
 		const descriptions = tools.reduce((sum, [description]) => sum + description.length, 0);
-		assert.ok(descriptions < 500, `three facade descriptions should stay under 500 chars combined, got ${descriptions} (408 today, 890 before de-glossing)`);
-		assert.ok(total < 3_400, `three facade tools (description + schema) should stay under 3400 chars, got ${total} (3077 today, 3457 before de-glossing)`);
+		assert.ok(descriptions < 550, `three facade descriptions should stay under 550 chars combined, got ${descriptions} (518 today, 408 before section addresses, 890 before de-glossing)`);
+		assert.ok(total < 3_650, `three facade tools (description + schema) should stay under 3650 chars, got ${total} (3514 today, 3373 before section addresses)`);
 	});
 
 	it("ships no stale text from removed subsystems in any description", () => {

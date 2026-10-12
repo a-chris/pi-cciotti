@@ -23,7 +23,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import { SUBAGENT_CONTROL_ACTIONS, SubagentControlParams, SubagentDelegationParams, SubagentWorkflowParams } from "../../src/extension/schemas.ts";
 import { normalizeControlParams } from "../../src/extension/facade.ts";
-import { SUBAGENT_GUIDE_TOPICS } from "../../src/extension/subagent-guide.ts";
+import { readSubagentGuide, SUBAGENT_GUIDE_TOPICS } from "../../src/extension/subagent-guide.ts";
 
 const servedFiles = [
 	"README.md",
@@ -336,5 +336,22 @@ describe("served docs match the facade contract", () => {
 		const documented = [...table.matchAll(/^\| `([a-zA-Z]+)` \|/gm)].map((match) => match[1]!);
 		assert.ok(documented.length >= 15, `expected the facade parameter table, found ${documented.length} rows`);
 		assert.deepEqual(documented.filter((key) => !MODEL_FACING_PARAMS.has(key)), [], "parameter reference documents params the facades do not expose");
+	});
+
+	it("routes every guide pointer in the served surface to a real section", () => {
+		// A bare docs topic now serves a table of contents rather than the whole
+		// document, so a pointer that names a section has to name an address the
+		// reader can resolve and the control schema accepts.
+		const topicNames = SUBAGENT_GUIDE_TOPICS.join("|");
+		const pointer = new RegExp(`topic:\\s*\\\\?["']([a-z][a-z0-9/-]*)|guide (?:topics? )?((?:${topicNames})(?:/[a-z0-9-]+)?)\\b`, "g");
+		const files = [...servedFiles, "src/extension/tool-description.ts", "src/runs/background/wait-tool.ts"];
+		const pattern = new RegExp(String((SubagentControlParams as { properties: { topic: { pattern: string } } }).properties.topic.pattern));
+		const pointers = files.flatMap((file) => [...read(file).matchAll(pointer)].map((match) => ({ file, address: match[1] ?? match[2]! })));
+
+		assert.ok(pointers.some(({ address }) => address.includes("/")), "expected section-address pointers in the served surface");
+		for (const { file, address } of pointers) {
+			assert.doesNotMatch(readSubagentGuide(address), /^Unknown/, `${file} points to ${address}, which the guide reader cannot resolve`);
+			assert.match(address, pattern, `${file} points to ${address}, which the control schema rejects`);
+		}
 	});
 });

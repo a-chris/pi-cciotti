@@ -1,7 +1,8 @@
 /**
  * Model-facing tool descriptions: one short description per facade tool,
  * each at most 60 words. Depth lives in guide topics, reachable via the
- * subagent_control action:guide (e.g. tool-reference, workflows, agents).
+ * subagent_control action:guide (e.g. tool-reference/execution-examples,
+ * workflows/scripted-workflows-source, agents/overriding-builtins-and-custom-agents).
  */
 
 import { delegationLevelGuideline, type DelegationLevel } from "../policy/delegation-level.ts";
@@ -31,8 +32,8 @@ export function buildSubagentToolPromptMetadata(delegationLevel?: DelegationLeve
 // in `required` or an `enum` is a third copy. `subagent_control` used to
 // enumerate its verbs verbatim; what stays is the read/mutate split, which an
 // enum cannot express.
-export const SUBAGENT_DELEGATION_DESCRIPTION = "Delegate one child agent for a focused task. Delegate only when authorized. Depth: guide topics tool-reference, agents.";
+export const SUBAGENT_DELEGATION_DESCRIPTION = "Delegate one child agent for a focused task. Delegate only when authorized. Depth: guide topics tool-reference/execution-examples, agents/overriding-builtins-and-custom-agents.";
 
-export const SUBAGENT_WORKFLOW_DESCRIPTION = "Run a multi-child workflow from a named resource or a script body, with bounded JSON args. Depth: guide topic workflows.";
+export const SUBAGENT_WORKFLOW_DESCRIPTION = "Run a multi-child workflow from a named resource or a script body, with bounded JSON args. Depth: guide topic workflows/scripted-workflows-source.";
 
-export const SUBAGENT_CONTROL_DESCRIPTION = "Run and registry control. Omit action for status. resume, steer, stop, interrupt, and mission.create mutate; the remaining verbs read. Depth: guide topic tool-reference.";
+export const SUBAGENT_CONTROL_DESCRIPTION = "Run and registry control. Omit action for status. resume, steer, stop, interrupt, and mission.create mutate; the remaining verbs read. Depth: guide topic tool-reference/status-and-control-actions.";

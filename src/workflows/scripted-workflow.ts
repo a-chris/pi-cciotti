@@ -1672,9 +1672,10 @@ function setupAbortResumeParams(params: Record<string, unknown>, result: Workflo
 	const error = typeof childResult?.error === "string" ? childResult.error : result.error;
 	if (error !== "This operation was aborted" || !isZeroUsage(childResult?.usage)) return undefined;
 	const messages = Array.isArray(childResult?.messages) ? childResult.messages : [];
-	const message = messages.findLast((entry) => isRecord(entry) && entry.role === "assistant");
+	// `Message` is a discriminated union, so the role check narrows to AssistantMessage and the
+	// fields below are read directly instead of through a `Record<string, unknown>` widening.
+	const message = messages.findLast((entry) => entry.role === "assistant");
 	if (message !== undefined) {
-		if (!isRecord(message)) return undefined;
 		if (message.stopReason !== "error" || message.errorMessage !== error) return undefined;
 		if (!Array.isArray(message.content) || message.content.length > 0 || !isZeroUsage(message.usage)) return undefined;
 		if (Object.hasOwn(message, "diagnostics") || Object.hasOwn(message, "responseId")) return undefined;

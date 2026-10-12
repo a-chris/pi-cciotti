@@ -21,14 +21,14 @@ const hostPeerPackages = [
 ] as const;
 const expectedHostPeerRanges = {
 	"@earendil-works/pi-agent-core": "*",
-	"@earendil-works/pi-ai": ">=0.80.0",
+	"@earendil-works/pi-ai": ">=1.0.0",
 	"@earendil-works/pi-coding-agent": "*",
 	"@earendil-works/pi-tui": "*",
 } satisfies Record<(typeof hostPeerPackages)[number], string>;
 const expectedHostDevVersions = {
-	"@earendil-works/pi-agent-core": "0.81.0",
-	"@earendil-works/pi-ai": "0.81.0",
-	"@earendil-works/pi-tui": "0.81.0",
+	"@earendil-works/pi-agent-core": "1.1.0",
+	"@earendil-works/pi-ai": "1.1.0",
+	"@earendil-works/pi-tui": "1.1.0",
 } satisfies Record<Exclude<(typeof hostPeerPackages)[number], "@earendil-works/pi-coding-agent">, string>;
 
 test("the root entrypoint exposes the runtime error flag to TypeScript consumers", () => {

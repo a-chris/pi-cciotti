@@ -330,6 +330,13 @@ export interface ToolRenderContext<TState = any, TArgs = any> {
     showImages: boolean;
     /** Whether the current result is an error. */
     isError: boolean;
+    /**
+     * Milliseconds the tool's execution took, from the final result; `undefined` while it runs, when it did not run, or
+     * for results stored before durations were recorded.
+     */
+    durationMs: number | undefined;
+    /** Horizontal padding configured by the outputPad setting. Renderers with `renderShell: "self"` apply it themselves. */
+    outputPad: number;
 }
 /**
  * How a registered tool is exposed to the model-facing declaration surface.
@@ -576,6 +583,8 @@ export interface AgentEndEvent {
 /** Fired after an agent run has fully settled and no automatic retry, compaction, or queued continuation will run. */
 export interface AgentSettledEvent {
     type: "agent_settled";
+    /** Whether the run ended because it was aborted, for example with Escape. */
+    aborted: boolean;
 }
 /** Fired at the start of each turn */
 export interface TurnStartEvent {
@@ -628,6 +637,10 @@ export interface ToolExecutionEndEvent {
     toolName: string;
     result: any;
     isError: boolean;
+    /** Milliseconds `execute()` took, measured with a monotonic clock; absent when the tool did not run. */
+    durationMs?: number;
+    /** Set when another tool (for example a codemode script) made this call. */
+    parentToolCallId?: string;
 }
 export type ModelSelectSource = "set" | "cycle" | "restore";
 /** Fired when a new model is selected */

@@ -45,6 +45,8 @@ export type AgentSessionEvent = Exclude<AgentEvent, {
     willRetry: boolean;
 } | {
     type: "agent_settled";
+    /** Whether the run ended because it was aborted, for example with Escape. */
+    aborted: boolean;
 } | {
     type: "queue_update";
     steering: readonly string[];

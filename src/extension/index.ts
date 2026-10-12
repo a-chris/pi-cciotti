@@ -61,6 +61,7 @@ import { disposeChildSessions } from "../runs/shared/child-session.ts";
 import { resolveCurrentSubagentCapabilityCeiling } from "../runs/shared/capability-ceiling.ts";
 import { formatDuration, shortenPath } from "../shared/formatters.ts";
 import { loadConfig, resolveAsyncByDefault } from "./config.ts";
+import { registerPinnedTool } from "./declaration-pinning.ts";
 import { SUBAGENT_CONTROL_DESCRIPTION, SUBAGENT_DELEGATION_DESCRIPTION, SUBAGENT_WORKFLOW_DESCRIPTION, buildSubagentToolPromptMetadata } from "./tool-description.ts";
 import { resolveDelegationLevel } from "../policy/delegation-level.ts";
 import { formatWorkflowPreflightSummary, normalizeWorkflowPreflight } from "../workflows/workflow-preflight.ts";
@@ -726,7 +727,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		},
 
 	};
-	pi.registerTool(delegationTool);
+	registerPinnedTool(pi, delegationTool);
 
 	const workflowTool: ToolDefinition<typeof SubagentWorkflowParams, Details> = {
 		name: SUBAGENT_WORKFLOW_TOOL,
@@ -767,7 +768,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		},
 
 	};
-	pi.registerTool(workflowTool);
+	registerPinnedTool(pi, workflowTool);
 
 	const controlTool: ToolDefinition<typeof SubagentControlParams, Details> = {
 		name: SUBAGENT_CONTROL_TOOL,
@@ -797,7 +798,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		},
 
 	};
-	pi.registerTool(controlTool);
+	registerPinnedTool(pi, controlTool);
 
 	pi.on("before_agent_start", (event, ctx) => {
 		const selectedTools = event.systemPromptOptions?.selectedTools ?? (typeof pi.getActiveTools === "function" ? pi.getActiveTools() : []);

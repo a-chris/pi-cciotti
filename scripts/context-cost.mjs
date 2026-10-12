@@ -41,6 +41,7 @@ import {
 } from "../src/extension/schemas.ts";
 import { buildAdvertisedAgentPrompt } from "../src/agents/advertised-agent-prompt.ts";
 import { discoverAgents, discoverAgentsAll } from "../src/agents/agents.ts";
+import { resolveWaitToolConfig } from "../src/runs/background/wait-config.ts";
 import { PARENT_WAIT_ESCAPE_HATCH, registerWaitTool } from "../src/runs/background/wait-tool.ts";
 
 const DENSE_CHARS_PER_TOKEN = 2.9;
@@ -70,8 +71,9 @@ const cwd = (() => {
 
 // The extension hides the bg_wait declaration when enabled (subagent.prepareLoadout)
 // and folds the parent escape hatch into the subagent description instead, so the
-// parent turn pays for one declaration less and one sentence more.
-const waitToolEnabled = !/^(0|false)$/u.test(process.env.PI_SUBAGENT_WAIT_TOOL_ENABLED ?? "");
+// parent turn pays for one declaration less and one sentence more. Use the runtime
+// resolver so the same env spellings (no/off/disabled) invert this the same way.
+const waitToolEnabled = resolveWaitToolConfig().enabled;
 const subagentDescription = waitToolEnabled
 	? `${SUBAGENT_DELEGATION_DESCRIPTION}\n\n${PARENT_WAIT_ESCAPE_HATCH}`
 	: SUBAGENT_DELEGATION_DESCRIPTION;

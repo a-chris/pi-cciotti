@@ -5,10 +5,18 @@ import { it } from "node:test";
 
 const scriptPath = fileURLToPath(new URL("../../scripts/context-cost.mjs", import.meta.url));
 
+// The bound below describes the default-on surface. With the wait tool disabled,
+// bg_wait is not hidden and its (larger, disabled-note) declaration is genuinely
+// visible, so measure the documented default rather than inheriting whichever env
+// the suite happens to run under.
+const measuredEnv = { ...process.env } as Record<string, string>;
+delete measuredEnv.PI_SUBAGENT_WAIT_TOOL_ENABLED;
+
 it("context-cost script reports a positive parent-turn total from live sources", () => {
 	const out = execFileSync(process.execPath, ["--experimental-strip-types", scriptPath, "--cwd", ".", "--json"], {
 		cwd: fileURLToPath(new URL("../..", import.meta.url)),
 		encoding: "utf-8",
+		env: measuredEnv,
 	});
 	const report = JSON.parse(out) as {
 		sections: { title: string; subtotalChars: number; rows: { label: string; chars: number }[] }[];

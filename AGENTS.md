@@ -31,3 +31,18 @@ Single test file commands:
 - Integration: `node --experimental-strip-types --import ./test/support/register-loader.mjs --test test/integration/<file>.test.ts` (the register-loader import is required; plain `npm test` flags do not apply to a single file)
 
 Pick the test files that cover the behavior you changed; if no existing test file covers it, add one. Only run the whole suite (`npm run test:all`) once, at the end of the work, together with `npm run typecheck`, as the final proof that everything is working.
+
+## Final proof against the real pi runtime
+
+Unit fixtures build contexts as plain object literals, which hides receiver-loss bugs in
+the session-manager readers that pi defines on its prototype (`buildContextEntries`).
+After `npm run test:all` and `npm run typecheck`, run the shape test once so it loads the
+installed pi package rather than skipping:
+
+```
+node --experimental-strip-types --import ./test/support/isolated-temp-root.mjs --test test/unit/declaration-pinning-session-manager-shape.test.ts
+```
+
+Point `PI_CCIOTTI_NATIVE_SDK` at an isolated SDK root to pin which install is used; without
+it the test picks up the global `@earendil-works/pi-coding-agent`. The test skips itself when
+no install is present, so a run with `skipped 1` means the real-runtime check did not happen.

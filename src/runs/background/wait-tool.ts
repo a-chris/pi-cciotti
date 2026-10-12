@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { registerPinnedTool } from "../../extension/declaration-pinning.ts";
+import { SUBAGENT_DELEGATION_DESCRIPTION } from "../../extension/tool-description.ts";
 import { SubagentWaitParams } from "../../extension/schemas.ts";
 import type { Details, SubagentState } from "../../shared/types.ts";
 import { resolveWaitToolConfig, waitForSubagents } from "./subagent-wait.ts";
@@ -14,6 +15,27 @@ import { finalizeToolResult } from "../../extension/tool-result.ts";
  * blocking wait is the correct behavior.
  */
 export const PARENT_WAIT_ESCAPE_HATCH = "Ordinary async subagent runs already notify this session natively, so do not call this merely to wait on a child — return control instead.";
+
+/** Name of the wait tool, shared by the registered definition and the hidden-declaration list. */
+export const WAIT_TOOL_NAME = "bg_wait";
+
+/**
+ * Builds the `prepareLoadout` hook once, at registration time, from the resolved
+ * wait-tool config. Enabled: hide this tool's own declaration and move its one-line
+ * parent guardrail onto `subagent`, which is always active in a parent session.
+ * Disabled: nothing to hide, so the registered description stands on its own.
+ */
+export function createWaitToolLoadout(config: { enabled: boolean }): () => {
+	hiddenDeclarations: string[];
+	descriptions?: Record<string, string>;
+} {
+	if (!config.enabled) return () => ({ hiddenDeclarations: [] });
+	const loadout = {
+		hiddenDeclarations: [WAIT_TOOL_NAME],
+		descriptions: { subagent: `${SUBAGENT_DELEGATION_DESCRIPTION}\n\n${PARENT_WAIT_ESCAPE_HATCH}` },
+	};
+	return () => loadout;
+}
 
 export function registerWaitTool(
 	pi: ExtensionAPI,
@@ -47,7 +69,7 @@ export function registerWaitTool(
 		...(subscriptions && ctx?.hasUI ? { subscribe: (input) => subscriptions.arm(input) } : {}),
 	}));
 	const primaryTool: ToolDefinition<typeof SubagentWaitParams, Details> = {
-		name: "bg_wait",
+		name: WAIT_TOOL_NAME,
 		label: "Background Wait",
 		description,
 		parameters: SubagentWaitParams,

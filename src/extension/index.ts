@@ -51,7 +51,7 @@ import { resolveControlConfig } from "../runs/shared/subagent-control.ts";
 import { registerSubagentRpcBridge } from "./rpc.ts";
 import { clearSlashSnapshots, getSlashRenderableSnapshot, resolveSlashMessageDetails, restoreSlashFinalSnapshots, type SlashMessageDetails } from "../slash/slash-live-state.ts";
 import { resolveWaitToolConfig } from "../runs/background/subagent-wait.ts";
-import { PARENT_WAIT_ESCAPE_HATCH, registerWaitTool } from "../runs/background/wait-tool.ts";
+import { createWaitToolLoadout, registerWaitTool } from "../runs/background/wait-tool.ts";
 import { createWaitSubscriptionManager } from "../runs/background/wait-subscriptions.ts";
 import { drainOutstandingWork } from "../runs/background/auto-drain.ts";
 import registerSubagentNotify, { parseSubagentNotifyContent, type SubagentNotifyDetails } from "../runs/background/notify.ts";
@@ -706,13 +706,9 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		// is hidden from the parent model-facing surface; the one-line parent escape
 		// hatch from that tool's description moves into this description so the model
 		// still knows not to wait on ordinary async children. When bg_wait is disabled by
-		// config there is nothing to hide and the registered description is unchanged.
-		prepareLoadout: () => waitToolConfig.enabled
-			? {
-				hiddenDeclarations: ["bg_wait"],
-				descriptions: { subagent: `${SUBAGENT_DELEGATION_DESCRIPTION}\n\n${PARENT_WAIT_ESCAPE_HATCH}` },
-			}
-			: { hiddenDeclarations: [] },
+		// config there is nothing to hide and the registered description is unchanged. Build
+		// the loadout once so every prepare pass sees the same object.
+		prepareLoadout: createWaitToolLoadout(waitToolConfig),
 
 		async execute(id, params, signal, onUpdate, ctx) {
 			// SAFETY: SubagentDelegationParams feeds this tool, so params already

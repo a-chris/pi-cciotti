@@ -11,6 +11,8 @@ export interface BuildSystemPromptOptions {
     toolSnippets?: Record<string, string>;
     /** Additional guideline bullets appended to the default system prompt guidelines. */
     promptGuidelines?: string[];
+    /** Tool names to omit from the model-facing tool surface and Available tools section. */
+    hiddenTools?: string[];
     /** Text to append to system prompt. */
     appendSystemPrompt?: string;
     /** Working directory. */

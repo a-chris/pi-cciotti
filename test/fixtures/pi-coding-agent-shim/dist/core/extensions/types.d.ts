@@ -332,6 +332,34 @@ export interface ToolRenderContext<TState = any, TArgs = any> {
     isError: boolean;
 }
 /**
+ * How a registered tool is exposed to the model-facing declaration surface.
+ *
+ * - "default": advertised in the tool declarations the model receives.
+ * - "hidden": registered and callable, but omitted from the model-facing
+ *   declarations for the turn.
+ */
+export type ToolExposure = "default" | "hidden";
+/**
+ * Per-turn tool loadout changes an extension prepares before the model-facing
+ * surface is built. Every field is optional: an empty object means "no change".
+ */
+export interface ToolLoadoutChanges {
+    /** Tool declarations to omit from the model-facing surface for this turn. */
+    hiddenDeclarations?: string[];
+    /** Model-facing description overrides, keyed by registered tool name. */
+    descriptions?: Record<string, string>;
+}
+/**
+ * Resolved tool loadout for a turn, after `prepareLoadout` contributions are
+ * merged over the registered tool defaults.
+ */
+export interface ToolLoadout {
+    /** Declarations omitted from the model-facing surface. */
+    hiddenDeclarations: string[];
+    /** Model-facing descriptions, keyed by registered tool name. */
+    descriptions: Record<string, string>;
+}
+/**
  * Tool definition for registerTool().
  */
 export interface ToolDefinition<TParams extends TSchema = TSchema, TDetails = unknown, TState = any> {
@@ -347,6 +375,18 @@ export interface ToolDefinition<TParams extends TSchema = TSchema, TDetails = un
     promptGuidelines?: string[];
     /** Parameter schema (TypeBox) */
     parameters: TParams;
+    /** Optional JSON Schema for this tool's structured output. */
+    outputSchema?: TSchema;
+    /** Static exposure for this tool. Defaults to "default". */
+    exposure?: ToolExposure;
+    /** Whether this tool starts active in a new session. Defaults to true. */
+    defaultActive?: boolean;
+    /**
+     * Prepare per-turn loadout changes before the model-facing surface is built:
+     * hide declarations and/or override model-facing descriptions. Must be
+     * synchronous and free of I/O.
+     */
+    prepareLoadout?: () => ToolLoadoutChanges | undefined;
     /** Controls whether ToolExecutionComponent renders the standard colored shell or the tool renders its own framing. */
     renderShell?: "default" | "self";
     /** Optional compatibility shim to prepare raw tool call arguments before schema validation. Must return an object conforming to TParams. */

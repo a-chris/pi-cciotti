@@ -27,14 +27,16 @@ it("context-cost script reports a positive parent-turn total from live sources",
 	// from a different local set than any later measurement reproduced.
 	//
 	// Measured tool declarations: 17,416 when one 81-parameter tool did everything,
-	// then 8,025 before the bg_wait de-duplication, 5,603 after it, and 5,261 after
-	// the same changes to the three facade tools. The bound sits above the current
-	// value and below both regressions, so either one fails here rather than
-	// spending chars per call unnoticed; the per-tool ceilings in schemas.test.ts
-	// (bg_wait) and tool-description.test.ts (the three facades) say which tool moved.
+	// then 8,025 before the bg_wait de-duplication, 5,603 after it, 5,261 after the
+	// same changes to the three facade tools, and 3,829 after hiding the parent
+	// bg_wait declaration and folding its one-line escape hatch into subagent. The
+	// bound sits above the current value and below both the 5,261 facade value and the
+	// 5,603/8,025/17,416 regressions, so any of them fails here rather than spending
+	// chars per call unnoticed; the per-tool ceilings in schemas.test.ts (bg_wait) and
+	// tool-description.test.ts (the three facades) say which tool moved.
 	assert.ok(
-		declarations.subtotalChars < 5_500,
-		`tool declarations regressed toward the pre-fix surface (17,416 with one monolithic tool, 8,025 before the bg_wait de-duplication, 5,603 before the facade de-glossing): ${declarations.subtotalChars}`,
+		declarations.subtotalChars < 4_200,
+		`tool declarations regressed toward the pre-fix surface (17,416 with one monolithic tool, 8,025 before the bg_wait de-duplication, 5,603 before the facade de-glossing, 5,261 before hiding the parent bg_wait declaration): ${declarations.subtotalChars}`,
 	);
 	assert.ok(report.parentTurnChars > 5_000, `parent turn total should be substantial, got ${report.parentTurnChars}`);
 	const labels = report.sections.flatMap((section) => section.rows.map((row) => row.label));

@@ -117,7 +117,7 @@ function recordedDeclaration(
   // projection in current pi; older or hand-built contexts fall back to raw entries,
   // and a context with neither simply has nothing recorded to match.
   const manager = ctx.sessionManager as Record<string, unknown>;
-  const entries = readEntries(manager.buildContextEntries) ?? readEntries(manager.getEntries);
+  const entries = readEntries(manager, "buildContextEntries") ?? readEntries(manager, "getEntries");
   if (!entries) return undefined;
 
   const systemMessages = collectSystemMessages(entries);
@@ -132,10 +132,16 @@ function recordedDeclaration(
   };
 }
 
-/** Call a session-manager entry reader, ignoring one this context does not provide. */
-function readEntries(read: unknown): SessionEntry[] | undefined {
+/**
+ * Call a session-manager entry reader, ignoring one this context does not provide.
+ *
+ * Invoke with the manager as receiver: pi's readers use `this` (`buildContextEntries`
+ * reads `this.getEntries()`), so a detached call throws on a nullish `this`.
+ */
+function readEntries(manager: Record<string, unknown>, key: string): SessionEntry[] | undefined {
+  const read = manager[key];
   if (typeof read !== "function") return undefined;
-  const entries = (read as () => SessionEntry[])();
+  const entries = (read as () => SessionEntry[]).call(manager);
   return Array.isArray(entries) ? entries : undefined;
 }
 

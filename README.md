@@ -1,6 +1,6 @@
 # pi-cciotti
 
-Most subagent setups burn context on giant schemas before the agent does any work. `pi-cciotti` keeps the model-facing surface small and predictable, cutting it from 17K to about 5K characters.
+Most subagent setups burn context on giant schemas before the agent does any work. `pi-cciotti` keeps the model-facing surface small and predictable: three delegation tools whose descriptions and schemas total about 3,500 characters.
 
 `pi-cciotti` lets one Pi session delegate focused work to child agents. You ask in plain language, Pi hands the job to a specialist, and the result comes back into the conversation. Code review, scouting, implementation, parallel audits, background jobs: anything that benefits from a second or third set of model eyes.
 
@@ -14,17 +14,17 @@ Most subagent setups burn context on giant schemas before the agent does any wor
 
 **Clear handoffs.** Each child takes one task and returns a result. If it cannot finish safely, it returns `BLOCKED: <reason>` so the parent can decide what to do next.
 
-**Plan before you build.** `/perl` gives you a written plan to review before implementation starts, then coordinates the work and review in an isolated worktree. You stay in control without having to supervise every step.
+**Review the plan before it runs.** `/perla` writes `plan.md` and stops; calling it again executes the plan through scout, worker, and a bounded review loop in its own worktree. `/perl` is the same engine without the pause. You stay in control without having to supervise every step.
 
 **Delegation on your terms.** Choose how often Pi delegates once in config, from `never` to `aggressive`, instead of repeating the rule in every prompt. `never` removes about 2.8KB from each parent turn on a 16-agent setup while keeping agents available when you ask for them.
 
-**A small surface.** The model gets separate tools for launching a child, composing workflows, and managing runs, each with one clear job. Their combined descriptions are 408 characters, down from 890, while deeper guidance stays in the docs.
+**A small surface.** The model gets separate tools for launching a child, composing workflows, and managing runs, each with one clear job. Their combined descriptions are about 520 characters, down from 890, while deeper guidance stays in the docs.
 
-**The right context for each job.** A child can start fresh, use the parent session, or receive a focused summary shaped for its role. Reviewers get decisions and diffs; scouts get entry points, without either receiving more context than the job needs.
+**The right context for each job.** A child can start fresh, fork the parent session, or receive a focused summary shaped for its role. Reviewers get decisions and diffs; scouts get entry points, without either receiving more context than the job needs.
 
 **Documentation you can trust.** The README, guides, and skills are checked against live tool schemas, so examples do not teach calls the tools reject. The contract test fails when the model-facing docs drift.
 
-**Failures are explicit.** Invalid or removed configuration keys stop loading with a clear error instead of silently restoring defaults.
+**Failures are explicit.** Settings that change what a run does are validated: a bad value stops the config load with a clear error instead of silently falling back to defaults.
 
 **Focused orchestration.** The parent coordinates the work, and children cannot create more children. A top-level run allows six cumulative child spawns by default, which stops accidental fan-out early.
 
@@ -91,17 +91,17 @@ The extension ships with agents you can use immediately:
 | `scout` | Fast local codebase recon: relevant files, entry points, data flow, risks. |
 | `researcher` | Web/docs research with sources and a concise research brief. Requires [pi-web-access in the child](docs/agents.md#web-research-prerequisites). |
 | `evidence-auditor` | Independently checks whether important research claims are supported by their sources. Requires [pi-web-access in the child](docs/agents.md#web-research-prerequisites). |
-| `planner` | Writes an executable `plan.md` from the brainstormed direction. The internal role of the `/perl` workflow; plans only, and it is `advertise: false` so it costs nothing in the per-turn catalog. |
+| `planner` | Writes an executable `plan.md` from the brainstormed direction; the plan phase of `/perl` and `/perla`. Not advertised to the model by default. |
 | `worker` | Implementation work. Edits files, validates, escalates unapproved decisions instead of guessing. |
-| `reviewer` | Code review and small fixes against the task/plan, tests, edge cases, and simplicity. |
+| `reviewer` | Read-only review against the task/plan: tests, edge cases, and simplicity. It reports fixes instead of applying them. |
 | `oracle` | A second opinion before acting. Challenges assumptions without editing. |
-| `delegate` | A lightweight general delegate that behaves close to the parent session. |
+| `delegate` | A lightweight general delegate that inherits the parent model. |
 
 Rule of thumb: `scout` before you understand the code, `planner` to settle the plan before implementing, `researcher` before you trust external facts, `evidence-auditor` before you rely on important research, `worker` to implement, `reviewer` to check, and `oracle` when the decision itself feels risky.
 
 ## Common workflows
 
-The package includes `/council` and `council-mode`; the model-based `council-*` agents are documented profiles you add in your own agent directory.
+The package includes `/council` and the `council-mode` skill; the `council-*` advisor agents are profiles you define yourself, not builtins.
 
 | Want | Ask naturally |
 |------|---------------|
@@ -109,10 +109,10 @@ The package includes `/council` and `council-mode`; the model-based `council-*` 
 | Solve a hard problem | "Use oracle to investigate this bug before we edit." |
 | Review a diff | "Use reviewer to review this diff." |
 | Run parallel reviewers | "Run reviewers for correctness, tests, and cleanup." |
-| Debate a material decision | "Use `/council` with model-based advisors to compare this decision." |
+| Debate a material decision | "Use `/council` to compare this decision with independent advisors." |
 | Implement then review | "Implement this, then review it." |
 | Review until clean | "Run a review loop on this change with a max of 3 rounds." |
-| Plan, review, then execute | "`/perl <task>` writes `plan.md` for your review; a second `/perl` call executes it (scout, worker, reviewer loop) in a shared worktree on `perl/work`. A `slug` arg gives a concurrent task its own lane." |
+| Plan, review, then execute | "`/perla <task>` writes `plan.md` and stops for your review; calling `/perla` again executes it (scout, worker, reviewer loop) in a worktree on `perl/work`. A `slug` arg gives a concurrent task its own lane." |
 | Execute a plan carefully | "Have worker implement this approved plan, then run reviewers and apply the feedback." |
 | Scout before planning | "Use scout to inspect the auth flow before planning." |
 | Run in the background | "Run this in the background." |
@@ -131,7 +131,7 @@ In the TUI, a persistent FleetView below the editor keeps active work visible. `
 
 Details, keybindings, and the machine-readable run artifacts are in [Observability](docs/observability.md).
 
-For bounded orchestration, `maxSubagentSpawnsPerRun` limits cumulative logical children in one run tree. It defaults to 6 and stays separate from active concurrency and the session-wide cumulative spawn budget. See [Configuration](docs/configuration.md#maxsubagentspawnsperrun).
+For bounded orchestration, `maxSubagentSpawnsPerRun` caps how many children one top-level run can spawn. It defaults to 6 and is separate from active-concurrency and session-wide spawn limits. See [Configuration](docs/configuration.md#maxsubagentspawnsperrun).
 
 ## If something feels off
 
@@ -151,9 +151,9 @@ The full reference lives in `docs/`:
 |-----|--------------|
 | [Agents](docs/agents.md) | Custom agents, frontmatter reference, overriding builtins, tools, extensions, skills, per-agent memory. |
 | [Models](docs/models.md) | Single-model selection and launch, defaults, per-role overrides, recommended tiering, thinking levels, model scope enforcement, profiles. |
-| [Workflows](docs/workflows.md) | Orchestration patterns, prompt shortcuts, scripted workflows, worktree isolation, child-to-parent coordination, the recursion guard. |
+| [Workflows](docs/workflows.md) | Orchestration patterns, prompt shortcuts, scripted workflows, worktree isolation, child-to-parent coordination. |
 | [Tool reference](docs/tool-reference.md) | Every `subagent` parameter, management actions, status/control actions, acceptance gates, external CLI runners. |
-| [Observability](docs/observability.md) | FleetView, the fleet inspector, lifecycle artifacts, events, logs, session sharing. |
+| [Observability](docs/observability.md) | FleetView, the fleet inspector, run artifacts, lifecycle events, child session files. |
 | [Missions](docs/missions.md) | Durable mission records, delivery receipts, run recovery. |
 | [Configuration](docs/configuration.md) | Every `config.json` key and environment variable. |
 | [Extension API](docs/extension-api.md) | The RPC, delegation API, preflight, capability ceilings, [trusted workflow resources](docs/extension-api.md#trusted-workflow-resources), background-work providers. |
